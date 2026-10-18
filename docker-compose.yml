@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # MongoDB 7 Primary Database
+  mongodb:
+    image: mongo:7.0
+    container_name: scholink-mongodb
+    restart: always
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_DATABASE: scholink
+    volumes:
+      - mongodb_data:/data/db
+
+  # Redis 7 Cache & Rate Limiting & Lock
+  redis:
+    image: redis:7.2-alpine
+    container_name: scholink-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  # RabbitMQ Event Bus
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: scholink-rabbitmq
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672' # Management UI (guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:RELEASE.2024-02-24T17-11-14Z
+    container_name: scholink-minio
+    restart: always
+    ports:
+      - '9000:9000'
+      - '9001:9001' # Web Console
+    environment:
+      MINIO_ROOT_USER: scholink_minio_admin
+      MINIO_ROOT_PASSWORD: scholink_minio_password
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # EMQX MQTT Broker (for Android Realtime)
+  emqx:
+    image: emqx/emqx:5.6.1
+    container_name: scholink-emqx
+    restart: always
+    ports:
+      - '1883:1883'
+      - '18083:18083' # Dashboard (admin/public)
+    volumes:
+      - emqx_data:/opt/emqx/data
+
+volumes:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  emqx_data:
