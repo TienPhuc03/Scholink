@@ -1,15 +1,14 @@
 version: '3.8'
 
 services:
-  # MongoDB 7 Primary Database
+  # MongoDB 7 Primary Database with Replica Set rs0 (ACID Transactions Support)
   mongodb:
     image: mongo:7.0
     container_name: scholink-mongodb
     restart: always
     ports:
       - '27017:27017'
-    environment:
-      MONGO_INITDB_DATABASE: scholink
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - mongodb_data:/data/db
 

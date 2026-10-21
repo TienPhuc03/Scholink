@@ -104,10 +104,15 @@ Mã nguồn ứng dụng di động nằm trong thư mục `android/`:
 - **Room Database** lưu cache offline danh sách cơ hội và trạng thái hồ sơ
 - **EMQX Paho MQTT Client** nhận thông báo và tin nhắn chat theo thời gian thực
 
-👉 Xem hướng dẫn chi tiết cho mobile tại: **[android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md)**
+👉 Xem hướng dẫn chi tiết cho mobile tại: **[docs/HUONG_DAN_ANDROID.md](./docs/HUONG_DAN_ANDROID.md)** (hoặc [android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md))
 
 ---
 
-## 📖 Sổ tay phát triển cho Team
-👉 **[Tài liệu hướng dẫn phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./HUONG_DAN_PHAT_TRIEN.md)**  
-👉 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2](./Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+## 📖 Thư Mục Tài Liệu Kỹ Thuật Dự Án (docs/)
+Toàn bộ tài liệu kỹ thuật, đặc tả nghiệp vụ và hướng dẫn vận hành đã được quy hoạch tập trung trong thư mục **[`docs/`](./docs/README.md)**:
+
+- 📑 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2 (52 trang)](./docs/Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+- 📘 **[Sổ tay phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./docs/HUONG_DAN_PHAT_TRIEN.md)**
+- 📕 **[Runbook Vận hành Demo TV3 (RUNBOOK_VAN_HANH_DEMO_TV3.md)](./docs/RUNBOOK_VAN_HANH_DEMO_TV3.md)**
+- 📱 **[Hướng dẫn phát triển ứng dụng di động Android Native](./docs/HUONG_DAN_ANDROID.md)**
+- 🌐 **[Trang mục lục tài liệu (docs/README.md)](./docs/README.md)**

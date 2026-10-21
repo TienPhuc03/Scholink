@@ -2,8 +2,8 @@ import { Injectable, Inject } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { IApplicationRepository, APPLICATION_REPOSITORY } from '../../domain/ports/application.repository.port';
 import { IOpportunityRepository, OPPORTUNITY_REPOSITORY } from '../../domain/ports/opportunity.repository.port';
-import { Application } from '../../domain/application.entity';
-import { SubmitApplicationDto } from '../dtos/opportunity.dto';
+import { Application, ApplicationStatus } from '../../domain/application.entity';
+import { SubmitApplicationDto, UpdateApplicationStatusDto } from '../dtos/opportunity.dto';
 import { DomainException, ErrorCode } from '@shared';
 
 @Injectable()
@@ -37,7 +37,7 @@ export class ApplicationUseCase {
       );
     }
 
-    const applicationId = crypto.randomUUID();
+    const applicationId = `app_${crypto.randomUUID()}`;
     const application = new Application(applicationId, {
       opportunityId: dto.opportunityId,
       studentId,
@@ -88,6 +88,78 @@ export class ApplicationUseCase {
     return {
       applicationId: application.id,
       status: application.status,
+    };
+  }
+
+  // ==========================================
+  // F24: ORGANIZER KANBAN & STATUS MANAGEMENT
+  // ==========================================
+  async getOpportunityKanban(opportunityId: string) {
+    const opportunity = await this.opportunityRepo.findById(opportunityId);
+    if (!opportunity) {
+      throw DomainException.notFound('Cơ hội (Học bổng / Cuộc thi)');
+    }
+
+    const applications = await this.applicationRepo.findManyByOpportunity(opportunityId);
+
+    const columns: Record<string, any[]> = {
+      SUBMITTED: [],
+      REVIEWING: [],
+      SHORTLISTED: [],
+      INTERVIEW: [],
+      ACCEPTED: [],
+      REJECTED: [],
+    };
+
+    for (const app of applications) {
+      const col = columns[app.status] ? app.status : 'SUBMITTED';
+      columns[col].push({
+        ...app.props,
+        id: app.id,
+        version: app.version,
+      });
+    }
+
+    return {
+      opportunityId,
+      opportunityTitle: opportunity.props.title,
+      totalApplications: applications.length,
+      columns: {
+        APPLIED: columns.SUBMITTED,
+        REVIEWING: columns.REVIEWING,
+        SHORTLISTED: columns.SHORTLISTED,
+        INTERVIEW: columns.INTERVIEW,
+        ACCEPTED: columns.ACCEPTED,
+        REJECTED: columns.REJECTED,
+      },
+    };
+  }
+
+  async updateStatus(applicationId: string, organizerId: string, dto: UpdateApplicationStatusDto) {
+    const application = await this.applicationRepo.findById(applicationId);
+    if (!application) {
+      throw DomainException.notFound('Hồ sơ ứng tuyển');
+    }
+
+    if (dto.expectedVersion !== undefined && application.version !== dto.expectedVersion) {
+      throw new DomainException(
+        ErrorCode.VERSION_MISMATCH,
+        `Xung đột phiên bản dữ liệu (Expected: ${dto.expectedVersion}, Current: ${application.version}). Vui lòng tải lại bảng Kanban.`,
+        409,
+      );
+    }
+
+    // Update status
+    (application.props as any).status = dto.status as ApplicationStatus;
+    application.incrementVersion();
+
+    await this.applicationRepo.update(application);
+
+    return {
+      applicationId: application.id,
+      status: application.status,
+      version: application.version,
+      updatedAt: new Date().toISOString(),
     };
   }
 }

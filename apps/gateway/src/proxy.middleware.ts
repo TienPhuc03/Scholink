@@ -25,6 +25,12 @@ export const MICROSERVICE_ROUTES: MicroserviceRoute[] = [
     getTargetUrl: () => process.env.IDENTITY_SERVICE_URL || 'http://localhost:3001',
   },
   {
+    prefix: '/api/v1/admin',
+    serviceName: 'Identity Microservice',
+    defaultPort: 3001,
+    getTargetUrl: () => process.env.IDENTITY_SERVICE_URL || 'http://localhost:3001',
+  },
+  {
     prefix: '/api/v1/opportunities',
     serviceName: 'Opportunity Microservice',
     defaultPort: 3002,
@@ -49,7 +55,25 @@ export const MICROSERVICE_ROUTES: MicroserviceRoute[] = [
     getTargetUrl: () => process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3003',
   },
   {
+    prefix: '/api/v1/chat',
+    serviceName: 'Collaboration Microservice',
+    defaultPort: 3003,
+    getTargetUrl: () => process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3003',
+  },
+  {
     prefix: '/api/v1/wallets',
+    serviceName: 'Billing Microservice',
+    defaultPort: 3004,
+    getTargetUrl: () => process.env.BILLING_SERVICE_URL || 'http://localhost:3004',
+  },
+  {
+    prefix: '/api/v1/wallet',
+    serviceName: 'Billing Microservice',
+    defaultPort: 3004,
+    getTargetUrl: () => process.env.BILLING_SERVICE_URL || 'http://localhost:3004',
+  },
+  {
+    prefix: '/api/v1/payments',
     serviceName: 'Billing Microservice',
     defaultPort: 3004,
     getTargetUrl: () => process.env.BILLING_SERVICE_URL || 'http://localhost:3004',

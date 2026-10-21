@@ -15,7 +15,7 @@ import { IdempotencyGuard } from './infrastructure/guards/idempotency.guard';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET', 'scholink-jwt-secret-key-at-least-32-chars-long'),
         signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRES_IN', '15m'),
+          expiresIn: (config.get<string>('JWT_EXPIRES_IN', '15m')) as any,
         },
       }),
     }),

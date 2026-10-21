@@ -30,7 +30,7 @@ export class PassportUseCase {
       throw DomainException.notFound('Passport');
     }
 
-    passport.updateProfile(dto);
+    passport.updateProfile(dto as any);
     await this.passportRepo.update(passport);
 
     return {

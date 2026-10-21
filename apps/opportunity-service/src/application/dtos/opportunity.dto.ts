@@ -41,3 +41,18 @@ export const SubmitApplicationDtoSchema = z.object({
 });
 
 export type SubmitApplicationDto = z.infer<typeof SubmitApplicationDtoSchema>;
+
+export const UpdateApplicationStatusDtoSchema = z.object({
+  status: z.enum([
+    'SUBMITTED',
+    'REVIEWING',
+    'SHORTLISTED',
+    'INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
+  ]),
+  expectedVersion: z.number().int().min(1).optional(),
+  note: z.string().max(500).optional(),
+});
+
+export type UpdateApplicationStatusDto = z.infer<typeof UpdateApplicationStatusDtoSchema>;

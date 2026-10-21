@@ -69,8 +69,8 @@ async function seed() {
   }
 
   // Seed Organizer
-  const orgExists = await User.findOne({ email: 'organizer@scholink.edu.vn' });
-  if (!orgExists) {
+  const orgUserExists = await User.findOne({ email: 'organizer@scholink.edu.vn' });
+  if (!orgUserExists) {
     const passwordHash = await bcrypt.hash('Organizer@2026', 10);
     await User.create({
       id: organizerId,
@@ -127,6 +127,54 @@ async function seed() {
       completionScore: 100, // 7/7 component hoàn chỉnh
     });
     console.log('  ✅ Khởi tạo Passport 100% completion score cho Student');
+  }
+
+  // Seed Organization & Membership
+  const orgSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true, unique: true },
+    taxCode: String,
+    email: String,
+    website: String,
+    description: String,
+    status: { type: String, default: 'ACTIVE' },
+    version: { type: Number, default: 1 },
+  }, { timestamps: true });
+
+  const orgMemSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    organizationId: { type: String, required: true },
+    userId: { type: String, required: true },
+    role: { type: String, default: 'ORGANIZER_MEMBER' },
+    status: { type: String, default: 'ACTIVE' },
+    grantedBy: String,
+    grantedAt: { type: Date, default: Date.now },
+  }, { timestamps: true });
+
+  const Organization = identityConn.model('organizations', orgSchema);
+  const OrgMembership = identityConn.model('organization_memberships', orgMemSchema);
+
+  const orgId = 'org_vinai_innovation_lab';
+  const orgExists = await Organization.findOne({ id: orgId });
+  if (!orgExists) {
+    await Organization.create({
+      id: orgId,
+      name: 'Viện Nghiên cứu Trí tuệ Nhân tạo VinAI',
+      taxCode: '0108999888',
+      email: 'contact@vinai.io',
+      website: 'https://vinai.io',
+      description: 'Đơn vị nghiên cứu hàng đầu về AI và Machine Learning tại Đông Nam Á.',
+      status: 'ACTIVE',
+    });
+    await OrgMembership.create({
+      id: `mem_org_${crypto.randomUUID()}`,
+      organizationId: orgId,
+      userId: organizerId,
+      role: 'ORGANIZER_ADMIN',
+      status: 'ACTIVE',
+      grantedBy: adminId,
+    });
+    console.log('  ✅ Tạo Đơn vị tổ chức: Viện Nghiên cứu Trí tuệ Nhân tạo VinAI kèm Organizer');
   }
 
   await identityConn.close();
@@ -297,6 +345,125 @@ async function seed() {
   }
 
   await notifyConn.close();
+
+  // ==========================================
+  // 5. COLLABORATION SERVICE SEED (TV3)
+  // ==========================================
+  const COLLAB_DB = process.env.COLLABORATION_DB_NAME || 'scholink_collaboration';
+  console.log(`\n📦 Kết nối tới ${COLLAB_DB}...`);
+  const collabConn = await mongoose.createConnection(`${MONGODB_URI}/${COLLAB_DB}`).asPromise();
+
+  const teamCollabSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    competitionId: { type: String, required: true },
+    name: { type: String, required: true },
+    description: String,
+    leaderId: { type: String, required: true },
+    minSize: { type: Number, default: 2 },
+    maxSize: { type: Number, default: 4 },
+    status: { type: String, default: 'ACTIVE' },
+    members: [Object],
+    rosterVersion: { type: Number, default: 1 },
+    fencingToken: { type: Number, default: 0 },
+  }, { timestamps: true });
+
+  const activeMemSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    studentId: { type: String, required: true },
+    competitionId: { type: String, required: true },
+    teamId: { type: String, required: true },
+    role: { type: String, default: 'MEMBER' },
+    joinedAt: { type: Date, default: Date.now },
+  }, { timestamps: true });
+
+  const chatRoomSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    type: { type: String, required: true },
+    refId: String,
+    participants: [String],
+    lastSeq: { type: Number, default: 0 },
+    lastMessageSnippet: String,
+    lastMessageAt: Date,
+  }, { timestamps: true });
+
+  const msgSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    roomId: { type: String, required: true },
+    senderId: { type: String, required: true },
+    seq: { type: Number, required: true },
+    clientMsgId: String,
+    content: { type: String, required: true },
+    readBy: [String],
+  }, { timestamps: true });
+
+  const TeamCollab = collabConn.model('teams', teamCollabSchema);
+  const ActiveMemCollab = collabConn.model('active_memberships', activeMemSchema);
+  const RoomCollab = collabConn.model('chat_rooms', chatRoomSchema);
+  const MsgCollab = collabConn.model('messages', msgSchema);
+
+  const teamId = 'team_bk_ai_innovators';
+  const teamExists = await TeamCollab.findOne({ id: teamId });
+  if (!teamExists) {
+    await TeamCollab.create({
+      id: teamId,
+      competitionId: 'opp_scholink_ai_challenge_2026',
+      name: 'BK AI Innovators Team',
+      description: 'Đội thi Đại học Bách Khoa tham gia giải quyết bài toán thị giác máy tính',
+      leaderId: studentId,
+      minSize: 2,
+      maxSize: 4,
+      status: 'ACTIVE',
+      members: [
+        { studentId, role: 'LEADER', joinedAt: new Date() },
+        { studentId: 'usr_student_002', role: 'MEMBER', joinedAt: new Date() },
+      ],
+      rosterVersion: 1,
+      fencingToken: 0,
+    });
+
+    await ActiveMemCollab.create({
+      id: `mem_${crypto.randomUUID()}`,
+      studentId,
+      competitionId: 'opp_scholink_ai_challenge_2026',
+      teamId,
+      role: 'LEADER',
+    });
+
+    const roomId = 'room_team_bk_ai_innovators';
+    await RoomCollab.create({
+      id: roomId,
+      type: 'TEAM',
+      refId: teamId,
+      participants: [studentId, 'usr_student_002'],
+      lastSeq: 2,
+      lastMessageSnippet: 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
+      lastMessageAt: new Date(),
+    });
+
+    await MsgCollab.create({
+      id: 'msg_001',
+      roomId,
+      senderId: studentId,
+      seq: 1,
+      clientMsgId: 'cmsg_001',
+      content: 'Chào mừng các thành viên đã tham gia đội BK AI Innovators!',
+      readBy: [studentId],
+    });
+
+    await MsgCollab.create({
+      id: 'msg_002',
+      roomId,
+      senderId: studentId,
+      seq: 2,
+      clientMsgId: 'cmsg_002',
+      content: 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
+      readBy: [studentId],
+    });
+
+    console.log('  ✅ Tạo Đội thi mẫu: BK AI Innovators Team kèm Phòng Chat và 2 tin nhắn (Seq #1, #2)');
+  }
+
+  await collabConn.close();
 
   console.log('\n🎉 Hoàn thành khởi tạo dữ liệu mẫu thành công!');
   console.log('----------------------------------------------------');
