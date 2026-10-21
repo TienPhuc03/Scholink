@@ -1,14 +1,20 @@
 # Compiled output
 dist/
+**/dist/
 build/
+**/build/
 
 # Node dependencies
 node_modules/
+**/node_modules/
 .pnpm-debug.log*
+**/.pnpm-debug.log*
 
 # Environment
 .env
+**/.env
 !.env.example
+!**/.env.example
 
 # Logs
 *.log
@@ -28,6 +34,7 @@ Thumbs.db
 
 # Coverage & Tests
 coverage/
+**/coverage/
 .nyc_output/
 
 # Android & Gradle
@@ -41,3 +48,4 @@ android/local.properties
 
 # Backups
 backups/
+**/backups/

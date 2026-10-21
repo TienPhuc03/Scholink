@@ -329,6 +329,20 @@ export class TeamUseCase {
     };
   }
 
+  async validateReservation(teamId: string, fencingToken: number) {
+    const reservation = await this.teamRepo.findActiveReservationByTeam(teamId);
+    if (!reservation) {
+      return { isValid: false, status: 'NOT_FOUND', errorCode: 'RESERVATION_NOT_FOUND' };
+    }
+    if (reservation.fencingToken !== fencingToken) {
+      return { isValid: false, status: 'STALE_FENCING_TOKEN', errorCode: 'FENCING_TOKEN_MISMATCH' };
+    }
+    if (new Date() > reservation.leaseExpiresAt) {
+      return { isValid: false, status: 'EXPIRED', errorCode: 'LEASE_EXPIRED' };
+    }
+    return { isValid: true, status: 'VALID', errorCode: '' };
+  }
+
   async submitTeamConsent(reservationId: string, studentId: string, dto: SubmitTeamConsentDto) {
     const reservation = await this.teamRepo.findReservationById(reservationId);
     if (!reservation) {

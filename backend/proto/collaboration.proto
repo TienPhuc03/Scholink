@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package collaboration;
+
+service CollaborationGrpcService {
+  rpc PrepareSubmission (PrepareSubmissionRequest) returns (PrepareSubmissionResponse);
+  rpc ValidateReservation (ValidateReservationRequest) returns (ValidateReservationResponse);
+  rpc ConfirmSubmission (ConfirmSubmissionRequest) returns (ConfirmSubmissionResponse);
+  rpc AbortSubmission (AbortSubmissionRequest) returns (AbortSubmissionResponse);
+  rpc SendChatMessage (SendChatMessageRequest) returns (SendChatMessageResponse);
+  rpc GetTeamDetails (GetTeamDetailsRequest) returns (GetTeamDetailsResponse);
+}
+
+message PrepareSubmissionRequest {
+  string team_id = 1;
+  string leader_id = 2;
+  string competition_id = 3;
+  string payload_hash = 4;
+}
+
+message PrepareSubmissionResponse {
+  bool success = 1;
+  string reservation_id = 2;
+  int64 fencing_token = 3;
+  int64 lease_expires_at = 4;
+  string message = 5;
+}
+
+message ValidateReservationRequest {
+  string team_id = 1;
+  int64 fencing_token = 2;
+}
+
+message ValidateReservationResponse {
+  bool is_valid = 1;
+  string status = 2;
+  string error_code = 3;
+}
+
+message ConfirmSubmissionRequest {
+  string team_id = 1;
+  string reservation_id = 2;
+  int64 fencing_token = 3;
+}
+
+message ConfirmSubmissionResponse {
+  bool success = 1;
+  string status = 2;
+  string message = 3;
+}
+
+message AbortSubmissionRequest {
+  string team_id = 1;
+  string reservation_id = 2;
+  int64 fencing_token = 3;
+  string reason = 4;
+}
+
+message AbortSubmissionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message SendChatMessageRequest {
+  string room_id = 1;
+  string sender_id = 2;
+  string sender_name = 3;
+  string client_msg_id = 4;
+  string content = 5;
+  string type = 6;
+}
+
+message SendChatMessageResponse {
+  string message_id = 1;
+  string room_id = 2;
+  int64 seq = 3;
+  string client_msg_id = 4;
+  string content = 5;
+  int64 created_at = 6;
+  bool is_duplicate = 7;
+}
+
+message GetTeamDetailsRequest {
+  string team_id = 1;
+}
+
+message TeamMemberProto {
+  string student_id = 1;
+  string role = 2;
+  string status = 3;
+}
+
+message GetTeamDetailsResponse {
+  string team_id = 1;
+  string name = 2;
+  string competition_id = 3;
+  string leader_id = 4;
+  string status = 5;
+  int32 max_members = 6;
+  repeated TeamMemberProto members = 7;
+}

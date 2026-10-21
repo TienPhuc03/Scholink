@@ -10,66 +10,78 @@ Dự án được phân tách thành **6 ứng dụng NestJS độc lập** và 
 
 ```
 Scholink/
-├── apps/
-│   ├── gateway/                  # [CỔNG API GATEWAY - Port 3000]
-│   │   └── src/
-│   │       ├── main.ts
-│   │       ├── proxy.middleware.ts# Reverse Proxy tự động chuyển tiếp request tới đúng service
-│   │       ├── health.controller.ts# Endpoint /health và /routes
-│   │       └── gateway.module.ts
+├── backend/                       # [HỆ THỐNG BACKEND & MICROSERVICES NESTJS]
+│   ├── apps/
+│   │   ├── gateway/                  # [CỔNG API GATEWAY - Port 3000]
+│   │   │   └── src/
+│   │   │       ├── main.ts
+│   │   │       ├── proxy.middleware.ts# Reverse Proxy tự động chuyển tiếp request tới đúng service
+│   │   │       ├── health.controller.ts# Endpoint /health và /routes
+│   │   │       ├── portal.controller.ts# Web Admin & Organizer Kanban Portal UI
+│   │   │       └── gateway.module.ts
+│   │   │
+│   │   ├── identity-service/         # [IDENTITY MICROSERVICE - Port 3001 - DB: scholink_identity]
+│   │   │   └── src/
+│   │   │       ├── main.ts
+│   │   │       ├── domain/           # User, Passport (7 thành phần), Consent
+│   │   │       ├── application/      # AuthUseCase, PassportUseCase, OrganizationUseCase, Zod DTOs
+│   │   │       ├── infrastructure/   # UserModel, PassportModel, OrganizationModel
+│   │   │       └── presentation/     # AuthController, ProfileController, AdminOrganizationController
+│   │   │
+│   │   ├── opportunity-service/      # [OPPORTUNITY MICROSERVICE - Port 3002 - DB: scholink_opportunity]
+│   │   │   └── src/
+│   │   │       ├── main.ts
+│   │   │       ├── domain/           # Opportunity, Application (Individual & Team)
+│   │   │       ├── application/      # OpportunityUseCase, ApplicationUseCase
+│   │   │       ├── infrastructure/   # OpportunityModel, ApplicationModel
+│   │   │       └── presentation/     # OpportunityController, ApplicationController (Kanban API)
+│   │   │
+│   │   ├── collaboration-service/    # [COLLABORATION MICROSERVICE - Port 3003 - DB: scholink_collaboration]
+│   │   │   └── src/
+│   │   │       ├── main.ts
+│   │   │       ├── domain/           # Team (Team-Up), JoinRequest, Reservation, ChatRoom, Message
+│   │   │       ├── application/      # TeamUseCase, ChatUseCase
+│   │   │       ├── infrastructure/   # TeamModel, ChatModel, ReservationWorker (Auto abort lease)
+│   │   │       └── presentation/     # TeamController, ChatController
+│   │   │
+│   │   ├── billing-service/          # [BILLING MICROSERVICE - Port 3004 - DB: scholink_billing]
+│   │   │   └── src/
+│   │   │       ├── main.ts
+│   │   │       ├── domain/           # Wallet (số nguyên VND), PaymentOrder
+│   │   │       ├── application/      # WalletUseCase, Topup, Purchase SKU
+│   │   │       ├── infrastructure/   # WalletModel, PaymentModel
+│   │   │       └── presentation/     # WalletController (/api/v1/wallets)
+│   │   │
+│   │   └── notification-service/     # [NOTIFICATION MICROSERVICE - Port 3005 - DB: scholink_notification]
+│   │       └── src/
+│   │           ├── main.ts
+│   │           ├── domain/           # Notification
+│   │           ├── application/      # NotificationUseCase
+│   │           ├── infrastructure/   # NotificationModel
+│   │           └── presentation/     # NotificationController (/api/v1/notifications)
 │   │
-│   ├── identity-service/         # [IDENTITY MICROSERVICE - Port 3001 - DB: scholink_identity]
-│   │   └── src/
-│   │       ├── main.ts
-│   │       ├── domain/           # User, Passport (7 thành phần), Consent
-│   │       ├── application/      # AuthUseCase, PassportUseCase, Zod DTOs
-│   │       ├── infrastructure/   # UserModel, PassportModel, Mongoose Repositories
-│   │       └── presentation/     # AuthController (/api/v1/auth), ProfileController (/api/v1/profiles)
+│   ├── libs/
+│   │   └── shared/                   # [SHARED KERNEL - Thư viện dùng chung]
+│   │       └── src/
+│   │           ├── domain/           # DomainException, ErrorCode, Entity, AggregateRoot, Result
+│   │           ├── application/      # PaginationHelper (cursor-based)
+│   │           └── infrastructure/   # ZodValidationPipe, GlobalExceptionFilter, JwtAuthGuard,
+│   │                                 # RolesGuard, IdempotencyGuard, CryptoService, DatabaseModule
 │   │
-│   ├── opportunity-service/      # [OPPORTUNITY MICROSERVICE - Port 3002 - DB: scholink_opportunity]
-│   │   └── src/
-│   │       ├── main.ts
-│   │       ├── domain/           # Opportunity, Application (Individual & Team)
-│   │       ├── application/      # OpportunityUseCase, ApplicationUseCase
-│   │       ├── infrastructure/   # OpportunityModel, ApplicationModel
-│   │       └── presentation/     # OpportunityController (/api/v1/opportunities), ApplicationController (/api/v1/applications)
+│   ├── scripts/
+│   │   ├── seed.ts                   # Khởi tạo dữ liệu mẫu (Admin, Organizer, Student, Passport 100%, học bổng/cuộc thi)
+│   │   ├── backup.ts                 # Sao lưu tự động 5 databases độc lập
+│   │   └── restore.ts                # Phục hồi cơ sở dữ liệu từ bản sao lưu
 │   │
-│   ├── collaboration-service/    # [COLLABORATION MICROSERVICE - Port 3003 - DB: scholink_collaboration]
-│   │   └── src/
-│   │       ├── main.ts
-│   │       ├── domain/           # Team (Team-Up), ChatRoom, Message
-│   │       ├── application/      # TeamUseCase, ChatUseCase
-│   │       ├── infrastructure/   # TeamModel, ChatModel
-│   │       └── presentation/     # TeamController (/api/v1/teams), ChatController (/api/v1/chats)
-│   │
-│   ├── billing-service/          # [BILLING MICROSERVICE - Port 3004 - DB: scholink_billing]
-│   │   └── src/
-│   │       ├── main.ts
-│   │       ├── domain/           # Wallet (số nguyên VND), PaymentOrder
-│   │       ├── application/      # WalletUseCase, Topup, Purchase SKU
-│   │       ├── infrastructure/   # WalletModel, PaymentModel
-│   │       └── presentation/     # WalletController (/api/v1/wallets)
-│   │
-│   └── notification-service/     # [NOTIFICATION MICROSERVICE - Port 3005 - DB: scholink_notification]
-│       └── src/
-│           ├── main.ts
-│           ├── domain/           # Notification
-│           ├── application/      # NotificationUseCase
-│           ├── infrastructure/   # NotificationModel
-│           └── presentation/     # NotificationController (/api/v1/notifications)
+│   ├── package.json
+│   ├── pnpm-workspace.yaml
+│   ├── nest-cli.json
+│   └── tsconfig.json
 │
-├── libs/
-│   └── shared/                   # [SHARED KERNEL - Thư viện dùng chung]
-│       └── src/
-│           ├── domain/           # DomainException, ErrorCode, Entity, AggregateRoot, Result
-│           ├── application/      # PaginationHelper (cursor-based)
-│           └── infrastructure/   # ZodValidationPipe, GlobalExceptionFilter, JwtAuthGuard,
-│                                 # RolesGuard, IdempotencyGuard, CryptoService, DatabaseModule
-│
-├── scripts/
-│   └── seed.ts                   # Khởi tạo dữ liệu mẫu (Admin, Organizer, Student, Passport 100%, học bổng/cuộc thi)
-│
-└── android/                      # [ỨNG DỤNG ANDROID KOTLIN CLIENT NATIVE]
+├── android/                          # [ỨNG DỤNG ANDROID KOTLIN CLIENT NATIVE ĐỘC LẬP]
+├── docs/                             # [TÀI LIỆU KỸ THUẬT & RUNBOOK TOÀN DIỆN]
+├── docker-compose.yml                # [HẠ TẦNG DÙNG CHUNG: MongoDB Replica Set, Redis, RabbitMQ, MinIO, EMQX]
+└── README.md
 ```
 
 ---

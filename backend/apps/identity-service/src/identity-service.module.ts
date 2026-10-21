@@ -20,6 +20,7 @@ import { OrganizationUseCase } from './application/use-cases/organization.use-ca
 import { AuthController } from './presentation/auth.controller';
 import { ProfileController } from './presentation/profile.controller';
 import { AdminOrganizationController } from './presentation/admin-organization.controller';
+import { IdentityGrpcController } from './presentation/identity-grpc.controller';
 
 @Module({
   imports: [
@@ -36,7 +37,7 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
       { name: OrganizationMembershipModel.name, schema: OrganizationMembershipSchema },
     ]),
   ],
-  controllers: [AuthController, ProfileController, AdminOrganizationController],
+  controllers: [AuthController, ProfileController, AdminOrganizationController, IdentityGrpcController],
   providers: [
     AuthUseCase,
     PassportUseCase,

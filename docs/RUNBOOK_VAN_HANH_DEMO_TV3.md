@@ -31,6 +31,13 @@ docker compose up -d
 
 ### Bước 2: Khởi tạo dữ liệu mẫu (Seed)
 ```bash
+# Di chuyển vào thư mục backend
+cd backend
+
+# Cài đặt thư viện nếu chưa cài
+pnpm install
+
+# Khởi tạo dữ liệu mẫu
 pnpm run seed
 ```
 *Tạo sẵn tài khoản và dữ liệu mẫu:*
@@ -41,8 +48,9 @@ pnpm run seed
 - **Đội thi & Chat:** Đội BK AI Innovators (`team_bk_ai_innovators`) kèm phòng chat và tin nhắn Seq #1, #2.
 
 ### Bước 3: Chạy các Microservices
-Mở các cửa sổ terminal riêng biệt:
+Mở các cửa sổ terminal riêng biệt trong thư mục `backend/`:
 ```bash
+cd backend
 pnpm run start:gateway        # API Gateway & Web Portal (Port 3000)
 pnpm run start:identity       # Identity & Admin Organization (Port 3001)
 pnpm run start:opportunity    # Opportunity & Kanban Application (Port 3002)
@@ -126,16 +134,36 @@ Truy cập trực tiếp **Scholink Web Portal** tại:
 ### Kịch Bản 5: Sao Lưu & Phục Hồi Dữ Liệu Tự Động (F42)
 1. **Thực hiện Sao lưu (Backup toàn bộ 5 Databases):**
    ```bash
+   cd backend
    pnpm run backup
    ```
    - Terminal sẽ hiển thị chi tiết tiến trình trích xuất từng collection của cả 5 databases (`scholink_identity`, `scholink_opportunity`, `scholink_collaboration`, `scholink_billing`, `scholink_notification`).
-   - Dữ liệu được đóng gói an toàn vào thư mục `backups/backup-<TIMESTAMP>/` kèm tệp `manifest.json`.
+   - Dữ liệu được đóng gói an toàn vào thư mục `backend/backups/backup-<TIMESTAMP>/` kèm tệp `manifest.json`.
 
 2. **Thực hiện Phục hồi (Restore):**
    ```bash
+   cd backend
    pnpm run restore
    ```
    - Tự động nhận diện bản backup mới nhất, làm sạch và nạp lại toàn bộ dữ liệu, khôi phục nguyên trạng 100% hệ thống chỉ trong vài giây.
+
+---
+
+### Kịch Bản 6: Kiểm Thử Hiệu Năng Cao gRPC vs RESTful (High-Load Architecture)
+
+1. **Kiểm thử trực tiếp trên Swagger Gateway:**
+   - Truy cập Swagger API Gateway: `http://localhost:3000/docs#/High-Load%20gRPC%20Gateways`
+   - Gọi endpoint: `GET /api/v1/grpc/teams/team_bk_ai_innovators/details`
+   - Quan sát trường `durationMs` trong JSON phản hồi (thời gian xử lý qua binary multiplexing cực ngắn).
+2. **Kiểm thử gọi gRPC Roster Freeze & Submission:**
+   - Gọi `POST /api/v1/grpc/teams/team_bk_ai_innovators/prepare-submission`
+   - Dữ liệu gửi: `{ "leaderId": "student_01", "competitionId": "comp_scholink_ai_challenge_2026" }`
+   - Gateway dispatch bằng stream gRPC xuống Collaboration Service, kích hoạt khóa đội và trả về `fencingToken` tức thì.
+3. **Kiểm thử bằng Postman (gRPC Request):**
+   - Mở Postman -> Chọn **New** -> **gRPC Request**.
+   - URL: `localhost:50053` (Collaboration Service) hoặc `localhost:50051` (Identity Service).
+   - Chọn method: `PrepareSubmission`, `ValidateReservation`, hoặc `GetProfileSnapshot`.
+   - Bấm **Invoke** để trải nghiệm tốc độ phản hồi trực tiếp của gRPC Server.
 
 ---
 

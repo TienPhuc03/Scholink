@@ -31,6 +31,7 @@ import { ChatUseCase } from './application/use-cases/chat.use-case';
 import { ReservationWorkerService } from './infrastructure/workers/reservation-worker.service';
 import { TeamController } from './presentation/team.controller';
 import { ChatController } from './presentation/chat.controller';
+import { CollaborationGrpcController } from './presentation/collaboration-grpc.controller';
 
 @Module({
   imports: [
@@ -51,7 +52,7 @@ import { ChatController } from './presentation/chat.controller';
       { name: ReadReceiptModel.name, schema: ReadReceiptSchema },
     ]),
   ],
-  controllers: [TeamController, ChatController],
+  controllers: [TeamController, ChatController, CollaborationGrpcController],
   providers: [
     TeamUseCase,
     ChatUseCase,
