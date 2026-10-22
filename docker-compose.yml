@@ -36,7 +36,7 @@ services:
 
   # MinIO Object Storage
   minio:
-    image: minio/minio:RELEASE.2024-02-24T17-11-14Z
+    image: quay.io/minio/minio:RELEASE.2024-02-24T17-11-14Z
     container_name: scholink-minio
     restart: always
     ports:
