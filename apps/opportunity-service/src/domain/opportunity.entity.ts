@@ -15,6 +15,8 @@ export interface OpportunityProps {
   title: string;
   slug: string;
   description: string;
+  benefits?: string;
+  requirements?: string;
   organizationId?: string;
   organizerName: string;
   sourceUrl?: string;
