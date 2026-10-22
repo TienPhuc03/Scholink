@@ -1,47 +1,29 @@
-import { Controller, Get, Post, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, UseFilters } from '@nestjs/common';
+import { GrpcMethod } from '@nestjs/microservices';
 import { OpportunityUseCase } from '../application/use-cases/opportunity.use-case';
-import {
-  CreateOpportunityDto,
-  CreateOpportunityDtoSchema,
-  QueryOpportunityDto,
-  QueryOpportunityDtoSchema,
-} from '../application/dtos/opportunity.dto';
-import { ZodValidationPipe, Public, JwtAuthGuard, RolesGuard, Roles, AuthenticatedUser } from '@shared';
+import { CreateOpportunityDto, QueryOpportunityDto } from '../application/dtos/opportunity.dto';
+import { GrpcExceptionFilter } from '@shared';
 
-@ApiTags('Opportunity Catalog (Opportunity Microservice)')
-@Controller('api/v1/opportunities')
+@UseFilters(GrpcExceptionFilter)
+@Controller()
 export class OpportunityController {
   constructor(private readonly opportunityUseCase: OpportunityUseCase) {}
 
-  @Public()
-  @Get()
-  @ApiOperation({ summary: 'Tìm kiếm danh sách học bổng và cuộc thi (cursor-based pagination)' })
-  @ApiResponse({ status: 200, description: 'Danh sách cơ hội' })
-  async list(
-    @Query(new ZodValidationPipe(QueryOpportunityDtoSchema)) query: QueryOpportunityDto,
-  ) {
+  @GrpcMethod('OpportunityGrpcService', 'ListOpportunities')
+  async list(query: QueryOpportunityDto) {
     return this.opportunityUseCase.list(query);
   }
 
-  @Public()
-  @Get(':id')
-  @ApiOperation({ summary: 'Xem chi tiết học bổng / cuộc thi' })
-  @ApiResponse({ status: 200, description: 'Chi tiết cơ hội' })
-  async getById(@Param('id') id: string) {
-    return this.opportunityUseCase.getById(id);
+  @GrpcMethod('OpportunityGrpcService', 'GetOpportunityById')
+  async getById(data: { id: string }) {
+    return this.opportunityUseCase.getById(data.id);
   }
 
-  @Post()
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ORGANIZER', 'ADMIN')
-  @ApiOperation({ summary: 'Tạo học bổng hoặc cuộc thi mới (Organizer / Admin)' })
-  @ApiResponse({ status: 201, description: 'Tạo thành công' })
+  @GrpcMethod('OpportunityGrpcService', 'CreateOpportunity')
   async create(
-    @Req() req: { user: AuthenticatedUser },
-    @Body(new ZodValidationPipe(CreateOpportunityDtoSchema)) dto: CreateOpportunityDto,
+    data: CreateOpportunityDto & { actorId: string; organizationId?: string },
   ) {
-    return this.opportunityUseCase.create(dto, req.user.userId);
+    const { actorId, organizationId, ...dto } = data;
+    return this.opportunityUseCase.create(dto, actorId, organizationId);
   }
 }

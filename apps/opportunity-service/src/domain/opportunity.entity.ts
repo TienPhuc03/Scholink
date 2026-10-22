@@ -1,38 +1,60 @@
 import { AggregateRoot, DomainException, ErrorCode } from '@shared';
 
 export type OpportunityType = 'SCHOLARSHIP' | 'COMPETITION';
-export type OpportunityStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'CLOSED' | 'CANCELLED';
+export type OpportunityStatus =
+  | 'DRAFT'
+  | 'PENDING_REVIEW'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'CLOSED'
+  | 'CANCELLED';
 export type ApplyMode = 'IN_APP' | 'EXTERNAL';
 
 export interface OpportunityProps {
-  type: OpportunityType;
-  title: string;
-  description: string;
-  organizationId?: string;
-  organizerName: string;
-  sourceUrl?: string;
-  applyMode: ApplyMode;
-  status: OpportunityStatus;
-  registerDeadline: Date;
-  submitDeadline?: Date;
-  timezone: string;
-  fundingLevel?: 'FULL' | 'PARTIAL' | 'OTHER';
-  competitionMode?: 'INDIVIDUAL' | 'TEAM';
-  minTeamSize?: number;
-  maxTeamSize?: number;
-  eligibilityRules?: Record<string, any>[];
-  tags?: string[];
-  createdAt?: Date;
-  updatedAt?: Date;
-  version?: number;
+  readonly type: OpportunityType;
+  readonly title: string;
+  readonly description: string;
+  readonly organizationId?: string;
+  readonly createdBy?: string;
+  readonly organizerName: string;
+  readonly sourceUrl?: string;
+  readonly applyMode: ApplyMode;
+  readonly status: OpportunityStatus;
+  readonly registerDeadline: Date;
+  readonly submitDeadline?: Date;
+  readonly timezone: string;
+  readonly fundingLevel?: 'FULL' | 'PARTIAL' | 'OTHER';
+  readonly competitionMode?: 'INDIVIDUAL' | 'TEAM';
+  readonly minTeamSize?: number;
+  readonly maxTeamSize?: number;
+  readonly eligibilityRules?: readonly Record<string, unknown>[];
+  readonly requiredFields?: readonly string[];
+  readonly tags?: readonly string[];
+  readonly ruleVersion?: number;
+  readonly createdAt?: Date;
+  readonly updatedAt?: Date;
+  readonly version?: number;
 }
 
 export class Opportunity extends AggregateRoot<string> {
-  private _props: OpportunityProps;
+  private readonly _props: Readonly<OpportunityProps>;
 
   constructor(id: string, props: OpportunityProps) {
-    super(id, props.version || 1, props.createdAt || new Date(), props.updatedAt || new Date());
-    this._props = props;
+    super(
+      id,
+      props.version || 1,
+      props.createdAt || new Date(),
+      props.updatedAt || new Date(),
+    );
+    this._props = Object.freeze({
+      ...props,
+      ruleVersion: props.ruleVersion ?? 1,
+      tags: props.tags ? Object.freeze([...props.tags]) : [],
+      eligibilityRules: props.eligibilityRules
+        ? Object.freeze([...props.eligibilityRules])
+        : [],
+      requiredFields: props.requiredFields ? Object.freeze([...props.requiredFields]) : [],
+    });
   }
 
   get type(): OpportunityType {
@@ -55,28 +77,39 @@ export class Opportunity extends AggregateRoot<string> {
     return this._props.registerDeadline;
   }
 
+  get ruleVersion(): number {
+    return this._props.ruleVersion ?? 1;
+  }
+
   get props(): Readonly<OpportunityProps> {
     return this._props;
   }
 
-  public publish(): void {
-    if (this._props.status !== 'PENDING_REVIEW') {
-      throw new DomainException(
+  public publish(): Opportunity {
+    if (this._props.status !== 'PENDING_REVIEW' && this._props.status !== 'DRAFT') {
+      throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
         `Không thể công bố cơ hội đang ở trạng thái ${this._props.status}`,
-        409,
       );
     }
-    this._props.status = 'PUBLISHED';
-    this.incrementVersion();
+    return new Opportunity(this.id, {
+      ...this._props,
+      status: 'PUBLISHED',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 
-  public close(): void {
-    this._props.status = 'CLOSED';
-    this.incrementVersion();
+  public close(): Opportunity {
+    return new Opportunity(this.id, {
+      ...this._props,
+      status: 'CLOSED',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 
-  public isRegistrationOpen(): boolean {
-    return this._props.status === 'PUBLISHED' && new Date() < this._props.registerDeadline;
+  public isRegistrationOpen(now: Date = new Date()): boolean {
+    return this._props.status === 'PUBLISHED' && now < this._props.registerDeadline;
   }
 }

@@ -1,31 +1,27 @@
 import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { Logger } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 import { OpportunityServiceModule } from './opportunity-service.module';
-import { GlobalExceptionFilter, CorrelationIdInterceptor } from '@shared';
 
 async function bootstrap() {
-  const logger = new Logger('OpportunityMicroservice');
-  const app = await NestFactory.create(OpportunityServiceModule);
+  const logger = new Logger('OpportunityGrpcMicroservice');
+  const grpcUrl = process.env.OPPORTUNITY_GRPC_URL || '0.0.0.0:50052';
 
-  app.enableCors({ origin: '*' });
-  app.useGlobalInterceptors(new CorrelationIdInterceptor());
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    OpportunityServiceModule,
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: 'scholink.opportunity',
+        protoPath: join(process.cwd(), 'libs/shared/src/protos/opportunity.proto'),
+        url: grpcUrl,
+      },
+    },
+  );
 
-  const config = new DocumentBuilder()
-    .setTitle('Opportunity Microservice (Port 3002)')
-    .setDescription('Dịch vụ quản lý danh mục học bổng, cuộc thi, crawler & kiểm duyệt, nộp hồ sơ trực tuyến.')
-    .setVersion('3.2')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-
-  const port = process.env.OPPORTUNITY_SERVICE_PORT || 3002;
-  await app.listen(port);
-  logger.log(`🚀 Opportunity Microservice running on: http://localhost:${port}`);
-  logger.log(`📚 Opportunity Swagger UI: http://localhost:${port}/docs`);
+  await app.listen();
+  logger.log(`🚀 Opportunity gRPC Microservice listening on: ${grpcUrl}`);
 }
 
 bootstrap();
