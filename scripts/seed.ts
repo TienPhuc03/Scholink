@@ -8,194 +8,300 @@ const OPPORTUNITY_DB = process.env.OPPORTUNITY_DB_NAME || 'scholink_opportunity'
 const BILLING_DB = process.env.BILLING_DB_NAME || 'scholink_billing';
 const NOTIFICATION_DB = process.env.NOTIFICATION_DB_NAME || 'scholink_notification';
 
-async function seed() {
-  console.log('🌱 Bắt đầu khởi tạo dữ liệu mẫu cho hệ thống Scholink Microservices...\n');
+const SEED_ADMIN_PASS = process.env.SEED_ADMIN_PASSWORD || 'ScholinkAdmin@2026';
+const SEED_ORG_PASS = process.env.SEED_ORGANIZER_PASSWORD || 'Organizer@2026';
+const SEED_STUDENT_PASS = process.env.SEED_STUDENT_PASSWORD || 'Student@2026';
 
-  // ==========================================
-  // 1. IDENTITY SERVICE SEED
-  // ==========================================
+async function seedIdentity(studentId: string, organizerId: string, adminId: string, orgId: string) {
   console.log(`📦 Kết nối tới ${IDENTITY_DB}...`);
-  const identityConn = await mongoose.createConnection(`${MONGODB_URI}/${IDENTITY_DB}`).asPromise();
+  const conn = await mongoose.createConnection(`${MONGODB_URI}/${IDENTITY_DB}`).asPromise();
 
-  const userSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    email: { type: String, required: true, unique: true },
-    passwordHash: { type: String, required: true },
-    fullName: { type: String, required: true },
-    role: { type: String, required: true, enum: ['STUDENT', 'ORGANIZER', 'ADMIN'] },
-    status: { type: String, required: true, default: 'ACTIVE' },
-    version: { type: Number, default: 1 },
-  }, { timestamps: true });
+  const userSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      email: { type: String, required: true },
+      normalizedEmail: { type: String, required: true, unique: true },
+      passwordHash: { type: String, required: true },
+      fullName: { type: String, required: true },
+      role: { type: String, required: true, enum: ['STUDENT', 'ORGANIZER', 'ADMIN'] },
+      status: { type: String, required: true, default: 'ACTIVE' },
+      sessionVersion: { type: Number, default: 1 },
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
 
-  const passportSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    studentId: { type: String, required: true, unique: true },
-    fullName: { type: String, required: true },
-    bio: String,
-    avatarAssetId: String,
-    education: Object,
-    certificates: [Object],
-    skills: [String],
-    achievements: [String],
-    cvAssetId: String,
-    pitchVideoAssetId: String,
-    isLookingForTeammate: { type: Boolean, default: false },
-    isOpenForScholarship: { type: Boolean, default: false },
-    isOpenForMentoring: { type: Boolean, default: false },
-    completionScore: { type: Number, default: 0 },
-    version: { type: Number, default: 1 },
-  }, { timestamps: true });
+  const orgSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      name: { type: String, required: true },
+      status: { type: String, required: true, default: 'ACTIVE' },
+      verifiedBy: String,
+      verifiedAt: Date,
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
 
-  const User = identityConn.model('users', userSchema);
-  const Passport = identityConn.model('passports', passportSchema);
+  const membershipSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      organizationId: { type: String, required: true },
+      userId: { type: String, required: true },
+      status: { type: String, required: true, default: 'ACTIVE' },
+      grantedBy: { type: String, required: true },
+      grantedAt: { type: Date, default: () => new Date() },
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
 
-  const studentId = 'usr_student_001';
-  const organizerId = 'usr_organizer_001';
-  const adminId = 'usr_admin_001';
+  const passportSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      studentId: { type: String, required: true, unique: true },
+      fullName: { type: String, required: true },
+      bio: String,
+      regionCode: String,
+      avatarAssetId: String,
+      education: Object,
+      certificates: [Object],
+      skills: [String],
+      achievements: [String],
+      cvAssetId: String,
+      pitchVideoAssetId: String,
+      isLookingForTeammate: { type: Boolean, default: false },
+      isOpenForScholarship: { type: Boolean, default: false },
+      isOpenForMentoring: { type: Boolean, default: false },
+      completionScore: { type: Number, default: 0 },
+      scoreVersion: { type: Number, default: 1 },
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
 
-  // Seed Admin
-  const adminExists = await User.findOne({ email: 'admin@scholink.edu.vn' });
-  if (!adminExists) {
-    const passwordHash = await bcrypt.hash('ScholinkAdmin@2026', 10);
-    await User.create({
-      id: adminId,
-      email: 'admin@scholink.edu.vn',
-      passwordHash,
-      fullName: 'Hệ Thống Quản Trị Scholink',
-      role: 'ADMIN',
-      status: 'ACTIVE',
-    });
-    console.log('  ✅ Tạo Admin: admin@scholink.edu.vn / ScholinkAdmin@2026');
-  }
+  const User = conn.model('users', userSchema);
+  const Organization = conn.model('organizations', orgSchema);
+  const Membership = conn.model('organization_memberships', membershipSchema);
+  const Passport = conn.model('passports', passportSchema);
 
-  // Seed Organizer
-  const orgExists = await User.findOne({ email: 'organizer@scholink.edu.vn' });
-  if (!orgExists) {
-    const passwordHash = await bcrypt.hash('Organizer@2026', 10);
-    await User.create({
-      id: organizerId,
-      email: 'organizer@scholink.edu.vn',
-      passwordHash,
-      fullName: 'Ban Tổ Chức VinAI Innovation Lab',
-      role: 'ORGANIZER',
-      status: 'ACTIVE',
-    });
-    console.log('  ✅ Tạo Organizer: organizer@scholink.edu.vn / Organizer@2026');
-  }
-
-  // Seed Student
-  const studentExists = await User.findOne({ email: 'student@scholink.edu.vn' });
-  if (!studentExists) {
-    const passwordHash = await bcrypt.hash('Student@2026', 10);
-    await User.create({
-      id: studentId,
-      email: 'student@scholink.edu.vn',
-      passwordHash,
-      fullName: 'Nguyễn Văn Sinh Viên',
-      role: 'STUDENT',
-      status: 'ACTIVE',
-    });
-    console.log('  ✅ Tạo Student: student@scholink.edu.vn / Student@2026');
-
-    // Create 100% completed Passport for Student
-    await Passport.create({
-      id: `pass_${crypto.randomUUID()}`,
-      studentId: studentId,
-      fullName: 'Nguyễn Văn Sinh Viên',
-      bio: 'Sinh viên năm 3 ngành Khoa học Máy tính Đại học Bách Khoa, đam mê AI, Deep Learning và các dự án vì cộng đồng.',
-      avatarAssetId: 'asset_avatar_001',
-      education: {
-        school: 'Đại học Bách Khoa TP.HCM',
-        major: 'Khoa học Máy tính',
-        gpa: 3.82,
-        graduationYear: 2027,
+  const adminHash = await bcrypt.hash(SEED_ADMIN_PASS, 10);
+  await User.updateOne(
+    { normalizedEmail: 'admin@scholink.edu.vn' },
+    {
+      $setOnInsert: {
+        id: adminId,
+        email: 'admin@scholink.edu.vn',
+        normalizedEmail: 'admin@scholink.edu.vn',
+        passwordHash: adminHash,
+        fullName: 'Hệ Thống Quản Trị Scholink',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
       },
-      certificates: [
-        { name: 'IELTS 7.5 Academic', issuer: 'British Council', year: 2024 },
-        { name: 'Deep Learning Specialization', issuer: 'DeepLearning.AI', year: 2025 },
-      ],
-      skills: ['Python', 'PyTorch', 'TypeScript', 'NestJS', 'Kotlin Jetpack Compose'],
-      achievements: [
-        'Giải Nhất Học bổng Khuyến khích Học tập HK1 2025',
-        'Top 5 Hackathon BK AI Innovators 2025',
-      ],
-      cvAssetId: 'asset_cv_nguyen_van_sinh_vien.pdf',
-      pitchVideoAssetId: 'asset_pitch_video_2026.mp4',
-      isLookingForTeammate: true,
-      isOpenForScholarship: true,
-      isOpenForMentoring: true,
-      completionScore: 100, // 7/7 component hoàn chỉnh
-    });
-    console.log('  ✅ Khởi tạo Passport 100% completion score cho Student');
-  }
+    },
+    { upsert: true },
+  );
 
-  await identityConn.close();
+  const orgHash = await bcrypt.hash(SEED_ORG_PASS, 10);
+  await User.updateOne(
+    { normalizedEmail: 'organizer@scholink.edu.vn' },
+    {
+      $setOnInsert: {
+        id: organizerId,
+        email: 'organizer@scholink.edu.vn',
+        normalizedEmail: 'organizer@scholink.edu.vn',
+        passwordHash: orgHash,
+        fullName: 'Ban Tổ Chức VinAI Innovation Lab',
+        role: 'ORGANIZER',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
 
-  // ==========================================
-  // 2. OPPORTUNITY SERVICE SEED
-  // ==========================================
+  await Organization.updateOne(
+    { id: orgId },
+    {
+      $setOnInsert: {
+        id: orgId,
+        name: 'Viện Nghiên cứu Trí tuệ Nhân tạo VinAI',
+        status: 'ACTIVE',
+        verifiedBy: adminId,
+        verifiedAt: new Date(),
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  await Membership.updateOne(
+    { organizationId: orgId, userId: organizerId },
+    {
+      $setOnInsert: {
+        id: 'mem_vinai_001',
+        organizationId: orgId,
+        userId: organizerId,
+        status: 'ACTIVE',
+        grantedBy: adminId,
+        grantedAt: new Date(),
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  const studentHash = await bcrypt.hash(SEED_STUDENT_PASS, 10);
+  await User.updateOne(
+    { normalizedEmail: 'student@scholink.edu.vn' },
+    {
+      $setOnInsert: {
+        id: studentId,
+        email: 'student@scholink.edu.vn',
+        normalizedEmail: 'student@scholink.edu.vn',
+        passwordHash: studentHash,
+        fullName: 'Nguyễn Văn Sinh Viên',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  await Passport.updateOne(
+    { studentId },
+    {
+      $setOnInsert: {
+        id: `pass_${studentId}`,
+        studentId,
+        fullName: 'Nguyễn Văn Sinh Viên',
+        bio: 'Sinh viên năm 3 ngành Khoa học Máy tính Đại học Bách Khoa, đam mê AI & Hệ thống Phân tán.',
+        regionCode: 'VN-SG',
+        avatarAssetId: 'asset_avatar_001',
+        education: {
+          institution: 'Đại học Bách Khoa TP.HCM',
+          major: 'Khoa học Máy tính',
+          startYear: 2023,
+          endYear: 2027,
+          gpa: 3.82,
+          gpaScale: 4,
+        },
+        certificates: [
+          {
+            type: 'IELTS',
+            name: 'IELTS 7.5 Academic',
+            score: '7.5',
+            issuedDate: new Date('2025-01-15'),
+            assetId: 'asset_ielts_001',
+            status: 'VERIFIED',
+          },
+        ],
+        skills: ['Python', 'TypeScript', 'Kotlin Jetpack Compose'],
+        achievements: [
+          'Giải Nhất Học bổng Khuyến khích Học tập HK1 2025',
+          'Top 5 Hackathon BK AI Innovators 2025',
+        ],
+        cvAssetId: 'asset_cv_nguyen_van_sinh_vien.pdf',
+        pitchVideoAssetId: 'asset_pitch_video_2026.mp4',
+        isLookingForTeammate: true,
+        isOpenForScholarship: true,
+        isOpenForMentoring: true,
+        completionScore: 100,
+        scoreVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  await conn.close();
+  console.log('  ✅ Hoàn tất Seed cho Identity Database (Users, Organization, Membership, Passport 100%)');
+}
+
+async function seedOpportunities(organizerId: string, orgId: string) {
   console.log(`\n📦 Kết nối tới ${OPPORTUNITY_DB}...`);
-  const oppConn = await mongoose.createConnection(`${MONGODB_URI}/${OPPORTUNITY_DB}`).asPromise();
+  const conn = await mongoose.createConnection(`${MONGODB_URI}/${OPPORTUNITY_DB}`).asPromise();
 
-  const oppSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    type: { type: String, required: true, enum: ['SCHOLARSHIP', 'COMPETITION'] },
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    organizationId: String,
-    organizerName: { type: String, required: true },
-    sourceUrl: String,
-    applyMode: { type: String, required: true, enum: ['IN_APP', 'EXTERNAL'], default: 'IN_APP' },
-    status: { type: String, required: true, default: 'PUBLISHED' },
-    registerDeadline: { type: Date, required: true },
-    submitDeadline: Date,
-    timezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
-    fundingLevel: String,
-    competitionMode: String,
-    minTeamSize: Number,
-    maxTeamSize: Number,
-    eligibilityRules: [Object],
-    tags: [String],
-    version: { type: Number, default: 1 },
-  }, { timestamps: true });
+  const oppSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      dedupKey: { type: String, unique: true, sparse: true },
+      type: { type: String, required: true, enum: ['SCHOLARSHIP', 'COMPETITION'] },
+      title: { type: String, required: true },
+      description: { type: String, required: true },
+      organizationId: String,
+      createdBy: String,
+      organizerName: { type: String, required: true },
+      sourceUrl: String,
+      applyMode: { type: String, required: true, enum: ['IN_APP', 'EXTERNAL'], default: 'IN_APP' },
+      status: { type: String, required: true, default: 'PUBLISHED' },
+      registerDeadline: { type: Date, required: true },
+      submitDeadline: Date,
+      timezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
+      fundingLevel: String,
+      competitionMode: String,
+      minTeamSize: Number,
+      maxTeamSize: Number,
+      ruleVersion: { type: Number, default: 1 },
+      tags: [String],
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
 
-  const Opportunity = oppConn.model('opportunities', oppSchema);
+  const Opportunity = conn.model('opportunities', oppSchema);
 
-  const sampleOpportunities = [
+  const items = [
     {
       id: 'opp_vinai_scholarship_2026',
+      dedupKey: 'scholarship:vinai_young_talent:2026',
       type: 'SCHOLARSHIP',
       title: 'Học bổng Nghiên cứu Tài năng Trẻ VinAI 2026',
-      description: 'Chương trình học bổng toàn phần dành cho sinh viên xuất sắc các ngành CNTT, Toán-Tin, Khoa học dữ liệu trên toàn quốc, tài trợ toàn bộ học phí và kinh phí nghiên cứu.',
-      organizationId: organizerId,
+      description:
+        'Chương trình học bổng toàn phần dành cho sinh viên xuất sắc các ngành CNTT, Toán-Tin, Khoa học dữ liệu trên toàn quốc.',
+      organizationId: orgId,
+      createdBy: organizerId,
       organizerName: 'Viện Nghiên cứu Trí tuệ Nhân tạo VinAI',
       applyMode: 'IN_APP',
       status: 'PUBLISHED',
       registerDeadline: new Date('2026-12-31T23:59:59+07:00'),
       submitDeadline: new Date('2026-12-31T23:59:59+07:00'),
       fundingLevel: 'FULL',
-      tags: ['AI/ML', 'STEM', 'Toàn phần', 'Học phí'],
+      ruleVersion: 1,
+      tags: ['AI/ML', 'STEM', 'Toàn phần'],
     },
     {
       id: 'opp_fpt_tech_scholarship_2026',
+      dedupKey: 'scholarship:fpt_women_in_tech:2026',
       type: 'SCHOLARSHIP',
       title: 'Học bổng Phát triển Sinh viên Nữ Công nghệ FPT 2026',
-      description: 'Hỗ trợ các nữ sinh viên theo đuổi ngành kỹ thuật công nghệ thông tin và viễn thông, bao gồm học bổng tiền mặt và cơ hội thực tập trực tiếp.',
-      organizationId: organizerId,
+      description:
+        'Hỗ trợ các nữ sinh viên theo đuổi ngành kỹ thuật công nghệ thông tin và viễn thông kèm cơ hội thực tập trực tiếp.',
+      organizationId: orgId,
+      createdBy: organizerId,
       organizerName: 'Tập đoàn FPT',
       applyMode: 'IN_APP',
       status: 'PUBLISHED',
       registerDeadline: new Date('2026-11-30T23:59:59+07:00'),
       submitDeadline: new Date('2026-11-30T23:59:59+07:00'),
       fundingLevel: 'PARTIAL',
+      ruleVersion: 1,
       tags: ['Công nghệ', 'Nữ sinh', 'Thực tập'],
     },
     {
       id: 'opp_scholink_ai_challenge_2026',
+      dedupKey: 'competition:scholink_ai_challenge:2026',
       type: 'COMPETITION',
       title: 'Cuộc thi Scholink AI Challenge 2026 - Đổi mới Sáng tạo Sinh viên',
-      description: 'Đấu trường AI thường niên lớn nhất dành cho sinh viên đại học. Thi đấu theo đội từ 2-4 thành viên, giải quyết bài toán thực tế về xử lý ngôn ngữ tự nhiên và thị giác máy tính.',
-      organizationId: organizerId,
+      description:
+        'Đấu trường AI thường niên dành cho sinh viên đại học. Thi đấu theo đội từ 2-4 thành viên giải quyết bài toán thực tế.',
+      organizationId: orgId,
+      createdBy: organizerId,
       organizerName: 'Scholink Community & Đối tác',
       applyMode: 'IN_APP',
       status: 'PUBLISHED',
@@ -204,14 +310,16 @@ async function seed() {
       competitionMode: 'TEAM',
       minTeamSize: 2,
       maxTeamSize: 4,
-      tags: ['AI Challenge', 'Đội thi', 'Hackathon', 'Giải thưởng lớn'],
+      ruleVersion: 1,
+      tags: ['AI Challenge', 'Đội thi', 'Hackathon'],
     },
     {
       id: 'opp_national_startup_hackathon_2026',
+      dedupKey: 'competition:national_startup_hackathon:2026',
       type: 'COMPETITION',
       title: 'National Student Startup Hackathon 2026',
-      description: 'Cuộc thi khởi nghiệp đổi mới sáng tạo quốc gia dành cho sinh viên các trường đại học, kết nối quỹ đầu tư mạo hiểm và doanh nghiệp lớn.',
-      organizationId: organizerId,
+      description:
+        'Cuộc thi khởi nghiệp đổi mới sáng tạo quốc gia dành cho sinh viên các trường đại học trên toàn quốc.',
       organizerName: 'Bộ Khoa học và Công nghệ & VCCI',
       sourceUrl: 'https://nationalstartuphackathon.gov.vn',
       applyMode: 'EXTERNAL',
@@ -220,91 +328,96 @@ async function seed() {
       competitionMode: 'TEAM',
       minTeamSize: 3,
       maxTeamSize: 5,
-      tags: ['Khởi nghiệp', 'Startup', 'Đổi mới sáng tạo'],
+      ruleVersion: 1,
+      tags: ['Khởi nghiệp', 'Startup'],
     },
   ];
 
-  for (const opp of sampleOpportunities) {
-    const exists = await Opportunity.findOne({ id: opp.id });
-    if (!exists) {
-      await Opportunity.create(opp);
-      console.log(`  ✅ Tạo cơ hội: [${opp.type}] ${opp.title}`);
-    }
+  for (const opp of items) {
+    await Opportunity.updateOne({ id: opp.id }, { $setOnInsert: opp }, { upsert: true });
   }
 
-  await oppConn.close();
+  await conn.close();
+  console.log('  ✅ Hoàn tất Seed cho Opportunity Database (4 Cơ hội chuẩn IN_APP & EXTERNAL)');
+}
 
-  // ==========================================
-  // 3. BILLING SERVICE SEED
-  // ==========================================
-  console.log(`\n📦 Kết nối tới ${BILLING_DB}...`);
+async function seedBillingAndNotifications(studentId: string) {
   const billingConn = await mongoose.createConnection(`${MONGODB_URI}/${BILLING_DB}`).asPromise();
-
-  const walletSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    userId: { type: String, required: true, unique: true },
-    balanceVnd: { type: Number, required: true, default: 0 },
-    heldVnd: { type: Number, required: true, default: 0 },
-    version: { type: Number, default: 1 },
-  }, { timestamps: true });
-
+  const walletSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      userId: { type: String, required: true, unique: true },
+      balanceVnd: { type: Number, required: true, default: 0 },
+      heldVnd: { type: Number, required: true, default: 0 },
+      version: { type: Number, default: 1 },
+    },
+    { timestamps: true },
+  );
   const Wallet = billingConn.model('wallets', walletSchema);
-
-  const walletExists = await Wallet.findOne({ userId: studentId });
-  if (!walletExists) {
-    await Wallet.create({
-      id: `wal_${crypto.randomUUID()}`,
-      userId: studentId,
-      balanceVnd: 500000, // 500.000 VND số nguyên
-      heldVnd: 0,
-    });
-    console.log('  ✅ Khởi tạo Ví VND cho Student: 500,000 VND');
-  }
-
+  await Wallet.updateOne(
+    { userId: studentId },
+    {
+      $setOnInsert: {
+        id: `wal_${studentId}`,
+        userId: studentId,
+        balanceVnd: 500000,
+        heldVnd: 0,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
   await billingConn.close();
 
-  // ==========================================
-  // 4. NOTIFICATION SERVICE SEED
-  // ==========================================
-  console.log(`\n📦 Kết nối tới ${NOTIFICATION_DB}...`);
-  const notifyConn = await mongoose.createConnection(`${MONGODB_URI}/${NOTIFICATION_DB}`).asPromise();
-
-  const notifySchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    userId: { type: String, required: true },
-    type: { type: String, required: true },
-    title: { type: String, required: true },
-    body: { type: String, required: true },
-    refUrl: String,
-    isRead: { type: Boolean, default: false },
-    readAt: Date,
-  }, { timestamps: true });
-
+  const notifyConn = await mongoose
+    .createConnection(`${MONGODB_URI}/${NOTIFICATION_DB}`)
+    .asPromise();
+  const notifySchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      userId: { type: String, required: true },
+      businessKey: { type: String, unique: true, sparse: true },
+      type: { type: String, required: true },
+      title: { type: String, required: true },
+      body: { type: String, required: true },
+      refUrl: String,
+      isRead: { type: Boolean, default: false },
+    },
+    { timestamps: true },
+  );
   const Notification = notifyConn.model('notifications', notifySchema);
-
-  const notifyExists = await Notification.findOne({ userId: studentId });
-  if (!notifyExists) {
-    await Notification.create({
-      id: `notif_${crypto.randomUUID()}`,
-      userId: studentId,
-      type: 'SYSTEM_WELCOME',
-      title: 'Chào mừng bạn đến với Scholink!',
-      body: 'Hồ sơ Passport của bạn đã sẵn sàng! Bạn có thể bắt đầu khám phá các học bổng và cuộc thi hấp dẫn ngay hôm nay.',
-      refUrl: '/passport',
-      isRead: false,
-    });
-    console.log('  ✅ Tạo thông báo chào mừng cho Student');
-  }
-
+  await Notification.updateOne(
+    { userId: studentId, businessKey: `welcome:${studentId}` },
+    {
+      $setOnInsert: {
+        id: `notif_${crypto.randomUUID()}`,
+        userId: studentId,
+        businessKey: `welcome:${studentId}`,
+        type: 'SYSTEM_WELCOME',
+        title: 'Chào mừng bạn đến với Scholink!',
+        body: 'Hồ sơ Passport của bạn đã sẵn sàng để ứng tuyển học bổng và cuộc thi.',
+        refUrl: '/passport',
+        isRead: false,
+      },
+    },
+    { upsert: true },
+  );
   await notifyConn.close();
+  console.log('  ✅ Hoàn tất Seed cho Billing & Notification Databases');
+}
 
-  console.log('\n🎉 Hoàn thành khởi tạo dữ liệu mẫu thành công!');
-  console.log('----------------------------------------------------');
-  console.log('Tài khoản kiểm thử đã sẵn sàng:');
-  console.log('  1. ADMIN:     admin@scholink.edu.vn     / ScholinkAdmin@2026');
-  console.log('  2. ORGANIZER: organizer@scholink.edu.vn / Organizer@2026');
-  console.log('  3. STUDENT:   student@scholink.edu.vn   / Student@2026');
-  console.log('----------------------------------------------------');
+async function seed() {
+  console.log('🌱 Khởi tạo dữ liệu mẫu Idempotent cho hệ thống Scholink Microservices...\n');
+  const studentId = 'usr_student_001';
+  const organizerId = 'usr_organizer_001';
+  const adminId = 'usr_admin_001';
+  const orgId = 'org_vinai_001';
+
+  await seedIdentity(studentId, organizerId, adminId, orgId);
+  await seedOpportunities(organizerId, orgId);
+  await seedBillingAndNotifications(studentId);
+
+  console.log('\n🎉 Khởi tạo dữ liệu mẫu thành công!');
 }
 
 seed().catch((err) => {
