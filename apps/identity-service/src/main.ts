@@ -1,31 +1,27 @@
 import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { Logger } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 import { IdentityServiceModule } from './identity-service.module';
-import { GlobalExceptionFilter, CorrelationIdInterceptor } from '@shared';
 
 async function bootstrap() {
-  const logger = new Logger('IdentityMicroservice');
-  const app = await NestFactory.create(IdentityServiceModule);
+  const logger = new Logger('IdentityGrpcMicroservice');
+  const grpcUrl = process.env.IDENTITY_GRPC_URL || '0.0.0.0:50051';
 
-  app.enableCors({ origin: '*' });
-  app.useGlobalInterceptors(new CorrelationIdInterceptor());
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    IdentityServiceModule,
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: 'scholink.identity',
+        protoPath: join(process.cwd(), 'libs/shared/src/protos/identity.proto'),
+        url: grpcUrl,
+      },
+    },
+  );
 
-  const config = new DocumentBuilder()
-    .setTitle('Identity Microservice (Port 3001)')
-    .setDescription('Dịch vụ quản lý xác thực tài khoản, quyền hạn, Passport sinh viên và Consent snapshot.')
-    .setVersion('3.2')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-
-  const port = process.env.IDENTITY_SERVICE_PORT || 3001;
-  await app.listen(port);
-  logger.log(`🚀 Identity Microservice running on: http://localhost:${port}`);
-  logger.log(`📚 Identity Swagger UI: http://localhost:${port}/docs`);
+  await app.listen();
+  logger.log(`🚀 Identity gRPC Microservice listening on: ${grpcUrl}`);
 }
 
 bootstrap();
