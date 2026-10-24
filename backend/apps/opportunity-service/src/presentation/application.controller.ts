@@ -1,66 +1,71 @@
-import { Controller, Get, Post, Patch, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Param, Req, UseGuards, UseFilters } from '@nestjs/common';
+import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ApplicationUseCase } from '../application/use-cases/application.use-case';
 import {
+  CreatePreviewDto,
   SubmitApplicationDto,
-  SubmitApplicationDtoSchema,
   UpdateApplicationStatusDto,
   UpdateApplicationStatusDtoSchema,
 } from '../application/dtos/opportunity.dto';
-import { ZodValidationPipe, JwtAuthGuard, RolesGuard, IdempotencyGuard, Roles, Idempotent, AuthenticatedUser } from '@shared';
+import {
+  ZodValidationPipe,
+  JwtAuthGuard,
+  RolesGuard,
+  Roles,
+  AuthenticatedUser,
+  GrpcExceptionFilter,
+} from '@shared';
 
 @ApiTags('Application (Opportunity Microservice)')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, IdempotencyGuard)
+@UseFilters(GrpcExceptionFilter)
 @Controller('api/v1/applications')
 export class ApplicationController {
   constructor(private readonly applicationUseCase: ApplicationUseCase) {}
 
-  @Post()
-  @Roles('STUDENT')
-  @Idempotent()
-  @ApiOperation({ summary: 'Nộp hồ sơ ứng tuyển học bổng / cuộc thi (yêu cầu Idempotency-Key & Consent)' })
-  @ApiResponse({ status: 201, description: 'Nộp hồ sơ thành công' })
-  async submit(
-    @Req() req: { user: AuthenticatedUser },
-    @Body(new ZodValidationPipe(SubmitApplicationDtoSchema)) dto: SubmitApplicationDto,
-  ) {
-    return this.applicationUseCase.submit(req.user.userId, dto);
+  // ================= gRPC Handlers (API Gateway Dispatch) =================
+  @GrpcMethod('OpportunityGrpcService', 'CreateApplicationPreview')
+  async createPreview(data: CreatePreviewDto & { studentId: string }) {
+    const { studentId, ...dto } = data;
+    return this.applicationUseCase.createPreview(studentId, dto);
   }
 
-  @Get('me')
-  @Roles('STUDENT')
-  @ApiOperation({ summary: 'Lấy danh sách các hồ sơ đã nộp của sinh viên hiện tại' })
-  @ApiResponse({ status: 200, description: 'Danh sách hồ sơ của tôi' })
-  async getMyApplications(@Req() req: { user: AuthenticatedUser }) {
-    return this.applicationUseCase.getMyApplications(req.user.userId);
+  @GrpcMethod('OpportunityGrpcService', 'GetApplicationPreview')
+  async getPreview(data: { studentId: string; previewId: string }) {
+    return this.applicationUseCase.getPreview(data.studentId, data.previewId);
   }
 
-  @Post(':id/withdraw')
-  @Roles('STUDENT')
-  @ApiOperation({ summary: 'Rút hồ sơ ứng tuyển trước hạn' })
-  @ApiResponse({ status: 200, description: 'Rút hồ sơ thành công' })
-  async withdraw(
-    @Req() req: { user: AuthenticatedUser },
-    @Param('id') id: string,
-  ) {
-    return this.applicationUseCase.withdraw(id, req.user.userId);
+  @GrpcMethod('OpportunityGrpcService', 'SubmitApplication')
+  async submit(data: SubmitApplicationDto & { studentId: string }) {
+    const { studentId, ...dto } = data;
+    return this.applicationUseCase.submit(studentId, dto);
   }
 
-  // ==========================================
-  // F24: ORGANIZER KANBAN & STATUS MANAGEMENT
-  // ==========================================
+  @GrpcMethod('OpportunityGrpcService', 'GetMyApplications')
+  async getMyApplications(data: { studentId: string }) {
+    const items = await this.applicationUseCase.getMyApplications(data.studentId);
+    return { items };
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'WithdrawApplication')
+  async withdraw(data: { applicationId: string; studentId: string }) {
+    return this.applicationUseCase.withdraw(data.applicationId, data.studentId);
+  }
+
+  // ================= HTTP Handlers (F24: Organizer Kanban) =================
   @Get('organizer/kanban/:opportunityId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ORGANIZER', 'ADMIN')
   @ApiOperation({ summary: 'Lấy danh sách hồ sơ theo các cột Kanban của cuộc thi / học bổng' })
   @ApiResponse({ status: 200, description: 'Dữ liệu Kanban' })
-  async getOpportunityKanban(
-    @Param('opportunityId') opportunityId: string,
-  ) {
+  async getOpportunityKanban(@Param('opportunityId') opportunityId: string) {
     return this.applicationUseCase.getOpportunityKanban(opportunityId);
   }
 
   @Patch(':id/status')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ORGANIZER', 'ADMIN')
   @ApiOperation({ summary: 'Organizer cập nhật trạng thái hồ sơ trên Kanban kèm expectedVersion' })
   @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })

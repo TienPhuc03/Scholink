@@ -4,7 +4,14 @@
   "monorepo": true,
   "root": "apps/gateway",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "libs/shared/src/protos/**/*.proto",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
   },
   "projects": {
     "gateway": {

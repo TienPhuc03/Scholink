@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import * as path from 'path';
+import { join } from 'path';
 import { IdentityServiceModule } from './identity-service.module';
 import { GlobalExceptionFilter, CorrelationIdInterceptor } from '@shared';
 
@@ -14,14 +14,14 @@ async function bootstrap() {
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // Connect gRPC Transport for High-Load East-West Microservices Communication
+  // Connect gRPC Transport for East-West Microservices Communication
   const grpcPort = process.env.IDENTITY_GRPC_PORT || 50051;
-  const protoPath = path.join(process.cwd(), 'proto/identity.proto');
+  const protoPath = join(process.cwd(), 'libs/shared/src/protos/identity.proto');
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      package: 'identity',
+      package: 'scholink.identity',
       protoPath,
       url: `0.0.0.0:${grpcPort}`,
     },

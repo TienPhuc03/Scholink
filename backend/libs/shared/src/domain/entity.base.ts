@@ -1,8 +1,8 @@
 export interface DomainEvent {
-  eventName: string;
-  occurredOn: Date;
-  aggregateId: string;
-  payload: Record<string, any>;
+  readonly eventName: string;
+  readonly occurredOn: Date;
+  readonly aggregateId: string;
+  readonly payload: Readonly<Record<string, unknown>>;
 }
 
 export abstract class Entity<TId = string> {
@@ -11,7 +11,12 @@ export abstract class Entity<TId = string> {
   protected readonly _createdAt: Date;
   protected _updatedAt: Date;
 
-  constructor(id: TId, version: number = 1, createdAt: Date = new Date(), updatedAt: Date = new Date()) {
+  constructor(
+    id: TId,
+    version: number = 1,
+    createdAt: Date = new Date(),
+    updatedAt: Date = new Date(),
+  ) {
     this._id = id;
     this._version = version;
     this._createdAt = createdAt;
@@ -39,25 +44,30 @@ export abstract class Entity<TId = string> {
     this._updatedAt = new Date();
   }
 
-  public equals(object?: Entity<TId>): boolean {
-    if (object == null || object === undefined) {
+  public equals(other?: Entity<TId>): boolean {
+    if (!other || !(other instanceof Entity)) {
       return false;
     }
-    if (this === object) {
-      return true;
-    }
-    if (!(object instanceof Entity)) {
-      return false;
-    }
-    return this._id === object._id;
+    return this._id === other._id;
   }
 }
 
 export abstract class AggregateRoot<TId = string> extends Entity<TId> {
   private _domainEvents: DomainEvent[] = [];
 
-  get domainEvents(): DomainEvent[] {
-    return [...this._domainEvents];
+  constructor(
+    id: TId,
+    version: number = 1,
+    createdAt: Date = new Date(),
+    updatedAt: Date = new Date(),
+    domainEvents: readonly DomainEvent[] = [],
+  ) {
+    super(id, version, createdAt, updatedAt);
+    this._domainEvents = [...domainEvents];
+  }
+
+  get domainEvents(): readonly DomainEvent[] {
+    return this._domainEvents;
   }
 
   protected addDomainEvent(domainEvent: DomainEvent): void {
@@ -69,18 +79,15 @@ export abstract class AggregateRoot<TId = string> extends Entity<TId> {
   }
 }
 
-export abstract class ValueObject<TProps> {
-  protected readonly props: TProps;
+export abstract class ValueObject<TProps extends Record<string, any>> {
+  protected readonly props: Readonly<TProps>;
 
   constructor(props: TProps) {
-    this.props = Object.freeze(props);
+    this.props = Object.freeze({ ...props });
   }
 
   public equals(vo?: ValueObject<TProps>): boolean {
-    if (vo === null || vo === undefined) {
-      return false;
-    }
-    if (vo.props === undefined) {
+    if (!vo || vo.props === undefined) {
       return false;
     }
     return JSON.stringify(this.props) === JSON.stringify(vo.props);

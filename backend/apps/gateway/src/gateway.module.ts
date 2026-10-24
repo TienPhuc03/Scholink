@@ -1,12 +1,20 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import * as path from 'path';
+import { join } from 'path';
 import { SharedModule } from '@shared';
 import { HealthController } from './health.controller';
 import { PortalController } from './portal.controller';
 import { GrpcGatewayController } from './grpc-gateway.controller';
 import { ReverseProxyMiddleware } from './proxy.middleware';
+import {
+  GATEWAY_IDENTITY_GRPC,
+  GATEWAY_OPPORTUNITY_GRPC,
+} from './grpc-clients.interface';
+import { GatewayAuthController } from './controllers/gateway-auth.controller';
+import { GatewayProfileController } from './controllers/gateway-profile.controller';
+import { GatewayOpportunityController } from './controllers/gateway-opportunity.controller';
+import { GatewayApplicationController } from './controllers/gateway-application.controller';
 
 @Module({
   imports: [
@@ -15,28 +23,70 @@ import { ReverseProxyMiddleware } from './proxy.middleware';
       envFilePath: '.env',
     }),
     SharedModule,
-    ClientsModule.register([
+    ClientsModule.registerAsync([
+      {
+        name: GATEWAY_IDENTITY_GRPC,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'scholink.identity',
+            protoPath: join(process.cwd(), 'libs/shared/src/protos/identity.proto'),
+            url: config.get<string>('IDENTITY_GRPC_URL', 'localhost:50051'),
+          },
+        }),
+      },
+      {
+        name: GATEWAY_OPPORTUNITY_GRPC,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'scholink.opportunity',
+            protoPath: join(process.cwd(), 'libs/shared/src/protos/opportunity.proto'),
+            url: config.get<string>('OPPORTUNITY_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+      },
       {
         name: 'COLLABORATION_GRPC_PACKAGE',
-        transport: Transport.GRPC,
-        options: {
-          package: 'collaboration',
-          protoPath: path.join(process.cwd(), 'proto/collaboration.proto'),
-          url: process.env.COLLABORATION_GRPC_URL || 'localhost:50053',
-        },
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'collaboration',
+            protoPath: join(process.cwd(), 'proto/collaboration.proto'),
+            url: config.get<string>('COLLABORATION_GRPC_URL', 'localhost:50053'),
+          },
+        }),
       },
       {
         name: 'IDENTITY_GRPC_PACKAGE',
-        transport: Transport.GRPC,
-        options: {
-          package: 'identity',
-          protoPath: path.join(process.cwd(), 'proto/identity.proto'),
-          url: process.env.IDENTITY_GRPC_URL || 'localhost:50051',
-        },
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'identity',
+            protoPath: join(process.cwd(), 'proto/identity.proto'),
+            url: config.get<string>('IDENTITY_GRPC_URL', 'localhost:50051'),
+          },
+        }),
       },
     ]),
   ],
-  controllers: [HealthController, PortalController, GrpcGatewayController],
+  controllers: [
+    HealthController,
+    PortalController,
+    GrpcGatewayController,
+    GatewayAuthController,
+    GatewayProfileController,
+    GatewayOpportunityController,
+    GatewayApplicationController,
+  ],
   providers: [ReverseProxyMiddleware],
 })
 export class GatewayModule implements NestModule {
@@ -44,4 +94,3 @@ export class GatewayModule implements NestModule {
     consumer.apply(ReverseProxyMiddleware).forRoutes('*');
   }
 }
-

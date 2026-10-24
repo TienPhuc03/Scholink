@@ -1,0 +1,184 @@
+syntax = "proto3";
+
+package scholink.identity;
+
+service IdentityGrpcService {
+  // Auth & Session RPCs (API Gateway -> Identity Service)
+  rpc Register (RegisterRequest) returns (RegisterResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+  rpc Refresh (RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout (LogoutRequest) returns (LogoutResponse);
+
+  // Profile & Passport RPCs (API Gateway -> Identity Service)
+  rpc GetMyPassport (GetMyPassportRequest) returns (PassportResponse);
+  rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
+  rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
+
+  // Cross-Service Internal RPCs (Opportunity Service -> Identity Service)
+  rpc GetProfileSnapshot (GetProfileSnapshotRequest) returns (ProfileSnapshotResponse);
+  rpc ValidateConsent (ValidateConsentRequest) returns (ValidateConsentResponse);
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string fullName = 3;
+}
+
+message RegisterResponse {
+  string userId = 1;
+  string email = 2;
+  string role = 3;
+  string status = 4;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message UserSummary {
+  string id = 1;
+  string email = 2;
+  string fullName = 3;
+  string role = 4;
+  string organizationId = 5;
+}
+
+message LoginResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+  UserSummary user = 3;
+}
+
+message RefreshTokenRequest {
+  string refreshToken = 1;
+}
+
+message RefreshTokenResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+}
+
+message LogoutRequest {
+  string userId = 1;
+  string sessionId = 2;
+}
+
+message LogoutResponse {
+  bool revoked = 1;
+}
+
+message GetMyPassportRequest {
+  string studentId = 1;
+}
+
+message EducationMessage {
+  string institution = 1;
+  string major = 2;
+  int32 startYear = 3;
+  int32 endYear = 4;
+  double gpa = 5;
+  double gpaScale = 6;
+}
+
+// Ngày tháng truyền dạng chuỗi ISO 8601; status do server gán, không nhận từ client
+message CertificateMessage {
+  string type = 1;
+  string name = 2;
+  string score = 3;
+  string issuedDate = 4;
+  string expiryDate = 5;
+  string assetId = 6;
+  string status = 7;
+}
+
+// Dùng `optional` để giữ presence: phân biệt "không gửi" với "gửi false/rỗng" khi cập nhật từng phần
+message UpdateMyPassportRequest {
+  string studentId = 1;
+  optional string fullName = 2;
+  optional string bio = 3;
+  optional string avatarAssetId = 4;
+  optional string regionCode = 5;
+  EducationMessage education = 6;
+  repeated string skills = 7;
+  repeated string achievements = 8;
+  optional string cvAssetId = 9;
+  optional string pitchVideoAssetId = 10;
+  optional bool isLookingForTeammate = 11;
+  optional bool isOpenForScholarship = 12;
+  optional bool isOpenForMentoring = 13;
+  repeated CertificateMessage certificates = 14;
+}
+
+message PassportResponse {
+  string id = 1;
+  string studentId = 2;
+  int32 profileVersion = 3;
+  string fullName = 4;
+  string bio = 5;
+  string avatarAssetId = 6;
+  string regionCode = 7;
+  EducationMessage education = 8;
+  repeated string skills = 9;
+  repeated string achievements = 10;
+  string cvAssetId = 11;
+  string pitchVideoAssetId = 12;
+  bool isLookingForTeammate = 13;
+  bool isOpenForScholarship = 14;
+  bool isOpenForMentoring = 15;
+  int32 completionScore = 16;
+  int32 scoreVersion = 17;
+  int32 version = 18;
+  repeated CertificateMessage certificates = 19;
+}
+
+message CreateConsentRequest {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  string opportunityId = 4;
+  string submissionId = 5;
+  int32 profileVersion = 6;
+  int32 ruleVersion = 7;
+  string payloadHash = 8;
+  string manifestHash = 9;
+}
+
+message ConsentResponse {
+  string consentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  string payloadHash = 4;
+  string expiresAt = 5;
+}
+
+message GetProfileSnapshotRequest {
+  string studentId = 1;
+  repeated string attachmentIds = 2;
+}
+
+message ProfileSnapshotResponse {
+  string snapshotId = 1;
+  int32 profileVersion = 2;
+  int32 completionScore = 3;
+  string snapshotJson = 4;
+  string manifestJson = 5;
+  string manifestHash = 6;
+  repeated string missingFields = 7;
+}
+
+message ValidateConsentRequest {
+  string studentId = 1;
+  string consentId = 2;
+  string previewId = 3;
+  string snapshotId = 4;
+  string opportunityId = 5;
+  int32 expectedRuleVersion = 6;
+  string expectedPayloadHash = 7;
+}
+
+message ValidateConsentResponse {
+  bool valid = 1;
+  int32 profileVersion = 2;
+}

@@ -4,27 +4,44 @@ export type UserRole = 'STUDENT' | 'ORGANIZER' | 'ADMIN';
 export type UserStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'BLOCKED' | 'DELETED';
 
 export interface UserProps {
-  email: string;
-  passwordHash: string;
-  role: UserRole;
-  status: UserStatus;
-  fullName: string;
-  phone?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  version?: number;
+  readonly email: string;
+  readonly normalizedEmail: string;
+  readonly passwordHash: string;
+  readonly role: UserRole;
+  readonly status: UserStatus;
+  readonly fullName: string;
+  readonly phone?: string;
+  readonly sessionVersion?: number;
+  readonly createdAt?: Date;
+  readonly updatedAt?: Date;
+  readonly version?: number;
 }
 
 export class User extends AggregateRoot<string> {
-  private _props: UserProps;
+  private readonly _props: Readonly<UserProps>;
 
-  constructor(id: string, props: UserProps) {
-    super(id, props.version || 1, props.createdAt || new Date(), props.updatedAt || new Date());
-    this._props = props;
+  constructor(id: string, props: Omit<UserProps, 'normalizedEmail'> & { normalizedEmail?: string }) {
+    super(
+      id,
+      props.version ?? 1,
+      props.createdAt ?? new Date(),
+      props.updatedAt ?? new Date(),
+    );
+    const normalizedEmail = (props.normalizedEmail ?? props.email).trim().toLowerCase();
+    this._props = Object.freeze({
+      ...props,
+      email: props.email.trim(),
+      normalizedEmail,
+      sessionVersion: props.sessionVersion ?? 1,
+    });
   }
 
   get email(): string {
     return this._props.email;
+  }
+
+  get normalizedEmail(): string {
+    return this._props.normalizedEmail;
   }
 
   get fullName(): string {
@@ -43,18 +60,40 @@ export class User extends AggregateRoot<string> {
     return this._props.passwordHash;
   }
 
-  public activate(): void {
-    this._props.status = 'ACTIVE';
-    this.incrementVersion();
+  get sessionVersion(): number {
+    return this._props.sessionVersion ?? 1;
   }
 
-  public block(): void {
-    this._props.status = 'BLOCKED';
-    this.incrementVersion();
+  get props(): Readonly<UserProps> {
+    return this._props;
   }
 
-  public changeRole(newRole: UserRole): void {
-    this._props.role = newRole;
-    this.incrementVersion();
+  public activate(): User {
+    return new User(this.id, {
+      ...this._props,
+      status: 'ACTIVE',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  public block(): User {
+    return new User(this.id, {
+      ...this._props,
+      status: 'BLOCKED',
+      sessionVersion: this.sessionVersion + 1,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  public changeRole(newRole: UserRole): User {
+    return new User(this.id, {
+      ...this._props,
+      role: newRole,
+      sessionVersion: this.sessionVersion + 1,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 }

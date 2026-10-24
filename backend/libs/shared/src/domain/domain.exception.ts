@@ -14,6 +14,7 @@ export enum ErrorCode {
   CONSENT_MISMATCH = 'CONSENT_MISMATCH',
   PREVIEW_EXPIRED = 'PREVIEW_EXPIRED',
   SNAPSHOT_STALE = 'SNAPSHOT_STALE',
+  ASSET_NOT_AVAILABLE = 'ASSET_NOT_AVAILABLE',
   STATE_CONFLICT = 'STATE_CONFLICT',
   IDEMPOTENCY_CONFLICT = 'IDEMPOTENCY_CONFLICT',
   REQUEST_IN_PROGRESS = 'REQUEST_IN_PROGRESS',
@@ -28,14 +29,19 @@ export enum ErrorCode {
 export class DomainException extends Error {
   public readonly code: ErrorCode;
   public readonly statusCode: number;
-  public readonly details?: any[];
+  public readonly details?: readonly unknown[];
 
-  constructor(code: ErrorCode, message: string, statusCode: number = 400, details?: any[]) {
+  constructor(
+    code: ErrorCode,
+    message: string,
+    statusCode: number = 400,
+    details?: readonly unknown[],
+  ) {
     super(message);
     this.name = 'DomainException';
     this.code = code;
     this.statusCode = statusCode;
-    this.details = details;
+    this.details = details ? Object.freeze([...details]) : undefined;
     Object.setPrototypeOf(this, DomainException.prototype);
   }
 
@@ -55,7 +61,15 @@ export class DomainException extends Error {
     return new DomainException(code, message, 409);
   }
 
-  static unprocessable(code: ErrorCode, message: string, details?: any[]): DomainException {
+  static gone(code: ErrorCode, message: string): DomainException {
+    return new DomainException(code, message, 410);
+  }
+
+  static unprocessable(
+    code: ErrorCode,
+    message: string,
+    details?: readonly unknown[],
+  ): DomainException {
     return new DomainException(code, message, 422, details);
   }
 }

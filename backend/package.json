@@ -19,6 +19,7 @@
     "seed": "ts-node scripts/seed.ts",
     "backup": "ts-node scripts/backup.ts",
     "restore": "ts-node scripts/restore.ts",
+    "test:e2e": "ts-node scripts/test-e2e.ts",
     "lint": "eslint \"{apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -58,5 +59,27 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "apps/**/*.(t|j)s",
+      "libs/**/*.(t|j)s"
+    ],
+    "coverageDirectory": "./coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@shared$": "<rootDir>/libs/shared/src/index",
+      "^@shared/(.*)$": "<rootDir>/libs/shared/src/$1"
+    }
   }
 }

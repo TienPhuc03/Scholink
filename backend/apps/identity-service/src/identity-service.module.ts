@@ -1,15 +1,36 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SharedModule, DatabaseModule } from '@shared';
-import { UserModel, UserSchema } from './infrastructure/persistence/user.schema';
-import { PassportModel, PassportSchema } from './infrastructure/persistence/passport.schema';
 import {
+  SharedModule,
+  DatabaseModule,
+  OutboxModel,
+  OutboxSchema,
+  ProcessedEventModel,
+  ProcessedEventSchema,
+  IdempotencyKeyModel,
+  IdempotencyKeySchema,
+} from '@shared';
+import {
+  UserModel,
+  UserSchema,
+  SessionModel,
+  SessionSchema,
+  OtpRecordModel,
+  OtpRecordSchema,
   OrganizationModel,
   OrganizationSchema,
   OrganizationMembershipModel,
   OrganizationMembershipSchema,
-} from './infrastructure/persistence/organization.schema';
+} from './infrastructure/persistence/user.schema';
+import {
+  PassportModel,
+  PassportSchema,
+  MediaAssetModel,
+  MediaAssetSchema,
+  ConsentModel,
+  ConsentSchema,
+} from './infrastructure/persistence/passport.schema';
 import { USER_REPOSITORY } from './domain/ports/user.repository.port';
 import { PASSPORT_REPOSITORY } from './domain/ports/passport.repository.port';
 import { MongooseUserRepository } from './infrastructure/persistence/user.repository';
@@ -32,9 +53,16 @@ import { IdentityGrpcController } from './presentation/identity-grpc.controller'
     SharedModule,
     MongooseModule.forFeature([
       { name: UserModel.name, schema: UserSchema },
-      { name: PassportModel.name, schema: PassportSchema },
+      { name: SessionModel.name, schema: SessionSchema },
+      { name: OtpRecordModel.name, schema: OtpRecordSchema },
       { name: OrganizationModel.name, schema: OrganizationSchema },
       { name: OrganizationMembershipModel.name, schema: OrganizationMembershipSchema },
+      { name: PassportModel.name, schema: PassportSchema },
+      { name: MediaAssetModel.name, schema: MediaAssetSchema },
+      { name: ConsentModel.name, schema: ConsentSchema },
+      { name: OutboxModel.name, schema: OutboxSchema },
+      { name: ProcessedEventModel.name, schema: ProcessedEventSchema },
+      { name: IdempotencyKeyModel.name, schema: IdempotencyKeySchema },
     ]),
   ],
   controllers: [AuthController, ProfileController, AdminOrganizationController, IdentityGrpcController],

@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package scholink.opportunity;
+
+service OpportunityGrpcService {
+  // Opportunity Catalog RPCs (API Gateway -> Opportunity Service)
+  rpc ListOpportunities (ListOpportunitiesRequest) returns (ListOpportunitiesResponse);
+  rpc GetOpportunityById (GetOpportunityByIdRequest) returns (OpportunityMessage);
+  rpc CreateOpportunity (CreateOpportunityRequest) returns (OpportunityMessage);
+
+  // Application & Immutable Preview RPCs (API Gateway -> Opportunity Service)
+  rpc CreateApplicationPreview (CreatePreviewRequest) returns (PreviewResponse);
+  rpc GetApplicationPreview (GetPreviewRequest) returns (PreviewResponse);
+  rpc SubmitApplication (SubmitApplicationRequest) returns (SubmitApplicationResponse);
+  rpc GetMyApplications (GetMyApplicationsRequest) returns (GetMyApplicationsResponse);
+  rpc WithdrawApplication (WithdrawApplicationRequest) returns (WithdrawApplicationResponse);
+}
+
+message ListOpportunitiesRequest {
+  string type = 1;
+  string keyword = 2;
+  string applyMode = 3;
+  int32 limit = 4;
+  string cursor = 5;
+}
+
+message OpportunityMessage {
+  string id = 1;
+  string type = 2;
+  string title = 3;
+  string description = 4;
+  string organizationId = 5;
+  string organizerName = 6;
+  string sourceUrl = 7;
+  string applyMode = 8;
+  string status = 9;
+  string registerDeadline = 10;
+  string submitDeadline = 11;
+  string timezone = 12;
+  string fundingLevel = 13;
+  string competitionMode = 14;
+  int32 minTeamSize = 15;
+  int32 maxTeamSize = 16;
+  repeated string tags = 17;
+  int32 ruleVersion = 18;
+  int32 version = 19;
+}
+
+message ListOpportunitiesResponse {
+  repeated OpportunityMessage items = 1;
+  string nextCursor = 2;
+  bool hasMore = 3;
+}
+
+message GetOpportunityByIdRequest {
+  string id = 1;
+}
+
+message CreateOpportunityRequest {
+  string actorId = 1;
+  string actorRole = 2;
+  string organizationId = 3;
+  string type = 4;
+  string title = 5;
+  string description = 6;
+  string organizerName = 7;
+  string sourceUrl = 8;
+  string applyMode = 9;
+  string registerDeadline = 10;
+  string submitDeadline = 11;
+  string timezone = 12;
+  string fundingLevel = 13;
+  string competitionMode = 14;
+  int32 minTeamSize = 15;
+  int32 maxTeamSize = 16;
+  repeated string tags = 17;
+}
+
+message CreatePreviewRequest {
+  string studentId = 1;
+  string opportunityId = 2;
+  string submissionId = 3;
+  int32 expectedRuleVersion = 4;
+  repeated string attachmentIds = 5;
+}
+
+message GetPreviewRequest {
+  string studentId = 1;
+  string previewId = 2;
+}
+
+message PreviewResponse {
+  string previewId = 1;
+  string opportunityId = 2;
+  string submissionId = 3;
+  string snapshotId = 4;
+  int32 profileVersion = 5;
+  int32 ruleVersion = 6;
+  string snapshotJson = 7;
+  string manifestJson = 8;
+  string manifestHash = 9;
+  string payloadHash = 10;
+  string screening = 11;
+  string expiresAt = 12;
+}
+
+message SubmitApplicationRequest {
+  string studentId = 1;
+  string opportunityId = 2;
+  string submissionId = 3;
+  string submissionType = 4;
+  string teamId = 5;
+  int32 expectedRuleVersion = 6;
+  string previewId = 7;
+  string snapshotId = 8;
+  int32 profileVersion = 9;
+  string payloadHash = 10;
+  string consentId = 11;
+}
+
+message SubmitApplicationResponse {
+  string applicationId = 1;
+  int32 revision = 2;
+  string status = 3;
+  string screening = 4;
+  string submittedAt = 5;
+  int32 ruleVersion = 6;
+  int32 profileVersion = 7;
+  string previewId = 8;
+  string snapshotId = 9;
+  string payloadHash = 10;
+  string consentId = 11;
+}
+
+message GetMyApplicationsRequest {
+  string studentId = 1;
+}
+
+message ApplicationSummaryMessage {
+  string id = 1;
+  string opportunityId = 2;
+  string studentId = 3;
+  string teamId = 4;
+  string submissionType = 5;
+  string status = 6;
+  string screening = 7;
+  string previewId = 8;
+  string snapshotId = 9;
+  int32 profileVersion = 10;
+  string payloadHash = 11;
+  string consentId = 12;
+  string submittedAt = 13;
+  int32 revision = 14;
+  int32 version = 15;
+}
+
+message GetMyApplicationsResponse {
+  repeated ApplicationSummaryMessage items = 1;
+}
+
+message WithdrawApplicationRequest {
+  string applicationId = 1;
+  string studentId = 2;
+}
+
+message WithdrawApplicationResponse {
+  string applicationId = 1;
+  string status = 2;
+  int32 revision = 3;
+  int32 version = 4;
+}

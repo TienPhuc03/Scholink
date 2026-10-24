@@ -12,30 +12,43 @@ export type ApplicationStatus =
   | 'REOPENED'
   | 'CANCELLED';
 
+export type ScreeningStatus = 'ELIGIBLE' | 'INELIGIBLE' | 'NEEDS_REVIEW';
+
 export interface ApplicationProps {
-  opportunityId: string;
-  studentId: string;
-  teamId?: string;
-  submissionType: 'INDIVIDUAL' | 'TEAM';
-  status: ApplicationStatus;
-  previewId: string;
-  snapshotId: string;
-  profileVersion: number;
-  payloadHash: string;
-  consentId: string;
-  submittedAt: Date;
-  revision: number;
-  createdAt?: Date;
-  updatedAt?: Date;
-  version?: number;
+  readonly opportunityId: string;
+  readonly studentId: string;
+  readonly teamId?: string;
+  readonly submissionType: 'INDIVIDUAL' | 'TEAM';
+  readonly status: ApplicationStatus;
+  readonly screening?: ScreeningStatus;
+  readonly previewId: string;
+  readonly snapshotId: string;
+  readonly profileVersion: number;
+  readonly ruleVersion?: number;
+  readonly payloadHash: string;
+  readonly consentId: string;
+  readonly submittedAt: Date;
+  readonly revision: number;
+  readonly createdAt?: Date;
+  readonly updatedAt?: Date;
+  readonly version?: number;
 }
 
 export class Application extends AggregateRoot<string> {
-  private _props: ApplicationProps;
+  private readonly _props: Readonly<ApplicationProps>;
 
   constructor(id: string, props: ApplicationProps) {
-    super(id, props.version || 1, props.createdAt || new Date(), props.updatedAt || new Date());
-    this._props = props;
+    super(
+      id,
+      props.version || 1,
+      props.createdAt || new Date(),
+      props.updatedAt || new Date(),
+    );
+    this._props = Object.freeze({
+      ...props,
+      screening: props.screening ?? 'ELIGIBLE',
+      ruleVersion: props.ruleVersion ?? 1,
+    });
   }
 
   get opportunityId(): string {
@@ -50,37 +63,102 @@ export class Application extends AggregateRoot<string> {
     return this._props.status;
   }
 
+  get screening(): ScreeningStatus {
+    return this._props.screening ?? 'ELIGIBLE';
+  }
+
+  get revision(): number {
+    return this._props.revision;
+  }
+
   get props(): Readonly<ApplicationProps> {
     return this._props;
   }
 
-  public withdraw(): void {
-    if (this._props.status === 'ACCEPTED' || this._props.status === 'REJECTED') {
-      throw new DomainException(
+  public canResubmit(): boolean {
+    return this._props.status === 'WITHDRAWN' || this._props.status === 'REOPENED';
+  }
+
+  /**
+   * Mục 11 & FR-APP-07 SRS: Rút hồ sơ trước khi ACCEPTED / REJECTED (Immutable update)
+   */
+  public withdraw(): Application {
+    if (
+      this._props.status === 'ACCEPTED' ||
+      this._props.status === 'REJECTED' ||
+      this._props.status === 'CANCELLED'
+    ) {
+      throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
         `Không thể rút hồ sơ đã ở trạng thái ${this._props.status}`,
-        409,
       );
     }
-    this._props.status = 'WITHDRAWN';
-    this.incrementVersion();
+
+    return new Application(this.id, {
+      ...this._props,
+      status: 'WITHDRAWN',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 
-  public shortlist(): void {
-    if (this._props.status !== 'SUBMITTED') {
-      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Chỉ có thể duyệt hồ sơ đã SUBMITTED', 409);
+  /**
+   * Mục 11 & FR-APP-07 SRS: Nộp lại trước hạn giữ nguyên Application, tăng revision và gắn snapshot mới
+   */
+  public resubmit(params: {
+    previewId: string;
+    snapshotId: string;
+    profileVersion: number;
+    ruleVersion: number;
+    payloadHash: string;
+    consentId: string;
+    screening?: ScreeningStatus;
+  }): Application {
+    if (!this.canResubmit()) {
+      throw DomainException.conflict(
+        ErrorCode.ALREADY_APPLIED,
+        'Bạn đã có hồ sơ đang còn hiệu lực cho cơ hội này',
+      );
     }
-    this._props.status = 'SHORTLISTED';
-    this.incrementVersion();
+
+    return new Application(this.id, {
+      ...this._props,
+      status: 'SUBMITTED',
+      screening: params.screening ?? 'ELIGIBLE',
+      previewId: params.previewId,
+      snapshotId: params.snapshotId,
+      profileVersion: params.profileVersion,
+      ruleVersion: params.ruleVersion,
+      payloadHash: params.payloadHash,
+      consentId: params.consentId,
+      submittedAt: new Date(),
+      revision: this._props.revision + 1,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 
-  public accept(): void {
-    this._props.status = 'ACCEPTED';
-    this.incrementVersion();
+  public shortlist(): Application {
+    if (this._props.status !== 'SUBMITTED') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Chỉ có thể duyệt hồ sơ đang ở trạng thái SUBMITTED',
+      );
+    }
+    return new Application(this.id, {
+      ...this._props,
+      status: 'SHORTLISTED',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 
-  public reject(): void {
-    this._props.status = 'REJECTED';
-    this.incrementVersion();
+  public changeStatus(status: ApplicationStatus): Application {
+    return new Application(this.id, {
+      ...this._props,
+      status,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
   }
 }

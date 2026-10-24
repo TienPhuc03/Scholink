@@ -12,12 +12,18 @@ import { IdempotencyGuard } from './infrastructure/guards/idempotency.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'scholink-jwt-secret-key-at-least-32-chars-long'),
-        signOptions: {
-          expiresIn: (config.get<string>('JWT_EXPIRES_IN', '15m')) as any,
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret =
+          config.get<string>('JWT_SECRET') ||
+          process.env.JWT_SECRET ||
+          'scholink-super-secret-jwt-key-minimum-32-chars-long!';
+        return {
+          secret,
+          signOptions: {
+            expiresIn: config.get<string>('JWT_EXPIRES_IN', '15m') as any,
+          },
+        };
+      },
     }),
   ],
   providers: [CryptoService, JwtAuthGuard, RolesGuard, IdempotencyGuard],
