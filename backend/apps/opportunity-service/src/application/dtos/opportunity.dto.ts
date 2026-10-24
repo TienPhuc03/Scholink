@@ -139,6 +139,30 @@ export const SubmitApplicationDtoSchema = z.object({
 
 export type SubmitApplicationDto = z.infer<typeof SubmitApplicationDtoSchema>;
 
+/**
+ * F24: Cập nhật trạng thái hồ sơ ứng tuyển từ Organizer Kanban
+ */
+export const UpdateApplicationStatusDtoSchema = z.object({
+  status: z.enum([
+    'SUBMITTED',
+    'REVIEWING',
+    'SHORTLISTED',
+    'INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
+    'WITHDRAWN',
+  ]),
+  expectedVersion: z.number().int().optional(),
+  note: z.string().trim().optional(),
+});
+
+export interface UpdateApplicationStatusDto {
+  status: 'SUBMITTED' | 'REVIEWING' | 'SHORTLISTED' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+  expectedVersion?: number;
+  note?: string;
+}
+
+
 // data trả về
 export interface OpportunitySummaryResponseDto {
   id: string;
