@@ -10,6 +10,7 @@ import {
 } from './grpc-clients.interface';
 import { GatewayAuthController } from './controllers/gateway-auth.controller';
 import { GatewayProfileController } from './controllers/gateway-profile.controller';
+import { GatewayMediaController } from './controllers/gateway-media.controller';
 import { GatewayOpportunityController } from './controllers/gateway-opportunity.controller';
 import { GatewayApplicationController } from './controllers/gateway-application.controller';
 
@@ -54,6 +55,7 @@ import { GatewayApplicationController } from './controllers/gateway-application.
     HealthController,
     GatewayAuthController,
     GatewayProfileController,
+    GatewayMediaController,
     GatewayOpportunityController,
     GatewayApplicationController,
   ],

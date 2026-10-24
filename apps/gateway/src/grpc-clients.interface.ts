@@ -3,6 +3,12 @@ import {
   RegisterDto,
   LoginDto,
   RefreshTokenDto,
+  SendOtpDto,
+  VerifyOtpDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  CreateUploadUrlDto,
+  CompleteUploadDto,
   UpdatePassportDto,
   CreateConsentDto,
   CreateOpportunityDto,
@@ -19,6 +25,10 @@ export interface IdentityGrpcClient {
   login(data: LoginDto): Observable<Record<string, unknown>>;
   refresh(data: RefreshTokenDto): Observable<Record<string, unknown>>;
   logout(data: { userId: string; sessionId?: string }): Observable<Record<string, unknown>>;
+  sendOtp(data: SendOtpDto): Observable<Record<string, unknown>>;
+  verifyOtp(data: VerifyOtpDto): Observable<Record<string, unknown>>;
+  forgotPassword(data: ForgotPasswordDto): Observable<Record<string, unknown>>;
+  resetPassword(data: ResetPasswordDto): Observable<Record<string, unknown>>;
   getMyPassport(data: { studentId: string }): Observable<Record<string, unknown>>;
   updateMyPassport(
     data: UpdatePassportDto & { studentId: string },
@@ -26,6 +36,16 @@ export interface IdentityGrpcClient {
   createConsent(
     data: CreateConsentDto & { studentId: string },
   ): Observable<Record<string, unknown>>;
+  createUploadUrl(
+    data: CreateUploadUrlDto & { ownerId: string },
+  ): Observable<Record<string, unknown>>;
+  completeUpload(
+    data: CompleteUploadDto & { ownerId: string; assetId: string },
+  ): Observable<Record<string, unknown>>;
+  getMediaAsset(data: {
+    ownerId: string;
+    assetId: string;
+  }): Observable<Record<string, unknown>>;
 }
 
 export interface OpportunityGrpcClient {

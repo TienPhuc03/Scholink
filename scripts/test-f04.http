@@ -202,3 +202,89 @@ Content-Type: application/json
 {
   "refreshToken": "{{refreshToken}}"
 }
+
+### ==============================================================================
+### PHẦN BỔ SUNG F13 BACKEND (TUẦN 2): EMAIL OTP, PASSWORD RESET & MEDIA UPLOAD
+### ==============================================================================
+
+### 15. [F13] Gửi mã OTP xác thực Email (TTL 5p, Cooldown 60s, SHA-256 Hash)
+# @name sendOtp
+POST {{baseUrl}}/auth/send-otp
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "purpose": "VERIFY_EMAIL"
+}
+
+### Lấy mã OTP preview trong môi trường dev
+@otpCode = {{sendOtp.response.body.devOtpPreview}}
+
+### ------------------------------------------------------------------------------
+### 16. [F13] Xác thực mã OTP (Nhập sai 5 lần liên tiếp sẽ khóa 15 phút - 429 OTP_LOCKED)
+POST {{baseUrl}}/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "otpCode": "{{otpCode}}",
+  "purpose": "VERIFY_EMAIL"
+}
+
+### ------------------------------------------------------------------------------
+### 17. [F13] Quên mật khẩu (Anti-Enumeration: luôn trả thông báo đồng nhất)
+# @name forgotPassword
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn"
+}
+
+@resetOtpCode = {{forgotPassword.response.body.devOtpPreview}}
+
+### ------------------------------------------------------------------------------
+### 18. [F13] Đặt lại mật khẩu bằng OTP (Tự động tăng sessionVersion & thu hồi phiên cũ)
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "otpCode": "{{resetOtpCode}}",
+  "newPassword": "Student@2026"
+}
+
+### ------------------------------------------------------------------------------
+### 19. [F13] Xin cấp Presigned Upload URL cho CV PDF (Kiểm MIME & Dung lượng <= 5MB)
+# @name createUploadUrl
+POST {{baseUrl}}/media/upload-url
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "category": "CV",
+  "fileName": "cv-nguyen-van-sinh-vien.pdf",
+  "mimeType": "application/pdf",
+  "sizeBytes": 524288
+}
+
+@uploadedAssetId = {{createUploadUrl.response.body.assetId}}
+
+### ------------------------------------------------------------------------------
+### 20. [F13] Hoàn tất tải lên & Quét Magic Bytes (%PDF = 25504446) + Malware Scan -> READY
+POST {{baseUrl}}/media/{{uploadedAssetId}}/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fileHeaderHex": "255044462d312e37",
+  "sampleContent": "%PDF-1.7 Clean Academic CV Document",
+  "actualSizeBytes": 524288
+}
+
+### ------------------------------------------------------------------------------
+### 21. [F13] Xem thông tin MediaAsset đã READY (Chỉ chủ sở hữu mới truy cập được)
+GET {{baseUrl}}/media/{{uploadedAssetId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+

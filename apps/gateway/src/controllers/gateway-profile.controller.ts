@@ -55,6 +55,11 @@ export class GatewayProfileController implements OnModuleInit {
     schema: {
       type: 'object',
       properties: {
+        expectedVersion: {
+          type: 'number',
+          description: 'Phiên bản Passport hiện tại để kiểm tra Optimistic Concurrency (tùy chọn)',
+          example: 1,
+        },
         fullName: { type: 'string', example: 'Nguyễn Văn Sinh Viên' },
         bio: { type: 'string', example: 'Sinh viên đam mê AI và Công nghệ phần mềm' },
         regionCode: { type: 'string', example: 'VN-SG' },
