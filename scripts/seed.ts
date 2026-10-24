@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
 
+declare const process: any;
+declare const crypto: any;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const IDENTITY_DB = process.env.IDENTITY_DB_NAME || 'scholink_identity';
 const OPPORTUNITY_DB = process.env.OPPORTUNITY_DB_NAME || 'scholink_opportunity';
@@ -81,49 +82,12 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
   );
 
   const User = conn.model('users', userSchema);
-  const Organization = conn.model('organizations', orgSchema);
+  const Org = conn.model('organizations', orgSchema);
   const Membership = conn.model('organization_memberships', membershipSchema);
   const Passport = conn.model('passports', passportSchema);
 
-  const adminHash = await bcrypt.hash(SEED_ADMIN_PASS, 10);
-  await User.updateOne(
-    { normalizedEmail: 'admin@scholink.edu.vn' },
-    {
-      $setOnInsert: {
-        id: adminId,
-        email: 'admin@scholink.edu.vn',
-        normalizedEmail: 'admin@scholink.edu.vn',
-        passwordHash: adminHash,
-        fullName: 'Hệ Thống Quản Trị Scholink',
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        sessionVersion: 1,
-        version: 1,
-      },
-    },
-    { upsert: true },
-  );
-
-  const orgHash = await bcrypt.hash(SEED_ORG_PASS, 10);
-  await User.updateOne(
-    { normalizedEmail: 'organizer@scholink.edu.vn' },
-    {
-      $setOnInsert: {
-        id: organizerId,
-        email: 'organizer@scholink.edu.vn',
-        normalizedEmail: 'organizer@scholink.edu.vn',
-        passwordHash: orgHash,
-        fullName: 'Ban Tổ Chức VinAI Innovation Lab',
-        role: 'ORGANIZER',
-        status: 'ACTIVE',
-        sessionVersion: 1,
-        version: 1,
-      },
-    },
-    { upsert: true },
-  );
-
-  await Organization.updateOne(
+  // 1. Tạo tổ chức mẫu VinAI
+  await Org.updateOne(
     { id: orgId },
     {
       $setOnInsert: {
@@ -138,11 +102,52 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { upsert: true },
   );
 
+  // 2. Tạo Admin
+  const adminHash = await bcrypt.hash(SEED_ADMIN_PASS, 10);
+  await User.updateOne(
+    { id: adminId },
+    {
+      $setOnInsert: {
+        id: adminId,
+        email: 'admin@scholink.edu.vn',
+        normalizedEmail: 'admin@scholink.edu.vn',
+        passwordHash: adminHash,
+        fullName: 'Hệ Thống Quản Trị Viên',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 3. Tạo Organizer
+  const orgHash = await bcrypt.hash(SEED_ORG_PASS, 10);
+  await User.updateOne(
+    { id: organizerId },
+    {
+      $setOnInsert: {
+        id: organizerId,
+        email: 'organizer@scholink.edu.vn',
+        normalizedEmail: 'organizer@scholink.edu.vn',
+        passwordHash: orgHash,
+        fullName: 'Đại Diện Tuyển Dụng VinAI',
+        role: 'ORGANIZER',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // Gán Organizer vào VinAI
   await Membership.updateOne(
     { organizationId: orgId, userId: organizerId },
     {
       $setOnInsert: {
-        id: 'mem_vinai_001',
+        id: `mem_${organizerId}_${orgId}`,
         organizationId: orgId,
         userId: organizerId,
         status: 'ACTIVE',
@@ -154,9 +159,10 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { upsert: true },
   );
 
+  // 4. Tạo Student & Passport 100%
   const studentHash = await bcrypt.hash(SEED_STUDENT_PASS, 10);
   await User.updateOne(
-    { normalizedEmail: 'student@scholink.edu.vn' },
+    { id: studentId },
     {
       $setOnInsert: {
         id: studentId,
@@ -177,34 +183,32 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { studentId },
     {
       $setOnInsert: {
-        id: `pass_${studentId}`,
+        id: `psp_${studentId}`,
         studentId,
         fullName: 'Nguyễn Văn Sinh Viên',
-        bio: 'Sinh viên năm 3 ngành Khoa học Máy tính Đại học Bách Khoa, đam mê AI & Hệ thống Phân tán.',
+        bio: 'Sinh viên năm 3 chuyên ngành Trí tuệ Nhân tạo - Bách Khoa TP.HCM',
         regionCode: 'VN-SG',
-        avatarAssetId: 'asset_avatar_001',
+        avatarAssetId: 'asset_avatar_001.png',
         education: {
           institution: 'Đại học Bách Khoa TP.HCM',
           major: 'Khoa học Máy tính',
           startYear: 2023,
-          endYear: 2027,
           gpa: 3.82,
-          gpaScale: 4,
+          gpaScale: 4.0,
         },
         certificates: [
           {
-            type: 'IELTS',
-            name: 'IELTS 7.5 Academic',
+            type: 'LANGUAGE',
+            name: 'IELTS Academic',
             score: '7.5',
-            issuedDate: new Date('2025-01-15'),
-            assetId: 'asset_ielts_001',
-            status: 'VERIFIED',
+            issuedDate: '2025-06-15T00:00:00.000Z',
+            status: 'SELF_DECLARED',
           },
         ],
-        skills: ['Python', 'TypeScript', 'Kotlin Jetpack Compose'],
+        skills: ['Python', 'PyTorch', 'TypeScript', 'NestJS', 'Docker', 'gRPC'],
         achievements: [
-          'Giải Nhất Học bổng Khuyến khích Học tập HK1 2025',
-          'Top 5 Hackathon BK AI Innovators 2025',
+          'Giải Nhất Nghiên cứu Khoa học Sinh viên Cấp Trường 2025',
+          'Học bổng Khuyến khích Học tập Xuất sắc 4 kỳ liên tiếp',
         ],
         cvAssetId: 'asset_cv_nguyen_van_sinh_vien.pdf',
         pitchVideoAssetId: 'asset_pitch_video_2026.mp4',
@@ -233,6 +237,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       dedupKey: { type: String, unique: true, sparse: true },
       type: { type: String, required: true, enum: ['SCHOLARSHIP', 'COMPETITION'] },
       title: { type: String, required: true },
+      slug: String,
       description: { type: String, required: true },
       organizationId: String,
       createdBy: String,
@@ -244,6 +249,10 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       submitDeadline: Date,
       timezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
       fundingLevel: String,
+      minGpa: { type: Number, default: 0 },
+      requiredIelts: { type: Number, default: 0 },
+      coverImageUrl: String,
+      isPromoted: { type: Boolean, default: false },
       competitionMode: String,
       minTeamSize: Number,
       maxTeamSize: Number,
@@ -262,6 +271,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       dedupKey: 'scholarship:vinai_young_talent:2026',
       type: 'SCHOLARSHIP',
       title: 'Học bổng Nghiên cứu Tài năng Trẻ VinAI 2026',
+      slug: 'hoc-bong-nghien-cuu-tai-nang-tre-vinai-2026',
       description:
         'Chương trình học bổng toàn phần dành cho sinh viên xuất sắc các ngành CNTT, Toán-Tin, Khoa học dữ liệu trên toàn quốc.',
       organizationId: orgId,
@@ -272,6 +282,9 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       registerDeadline: new Date('2026-12-31T23:59:59+07:00'),
       submitDeadline: new Date('2026-12-31T23:59:59+07:00'),
       fundingLevel: 'FULL',
+      minGpa: 3.2,
+      requiredIelts: 6.5,
+      isPromoted: true,
       ruleVersion: 1,
       tags: ['AI/ML', 'STEM', 'Toàn phần'],
     },
@@ -280,6 +293,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       dedupKey: 'scholarship:fpt_women_in_tech:2026',
       type: 'SCHOLARSHIP',
       title: 'Học bổng Phát triển Sinh viên Nữ Công nghệ FPT 2026',
+      slug: 'hoc-bong-phat-trien-sinh-vien-nu-cong-nghe-fpt-2026',
       description:
         'Hỗ trợ các nữ sinh viên theo đuổi ngành kỹ thuật công nghệ thông tin và viễn thông kèm cơ hội thực tập trực tiếp.',
       organizationId: orgId,
@@ -290,6 +304,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       registerDeadline: new Date('2026-11-30T23:59:59+07:00'),
       submitDeadline: new Date('2026-11-30T23:59:59+07:00'),
       fundingLevel: 'PARTIAL',
+      minGpa: 3.0,
       ruleVersion: 1,
       tags: ['Công nghệ', 'Nữ sinh', 'Thực tập'],
     },
@@ -298,6 +313,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       dedupKey: 'competition:scholink_ai_challenge:2026',
       type: 'COMPETITION',
       title: 'Cuộc thi Scholink AI Challenge 2026 - Đổi mới Sáng tạo Sinh viên',
+      slug: 'cuoc-thi-scholink-ai-challenge-2026',
       description:
         'Đấu trường AI thường niên dành cho sinh viên đại học. Thi đấu theo đội từ 2-4 thành viên giải quyết bài toán thực tế.',
       organizationId: orgId,
@@ -310,6 +326,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       competitionMode: 'TEAM',
       minTeamSize: 2,
       maxTeamSize: 4,
+      isPromoted: true,
       ruleVersion: 1,
       tags: ['AI Challenge', 'Đội thi', 'Hackathon'],
     },
@@ -318,6 +335,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       dedupKey: 'competition:national_startup_hackathon:2026',
       type: 'COMPETITION',
       title: 'National Student Startup Hackathon 2026',
+      slug: 'national-student-startup-hackathon-2026',
       description:
         'Cuộc thi khởi nghiệp đổi mới sáng tạo quốc gia dành cho sinh viên các trường đại học trên toàn quốc.',
       organizerName: 'Bộ Khoa học và Công nghệ & VCCI',
@@ -418,6 +436,12 @@ async function seed() {
   await seedBillingAndNotifications(studentId);
 
   console.log('\n🎉 Khởi tạo dữ liệu mẫu thành công!');
+  console.log('----------------------------------------------------');
+  console.log('Tài khoản kiểm thử đã sẵn sàng:');
+  console.log('  1. ADMIN:     admin@scholink.edu.vn     / ScholinkAdmin@2026');
+  console.log('  2. ORGANIZER: organizer@scholink.edu.vn / Organizer@2026');
+  console.log('  3. STUDENT:   student@scholink.edu.vn   / Student@2026');
+  console.log('----------------------------------------------------');
 }
 
 seed().catch((err) => {

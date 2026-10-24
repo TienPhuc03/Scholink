@@ -5,7 +5,11 @@ import {
   OPPORTUNITY_REPOSITORY,
 } from '../../domain/ports/opportunity.repository.port';
 import { Opportunity } from '../../domain/opportunity.entity';
-import { CreateOpportunityDto, QueryOpportunityDto } from '../dtos/opportunity.dto';
+import {
+  CreateOpportunityDto,
+  QueryOpportunityDto,
+  OpportunityDetailResponseDto,
+} from '../dtos/opportunity.dto';
 import { DomainException, PaginationHelper, PaginatedResult } from '@shared';
 
 @Injectable()
@@ -15,13 +19,28 @@ export class OpportunityUseCase {
     private readonly opportunityRepo: IOpportunityRepository,
   ) {}
 
+  private generateSlug(title: string): string {
+    return (
+      title
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') +
+      '-' +
+      Date.now().toString().slice(-4)
+    );
+  }
+
   async create(dto: CreateOpportunityDto, actorId: string, organizationId?: string) {
     const id = `opp_${crypto.randomUUID()}`;
-    // Mục 2 SRS: Cơ hội thuộc organizationId lấy từ server, createdBy chỉ phục vụ audit
     const opportunity = new Opportunity(id, {
       type: dto.type,
       title: dto.title,
+      slug: dto.slug || this.generateSlug(dto.title),
       description: dto.description,
+      benefits: dto.benefits,
+      requirements: dto.requirements,
       organizationId: organizationId || actorId,
       createdBy: actorId,
       organizerName: dto.organizerName,
@@ -32,9 +51,14 @@ export class OpportunityUseCase {
       submitDeadline: dto.submitDeadline ? new Date(dto.submitDeadline) : undefined,
       timezone: dto.timezone,
       fundingLevel: dto.fundingLevel,
+      minGpa: dto.minGpa ?? 0,
+      requiredIelts: dto.requiredIelts ?? 0,
+      coverImageUrl: dto.coverImageUrl,
+      isPromoted: dto.isPromoted ?? false,
       competitionMode: dto.competitionMode,
       minTeamSize: dto.minTeamSize,
       maxTeamSize: dto.maxTeamSize,
+      eligibilityRules: dto.eligibilityRules,
       tags: dto.tags,
       ruleVersion: 1,
     });
@@ -55,13 +79,13 @@ export class OpportunityUseCase {
     });
 
     return PaginationHelper.createPaginatedResponse(
-      opportunities.map((o) => this.toResponse(o)),
+      opportunities.map((o) => this.toResponse(o) as any),
       limit,
-      (item) => ({ id: item.id, createdAt: item.createdAt }),
+      (item) => ({ id: item.id as string, createdAt: item.createdAt as string }),
     );
   }
 
-  async getById(id: string) {
+  async getById(id: string): Promise<OpportunityDetailResponseDto> {
     const opportunity = await this.opportunityRepo.findById(id);
     if (!opportunity) {
       throw DomainException.notFound('Cơ hội');
@@ -69,16 +93,19 @@ export class OpportunityUseCase {
     return this.toResponse(opportunity);
   }
 
-  private toResponse(opportunity: Opportunity) {
+  private toResponse(opportunity: Opportunity): OpportunityDetailResponseDto {
+    const props = opportunity.props;
     return Object.freeze({
-      ...opportunity.props,
+      ...props,
       id: opportunity.id,
       registerDeadline: opportunity.registerDeadline.toISOString(),
-      submitDeadline: opportunity.props.submitDeadline
-        ? opportunity.props.submitDeadline.toISOString()
+      submitDeadline: props.submitDeadline
+        ? props.submitDeadline.toISOString()
         : undefined,
+      createdAt: (opportunity.createdAt || new Date()).toISOString(),
+      updatedAt: (opportunity.updatedAt || new Date()).toISOString(),
       ruleVersion: opportunity.ruleVersion,
       version: opportunity.version,
-    });
+    }) as OpportunityDetailResponseDto;
   }
 }
