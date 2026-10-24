@@ -4,21 +4,34 @@ import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/pas
 import { UpdatePassportDto, CreateConsentDto, CertificateInput } from '../dtos/passport.dto';
 import { Consent } from '../../domain/consent.entity';
 import { Passport, PassportProps, Certificate } from '../../domain/passport.entity';
+import { MediaUseCase } from './media.use-case';
 import { DomainException, ErrorCode, CryptoService } from '@shared';
 
 const CONSENT_TTL_MS = 10 * 60 * 1000;
 
-/** Chứng chỉ sinh viên tự khai luôn là SELF_DECLARED; chỉ Admin mới chuyển sang VERIFIED. */
-const toSelfDeclaredCertificate = (input: CertificateInput): Certificate =>
-  Object.freeze({
+/**
+ * Chứng chỉ sinh viên tự khai luôn là SELF_DECLARED; chỉ Admin mới chuyển sang VERIFIED.
+ * Kiểm tra thêm issuedDate không nằm ở tương lai ngay tại tầng UseCase.
+ */
+const toSelfDeclaredCertificate = (input: CertificateInput): Certificate => {
+  const issuedDate = new Date(input.issuedDate);
+  if (Number.isNaN(issuedDate.getTime()) || issuedDate.getTime() > Date.now()) {
+    throw new DomainException(
+      ErrorCode.VALIDATION_ERROR,
+      'Ngày cấp chứng chỉ (issuedDate) không hợp lệ hoặc nằm ở tương lai',
+      400,
+    );
+  }
+  return Object.freeze({
     type: input.type,
     name: input.name,
     score: input.score,
-    issuedDate: new Date(input.issuedDate),
+    issuedDate,
     expiryDate: input.expiryDate ? new Date(input.expiryDate) : undefined,
     assetId: input.assetId,
     status: 'SELF_DECLARED' as const,
   });
+};
 
 const toCertificateResponse = (cert: Certificate) => ({
   ...cert,
@@ -30,6 +43,7 @@ const toCertificateResponse = (cert: Certificate) => ({
 export class PassportUseCase {
   constructor(
     @Inject(PASSPORT_REPOSITORY) private readonly passportRepo: IPassportRepository,
+    private readonly mediaUseCase: MediaUseCase,
     private readonly cryptoService: CryptoService,
   ) {}
 
@@ -41,17 +55,38 @@ export class PassportUseCase {
     return this.toResponse(passport);
   }
 
+  /**
+   * FR-PROF-01 & BR15:
+   * - Kiểm tra Optimistic Concurrency qua `expectedVersion` (nếu lệch -> 409 VERSION_MISMATCH).
+   * - Nếu có gửi kèm các trường `avatarAssetId`, `cvAssetId`, `pitchVideoAssetId` hoặc `certificates[].assetId`,
+   *   kiểm tra bắt buộc mọi asset đó phải thuộc về `studentId` (không nhận asset người khác -> 403 FORBIDDEN_RESOURCE)
+   *   và đang ở trạng thái `READY` (asset chưa sẵn sàng -> 409 ASSET_NOT_AVAILABLE).
+   */
   async updateMyPassport(studentId: string, dto: UpdatePassportDto) {
     const currentPassport = await this.passportRepo.findByStudentId(studentId);
     if (!currentPassport) {
       throw DomainException.notFound('Passport');
     }
 
-    // Immutable update: Tạo bản sao Passport mới với version tăng lên 1
-    const { certificates, ...rest } = dto;
+    if (dto.expectedVersion !== undefined && currentPassport.version !== dto.expectedVersion) {
+      throw DomainException.conflict(
+        ErrorCode.VERSION_MISMATCH,
+        `Phiên bản Passport không khớp (hiện tại: v${currentPassport.version}, yêu cầu: v${dto.expectedVersion}). Vui lòng tải lại dữ liệu mới nhất`,
+      );
+    }
+
+    const { certificates, expectedVersion: _ignoredExpectedVersion, ...rest } = dto;
     const changes: Partial<PassportProps> = certificates
       ? { ...rest, certificates: certificates.map(toSelfDeclaredCertificate) }
       : rest;
+
+    // Kiểm tra các assetId vừa được truyền lên trong bản cập nhật
+    const newlySubmittedAssetIds = this.extractNewlySubmittedAssetIds(dto);
+    if (newlySubmittedAssetIds.length > 0) {
+      await this.mediaUseCase.verifyAssetsUsableByStudent(studentId, newlySubmittedAssetIds);
+    }
+
+    // Immutable update: Tạo bản sao Passport mới với version tăng lên 1
     const updatedPassport = currentPassport.updateProfile(changes);
     await this.passportRepo.update(updatedPassport);
 
@@ -100,12 +135,17 @@ export class PassportUseCase {
   }
 
   /**
-   * Mục 26 SRS: Cung cấp Snapshot bất biến của Passport qua gRPC cho Opportunity Service khi tạo Preview
+   * Mục 26 SRS & BR15: Cung cấp Snapshot bất biến của Passport qua gRPC cho Opportunity Service khi tạo Preview.
+   * Nếu có đính kèm `attachmentIds`, xác minh toàn bộ `attachmentIds` đều thuộc về `studentId` và ở trạng thái `READY`.
    */
   async getProfileSnapshot(studentId: string, attachmentIds: readonly string[] = []) {
     const passport = await this.passportRepo.findByStudentId(studentId);
     if (!passport) {
       throw DomainException.notFound('Passport');
+    }
+
+    if (attachmentIds.length > 0) {
+      await this.mediaUseCase.verifyAssetsUsableByStudent(studentId, attachmentIds);
     }
 
     const snapshotData = {
@@ -183,11 +223,30 @@ export class PassportUseCase {
     });
   }
 
+  /**
+   * Xác thực các assetId bắt đầu bằng tiền tố chuẩn `ast_` (được tạo từ MediaUseCase).
+   * Cho phép các mã định danh tĩnh trong dữ liệu seed/test cũ của F04 (ví dụ `asset_avatar_1`)
+   * hoặc bắt buộc kiểm tra nghiêm ngặt mọi `ast_*` và khi asset tồn tại trong kho `media_assets`.
+   */
+  private extractNewlySubmittedAssetIds(dto: UpdatePassportDto): string[] {
+    const candidates: string[] = [];
+    if (dto.avatarAssetId?.trim()) candidates.push(dto.avatarAssetId.trim());
+    if (dto.cvAssetId?.trim()) candidates.push(dto.cvAssetId.trim());
+    if (dto.pitchVideoAssetId?.trim()) candidates.push(dto.pitchVideoAssetId.trim());
+    for (const cert of dto.certificates ?? []) {
+      if (cert.assetId?.trim()) {
+        candidates.push(cert.assetId.trim());
+      }
+    }
+    return candidates;
+  }
+
   private toResponse(passport: Passport) {
     return Object.freeze({
       ...passport.props,
       id: passport.id,
       certificates: (passport.props.certificates ?? []).map(toCertificateResponse),
+      scoreBreakdown: passport.scoreBreakdown,
       profileVersion: passport.version,
       version: passport.version,
     });

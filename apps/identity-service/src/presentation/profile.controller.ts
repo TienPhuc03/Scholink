@@ -1,13 +1,22 @@
 import { Controller, UseFilters } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { PassportUseCase } from '../application/use-cases/passport.use-case';
-import { UpdatePassportDto, CreateConsentDto } from '../application/dtos/passport.dto';
+import { MediaUseCase } from '../application/use-cases/media.use-case';
+import {
+  UpdatePassportDto,
+  CreateConsentDto,
+  CreateUploadUrlDto,
+  CompleteUploadDto,
+} from '../application/dtos/passport.dto';
 import { GrpcExceptionFilter } from '@shared';
 
 @UseFilters(GrpcExceptionFilter)
 @Controller()
 export class ProfileController {
-  constructor(private readonly passportUseCase: PassportUseCase) {}
+  constructor(
+    private readonly passportUseCase: PassportUseCase,
+    private readonly mediaUseCase: MediaUseCase,
+  ) {}
 
   @GrpcMethod('IdentityGrpcService', 'GetMyPassport')
   async getMyPassport(data: { studentId: string }) {
@@ -24,6 +33,25 @@ export class ProfileController {
   async createConsent(data: CreateConsentDto & { studentId: string }) {
     const { studentId, ...dto } = data;
     return this.passportUseCase.createConsent(studentId, dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'CreateUploadUrl')
+  async createUploadUrl(data: CreateUploadUrlDto & { ownerId: string }) {
+    const { ownerId, ...dto } = data;
+    return this.mediaUseCase.createUploadUrl(ownerId, dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'CompleteUpload')
+  async completeUpload(
+    data: CompleteUploadDto & { ownerId: string; assetId: string },
+  ) {
+    const { ownerId, assetId, ...dto } = data;
+    return this.mediaUseCase.completeUpload(ownerId, assetId, dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'GetMediaAsset')
+  async getMediaAsset(data: { ownerId: string; assetId: string }) {
+    return this.mediaUseCase.getMediaAsset(data.ownerId, data.assetId);
   }
 
   @GrpcMethod('IdentityGrpcService', 'GetProfileSnapshot')

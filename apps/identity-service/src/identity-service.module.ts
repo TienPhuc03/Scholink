@@ -38,6 +38,7 @@ import { MongooseUserRepository } from './infrastructure/persistence/user.reposi
 import { MongoosePassportRepository } from './infrastructure/persistence/passport.repository';
 import { AuthUseCase } from './application/use-cases/auth.use-case';
 import { PassportUseCase } from './application/use-cases/passport.use-case';
+import { MediaUseCase } from './application/use-cases/media.use-case';
 import { AuthController } from './presentation/auth.controller';
 import { ProfileController } from './presentation/profile.controller';
 
@@ -67,6 +68,7 @@ import { ProfileController } from './presentation/profile.controller';
   controllers: [AuthController, ProfileController],
   providers: [
     AuthUseCase,
+    MediaUseCase,
     PassportUseCase,
     {
       provide: USER_REPOSITORY,
@@ -77,6 +79,6 @@ import { ProfileController } from './presentation/profile.controller';
       useClass: MongoosePassportRepository,
     },
   ],
-  exports: [AuthUseCase, PassportUseCase, USER_REPOSITORY, PASSPORT_REPOSITORY],
+  exports: [AuthUseCase, MediaUseCase, PassportUseCase, USER_REPOSITORY, PASSPORT_REPOSITORY],
 })
 export class IdentityServiceModule {}
