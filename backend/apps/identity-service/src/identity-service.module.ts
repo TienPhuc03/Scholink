@@ -41,7 +41,6 @@ import { OrganizationUseCase } from './application/use-cases/organization.use-ca
 import { AuthController } from './presentation/auth.controller';
 import { ProfileController } from './presentation/profile.controller';
 import { AdminOrganizationController } from './presentation/admin-organization.controller';
-import { IdentityGrpcController } from './presentation/identity-grpc.controller';
 
 @Module({
   imports: [
@@ -65,7 +64,7 @@ import { IdentityGrpcController } from './presentation/identity-grpc.controller'
       { name: IdempotencyKeyModel.name, schema: IdempotencyKeySchema },
     ]),
   ],
-  controllers: [AuthController, ProfileController, AdminOrganizationController, IdentityGrpcController],
+  controllers: [AuthController, ProfileController, AdminOrganizationController],
   providers: [
     AuthUseCase,
     PassportUseCase,
