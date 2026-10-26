@@ -1,4 +1,6 @@
+import { OtpPurpose } from '@shared';
 import { User } from '../user.entity';
+import { OtpRecord } from '../otp-record.entity';
 
 export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
 
@@ -21,4 +23,8 @@ export interface IUserRepository {
   findSessionByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   markSessionUsed(sessionId: string): Promise<void>;
   revokeSessionFamily(familyId: string, reason: string): Promise<void>;
+  revokeAllUserSessions(userId: string, reason: string): Promise<void>;
+  findOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<OtpRecord | null>;
+  saveOtpRecord(record: OtpRecord): Promise<void>;
+  deleteOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<void>;
 }

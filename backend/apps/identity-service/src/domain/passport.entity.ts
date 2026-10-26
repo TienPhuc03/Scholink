@@ -20,6 +20,17 @@ export interface Certificate {
   readonly status: 'SELF_DECLARED' | 'VERIFIED' | 'REJECTED';
 }
 
+export interface ScoreBreakdown {
+  readonly basicScore: number;
+  readonly educationScore: number;
+  readonly certificateScore: number;
+  readonly achievementScore: number;
+  readonly skillScore: number;
+  readonly cvOrVideoScore: number;
+  readonly intentScore: number;
+  readonly totalScore: number;
+}
+
 export interface PassportProps {
   readonly studentId: string;
   readonly profileVersion: number;
@@ -44,6 +55,7 @@ export interface PassportProps {
 
 export class Passport extends AggregateRoot<string> {
   private readonly _props: Readonly<PassportProps>;
+  private readonly _scoreBreakdown: Readonly<ScoreBreakdown>;
 
   constructor(id: string, props: PassportProps) {
     super(
@@ -53,11 +65,12 @@ export class Passport extends AggregateRoot<string> {
       props.updatedAt || new Date(),
     );
     const normalizedSkills = Passport.normalizeSkills(props.skills);
-    const computedScore = Passport.computeScore({
+    const breakdown = Passport.computeScoreBreakdown({
       ...props,
       skills: normalizedSkills,
     });
 
+    this._scoreBreakdown = breakdown;
     this._props = Object.freeze({
       ...props,
       profileVersion: props.profileVersion || 1,
@@ -65,9 +78,10 @@ export class Passport extends AggregateRoot<string> {
       achievements: props.achievements ? Object.freeze([...props.achievements]) : [],
       certificates: props.certificates ? Object.freeze([...props.certificates]) : [],
       education: props.education ? Object.freeze({ ...props.education }) : undefined,
-      completionScore: computedScore,
+      completionScore: breakdown.totalScore,
       scoreVersion: 1,
     });
+    Object.freeze(this);
   }
 
   get studentId(): string {
@@ -80,6 +94,10 @@ export class Passport extends AggregateRoot<string> {
 
   get completionScore(): number {
     return this._props.completionScore ?? 0;
+  }
+
+  get scoreBreakdown(): Readonly<ScoreBreakdown> {
+    return this._scoreBreakdown;
   }
 
   get scoreVersion(): number {
@@ -109,49 +127,82 @@ export class Passport extends AggregateRoot<string> {
    * Mục 12A SRS (scoreVersion = 1):
    * Cơ bản (20) + Học vấn (25) + Chứng chỉ (10) + Thành tích (15) + Kỹ năng (15) + CV/Video (5) + Lịch/Vị trí (10) = 100
    */
-  public static computeScore(props: Partial<PassportProps>): number {
-    let score = 0;
+  public static computeScoreBreakdown(props: Partial<PassportProps>): Readonly<ScoreBreakdown> {
+    let basicScore = 0;
+    if (props.fullName && props.fullName.trim().length >= 2) basicScore += 10;
+    if (props.avatarAssetId) basicScore += 5;
+    if (props.regionCode || props.bio) basicScore += 5;
 
-    // 1. Cơ bản (tối đa 20: tên + email xác minh = 10, avatar READY = 5, regionCode/bio = 5)
-    if (props.fullName && props.fullName.trim().length >= 2) score += 10;
-    if (props.avatarAssetId) score += 5;
-    if (props.regionCode || props.bio) score += 5;
-
-    // 2. Học vấn (tối đa 25: trường + ngành + năm học = 15, GPA hợp lệ trong thang = 10)
+    let educationScore = 0;
     const edu = props.education;
     if (edu?.institution && edu?.major) {
-      score += 15;
+      educationScore += 15;
       const scale = edu.gpaScale ?? 4;
       if (edu.gpa !== undefined && edu.gpa > 0 && edu.gpa <= scale) {
-        score += 10;
+        educationScore += 10;
       }
     }
 
-    // 3. Chứng chỉ (10)
-    if (props.certificates && props.certificates.length > 0) {
-      score += 10;
-    }
+    const certificateScore = props.certificates && props.certificates.length > 0 ? 10 : 0;
+    const achievementScore = props.achievements && props.achievements.length > 0 ? 15 : 0;
 
-    // 4. Thành tích (15)
-    if (props.achievements && props.achievements.length > 0) {
-      score += 15;
-    }
-
-    // 5. Kỹ năng không trùng (5 điểm / kỹ năng, tối đa 15)
     const uniqueSkills = Passport.normalizeSkills(props.skills);
-    score += Math.min(uniqueSkills.length * 5, 15);
+    const skillScore = Math.min(uniqueSkills.length * 5, 15);
 
-    // 6. CV hoặc Pitch video (5)
-    if (props.cvAssetId || props.pitchVideoAssetId) {
-      score += 5;
+    const cvOrVideoScore = props.cvAssetId || props.pitchVideoAssetId ? 5 : 0;
+    const intentScore =
+      props.isLookingForTeammate || props.isOpenForScholarship || props.isOpenForMentoring
+        ? 10
+        : 0;
+
+    const totalScore = Math.min(
+      basicScore +
+        educationScore +
+        certificateScore +
+        achievementScore +
+        skillScore +
+        cvOrVideoScore +
+        intentScore,
+      100,
+    );
+
+    return Object.freeze({
+      basicScore,
+      educationScore,
+      certificateScore,
+      achievementScore,
+      skillScore,
+      cvOrVideoScore,
+      intentScore,
+      totalScore,
+    });
+  }
+
+  public static computeScore(props: Partial<PassportProps>): number {
+    return Passport.computeScoreBreakdown(props).totalScore;
+  }
+
+  /**
+   * Trích xuất toàn bộ danh sách assetId đang được tham chiếu trong Passport
+   * để kiểm tra quyền sở hữu (ownerId === studentId) và trạng thái READY (BR15).
+   */
+  public getReferencedAssetIds(): string[] {
+    const ids = new Set<string>();
+    if (this._props.avatarAssetId?.trim()) {
+      ids.add(this._props.avatarAssetId.trim());
     }
-
-    // 7. Trạng thái tìm đội / học bổng / lịch (10)
-    if (props.isLookingForTeammate || props.isOpenForScholarship || props.isOpenForMentoring) {
-      score += 10;
+    if (this._props.cvAssetId?.trim()) {
+      ids.add(this._props.cvAssetId.trim());
     }
-
-    return Math.min(score, 100);
+    if (this._props.pitchVideoAssetId?.trim()) {
+      ids.add(this._props.pitchVideoAssetId.trim());
+    }
+    for (const cert of this._props.certificates ?? []) {
+      if (cert.assetId?.trim()) {
+        ids.add(cert.assetId.trim());
+      }
+    }
+    return [...ids];
   }
 
   public getMissingFields(): string[] {

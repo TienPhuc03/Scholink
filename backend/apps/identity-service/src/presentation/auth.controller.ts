@@ -1,7 +1,15 @@
 import { Controller, UseFilters } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { AuthUseCase } from '../application/use-cases/auth.use-case';
-import { RegisterDto, LoginDto, RefreshTokenDto } from '../application/dtos/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  RefreshTokenDto,
+  SendOtpDto,
+  VerifyOtpDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from '../application/dtos/auth.dto';
 import { GrpcExceptionFilter } from '@shared';
 
 @UseFilters(GrpcExceptionFilter)
@@ -27,5 +35,25 @@ export class AuthController {
   @GrpcMethod('IdentityGrpcService', 'Logout')
   async logout(data: { userId: string; sessionId?: string }) {
     return this.authUseCase.logout(data.userId, data.sessionId);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'SendOtp')
+  async sendOtp(dto: SendOtpDto) {
+    return this.authUseCase.sendOtp(dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'VerifyOtp')
+  async verifyOtp(dto: VerifyOtpDto) {
+    return this.authUseCase.verifyOtp(dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'ForgotPassword')
+  async forgotPassword(dto: ForgotPasswordDto) {
+    return this.authUseCase.forgotPassword(dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'ResetPassword')
+  async resetPassword(dto: ResetPasswordDto) {
+    return this.authUseCase.resetPassword(dto);
   }
 }

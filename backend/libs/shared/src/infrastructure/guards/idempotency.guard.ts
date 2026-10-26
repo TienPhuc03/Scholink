@@ -12,12 +12,14 @@ import { DomainException, ErrorCode } from '../../domain/domain.exception';
 export const IDEMPOTENT_KEY = 'idempotent';
 export const Idempotent = () => SetMetadata(IDEMPOTENT_KEY, true);
 
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 giờ theo SRS BR13
+
 interface IdempotentEntry {
-  status: 'PROCESSING' | 'COMPLETED';
-  requestHash: string;
-  responseBody?: any;
-  statusCode?: number;
-  createdAt: number;
+  readonly status: 'PROCESSING' | 'COMPLETED';
+  readonly requestHash: string;
+  readonly responseBody?: unknown;
+  readonly statusCode?: number;
+  readonly createdAt: number;
 }
 
 @Injectable()
@@ -27,6 +29,8 @@ export class IdempotencyGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    IdempotencyGuard.evictExpiredEntries();
+
     const isIdempotentRequired = this.reflector.getAllAndOverride<boolean>(
       IDEMPOTENT_KEY,
       [context.getHandler(), context.getClass()],
@@ -49,7 +53,7 @@ export class IdempotencyGuard implements CanActivate {
       );
     }
 
-    const actorId = (request as any).user?.userId || 'anonymous';
+    const actorId = (request as { user?: { userId?: string } }).user?.userId || 'anonymous';
     const method = request.method;
     const route = request.baseUrl + request.path;
     const scopeKey = `${actorId}:${method}:${route}:${idempotencyKey}`;
@@ -83,24 +87,44 @@ export class IdempotencyGuard implements CanActivate {
       }
     }
 
-    IdempotencyGuard.cache.set(scopeKey, {
-      status: 'PROCESSING',
-      requestHash,
-      createdAt: Date.now(),
-    });
+    IdempotencyGuard.cache.set(
+      scopeKey,
+      Object.freeze({
+        status: 'PROCESSING',
+        requestHash,
+        createdAt: Date.now(),
+      }),
+    );
 
     const originalJson = response.json.bind(response);
-    response.json = (body: any) => {
-      IdempotencyGuard.cache.set(scopeKey, {
-        status: 'COMPLETED',
-        requestHash,
-        responseBody: body,
-        statusCode: response.statusCode,
-        createdAt: Date.now(),
-      });
+    response.json = (body: unknown) => {
+      if (response.statusCode >= 500) {
+        // Nhả khóa nếu gặp lỗi hệ thống 5xx để client có thể retry hợp lệ
+        IdempotencyGuard.cache.delete(scopeKey);
+      } else {
+        IdempotencyGuard.cache.set(
+          scopeKey,
+          Object.freeze({
+            status: 'COMPLETED',
+            requestHash,
+            responseBody: body,
+            statusCode: response.statusCode,
+            createdAt: Date.now(),
+          }),
+        );
+      }
       return originalJson(body);
     };
 
     return true;
+  }
+
+  private static evictExpiredEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of IdempotencyGuard.cache.entries()) {
+      if (now - entry.createdAt > IDEMPOTENCY_TTL_MS) {
+        IdempotencyGuard.cache.delete(key);
+      }
+    }
   }
 }

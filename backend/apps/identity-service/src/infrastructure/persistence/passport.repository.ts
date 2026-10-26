@@ -1,14 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { MediaCategory } from '@shared';
 import { IPassportRepository } from '../../domain/ports/passport.repository.port';
 import { Passport, Education, Certificate } from '../../domain/passport.entity';
 import { Consent } from '../../domain/consent.entity';
+import { MediaAsset, MediaAssetStatus } from '../../domain/media-asset.entity';
 import {
   PassportModel,
   PassportDocument,
   ConsentModel,
   ConsentDocument,
+  MediaAssetModel,
+  MediaAssetDocument,
 } from './passport.schema';
 
 @Injectable()
@@ -18,10 +22,15 @@ export class MongoosePassportRepository implements IPassportRepository {
     private readonly passportModel: Model<PassportDocument>,
     @InjectModel(ConsentModel.name)
     private readonly consentModel: Model<ConsentDocument>,
+    @InjectModel(MediaAssetModel.name)
+    private readonly mediaAssetModel: Model<MediaAssetDocument>,
   ) {}
 
   async findByStudentId(studentId: string): Promise<Passport | null> {
-    const doc = await this.passportModel.findOne({ studentId: String(studentId) }).lean().exec();
+    const doc = await this.passportModel
+      .findOne({ studentId: { $eq: String(studentId) } })
+      .lean()
+      .exec();
     if (!doc) return null;
     return this.toDomain(doc);
   }
@@ -52,7 +61,7 @@ export class MongoosePassportRepository implements IPassportRepository {
   async update(passport: Passport): Promise<void> {
     await this.passportModel
       .updateOne(
-        { id: String(passport.id) },
+        { id: { $eq: String(passport.id) } },
         {
           $set: {
             fullName: passport.props.fullName,
@@ -95,7 +104,10 @@ export class MongoosePassportRepository implements IPassportRepository {
   }
 
   async findConsentById(consentId: string): Promise<Consent | null> {
-    const doc = await this.consentModel.findOne({ id: String(consentId) }).lean().exec();
+    const doc = await this.consentModel
+      .findOne({ id: { $eq: String(consentId) } })
+      .lean()
+      .exec();
     if (!doc) return null;
     return new Consent(doc.id, {
       actorId: doc.actorId,
@@ -109,6 +121,81 @@ export class MongoosePassportRepository implements IPassportRepository {
       manifestHash: doc.manifestHash,
       payloadHash: doc.payloadHash,
       expiresAt: new Date(doc.expiresAt),
+    });
+  }
+
+  async saveMediaAsset(asset: MediaAsset): Promise<void> {
+    await this.mediaAssetModel.create({
+      id: asset.id,
+      ownerId: asset.ownerId,
+      category: asset.category,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      sha256: asset.sha256,
+      objectKey: asset.objectKey,
+      status: asset.status,
+      version: asset.version,
+    });
+  }
+
+  async updateMediaAsset(asset: MediaAsset): Promise<void> {
+    await this.mediaAssetModel
+      .updateOne(
+        { id: { $eq: String(asset.id) } },
+        {
+          $set: {
+            sizeBytes: asset.sizeBytes,
+            sha256: asset.sha256,
+            status: asset.status,
+            version: asset.version,
+          },
+        },
+      )
+      .exec();
+  }
+
+  async findMediaAssetById(assetId: string): Promise<MediaAsset | null> {
+    const doc = await this.mediaAssetModel
+      .findOne({ id: { $eq: String(assetId) } })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return this.toMediaAssetDomain(doc);
+  }
+
+  async findMediaAssetsByIds(assetIds: readonly string[]): Promise<MediaAsset[]> {
+    if (assetIds.length === 0) return [];
+    const safeIds = assetIds.map((id) => String(id));
+    const docs = await this.mediaAssetModel
+      .find({ id: { $in: safeIds } })
+      .lean()
+      .exec();
+    return docs.map((doc) => this.toMediaAssetDomain(doc));
+  }
+
+  private toMediaAssetDomain(doc: {
+    id: string;
+    ownerId: string;
+    category: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    objectKey: string;
+    status: string;
+    version: number;
+  }): MediaAsset {
+    return new MediaAsset(doc.id, {
+      ownerId: doc.ownerId,
+      category: doc.category as MediaCategory,
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      sizeBytes: doc.sizeBytes,
+      sha256: doc.sha256,
+      objectKey: doc.objectKey,
+      status: doc.status as MediaAssetStatus,
+      version: doc.version,
     });
   }
 

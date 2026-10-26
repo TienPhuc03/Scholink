@@ -38,6 +38,7 @@ import { MongoosePassportRepository } from './infrastructure/persistence/passpor
 import { AuthUseCase } from './application/use-cases/auth.use-case';
 import { PassportUseCase } from './application/use-cases/passport.use-case';
 import { OrganizationUseCase } from './application/use-cases/organization.use-case';
+import { MediaUseCase } from './application/use-cases/media.use-case';
 import { AuthController } from './presentation/auth.controller';
 import { ProfileController } from './presentation/profile.controller';
 import { AdminOrganizationController } from './presentation/admin-organization.controller';
@@ -67,6 +68,7 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
   controllers: [AuthController, ProfileController, AdminOrganizationController],
   providers: [
     AuthUseCase,
+    MediaUseCase,
     PassportUseCase,
     OrganizationUseCase,
     {
@@ -78,6 +80,6 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
       useClass: MongoosePassportRepository,
     },
   ],
-  exports: [AuthUseCase, PassportUseCase, OrganizationUseCase, USER_REPOSITORY, PASSPORT_REPOSITORY],
+  exports: [AuthUseCase, MediaUseCase, PassportUseCase, OrganizationUseCase, USER_REPOSITORY, PASSPORT_REPOSITORY],
 })
 export class IdentityServiceModule {}

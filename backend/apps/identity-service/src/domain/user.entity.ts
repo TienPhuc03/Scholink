@@ -34,6 +34,7 @@ export class User extends AggregateRoot<string> {
       normalizedEmail,
       sessionVersion: props.sessionVersion ?? 1,
     });
+    Object.freeze(this);
   }
 
   get email(): string {
@@ -72,6 +73,21 @@ export class User extends AggregateRoot<string> {
     return new User(this.id, {
       ...this._props,
       status: 'ACTIVE',
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
+   * FR-AUTH-03 & FR-AUTH-04: Đặt lại mật khẩu mới (Immutable update) và tự động tăng `sessionVersion`
+   * để vô hiệu hóa toàn bộ các phiên Refresh Token cũ trước đó.
+   */
+  public withPasswordReset(newPasswordHash: string): User {
+    return new User(this.id, {
+      ...this._props,
+      passwordHash: newPasswordHash,
+      status: this._props.status === 'PENDING_VERIFICATION' ? 'ACTIVE' : this._props.status,
+      sessionVersion: this.sessionVersion + 1,
       version: this.version + 1,
       updatedAt: new Date(),
     });
