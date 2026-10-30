@@ -35,8 +35,18 @@ export class ApplicationController {
     return { items };
   }
 
+  @GrpcMethod('OpportunityGrpcService', 'GetApplicationById')
+  async getApplicationById(data: { applicationId: string; studentId: string }) {
+    return this.applicationUseCase.getApplicationById(data.applicationId, data.studentId);
+  }
+
   @GrpcMethod('OpportunityGrpcService', 'WithdrawApplication')
   async withdraw(data: { applicationId: string; studentId: string }) {
     return this.applicationUseCase.withdraw(data.applicationId, data.studentId);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'CheckReadiness')
+  async checkReadiness(data: { studentId: string; opportunityId: string }) {
+    return this.applicationUseCase.checkReadiness(data.studentId, data.opportunityId);
   }
 }

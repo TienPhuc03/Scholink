@@ -50,6 +50,9 @@ export class SubmissionPreviewModel {
   @Prop({ required: true, enum: ['ELIGIBLE', 'INELIGIBLE', 'NEEDS_REVIEW'], default: 'ELIGIBLE' })
   screening: string;
 
+  @Prop({ type: [Object], default: [] })
+  screeningReasons: Record<string, unknown>[];
+
   @Prop({ required: true, index: { expires: 0 } })
   expiresAt: Date;
 }
@@ -88,6 +91,9 @@ export class ApplicationModel {
 
   @Prop({ required: true, enum: ['ELIGIBLE', 'INELIGIBLE', 'NEEDS_REVIEW'], default: 'ELIGIBLE' })
   screening: string;
+
+  @Prop({ type: [Object], default: [] })
+  screeningReasons: Record<string, unknown>[];
 
   @Prop({ required: true })
   previewId: string;
@@ -161,6 +167,9 @@ export class ApplicationRevisionModel {
 
   @Prop({ required: true, enum: ['ELIGIBLE', 'INELIGIBLE', 'NEEDS_REVIEW'], default: 'ELIGIBLE' })
   screening: string;
+
+  @Prop({ type: [Object], default: [] })
+  screeningReasons: Record<string, unknown>[];
 
   @Prop({ required: true })
   submittedAt: Date;

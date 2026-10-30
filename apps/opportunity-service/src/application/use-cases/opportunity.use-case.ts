@@ -35,6 +35,8 @@ export class OpportunityUseCase {
       competitionMode: dto.competitionMode,
       minTeamSize: dto.minTeamSize,
       maxTeamSize: dto.maxTeamSize,
+      requiredFields: dto.requiredFields,
+      eligibilityRules: dto.eligibilityRules,
       tags: dto.tags,
       ruleVersion: 1,
     });

@@ -1,4 +1,5 @@
 import { AggregateRoot, DomainException, ErrorCode } from '@shared';
+import { ScreeningReason } from './opportunity.entity';
 
 export type ApplicationStatus =
   | 'DRAFT'
@@ -21,6 +22,7 @@ export interface ApplicationProps {
   readonly submissionType: 'INDIVIDUAL' | 'TEAM';
   readonly status: ApplicationStatus;
   readonly screening?: ScreeningStatus;
+  readonly screeningReasons?: readonly ScreeningReason[];
   readonly previewId: string;
   readonly snapshotId: string;
   readonly profileVersion: number;
@@ -47,6 +49,7 @@ export class Application extends AggregateRoot<string> {
     this._props = Object.freeze({
       ...props,
       screening: props.screening ?? 'ELIGIBLE',
+      screeningReasons: Object.freeze([...(props.screeningReasons ?? [])]),
       ruleVersion: props.ruleVersion ?? 1,
     });
   }
@@ -65,6 +68,10 @@ export class Application extends AggregateRoot<string> {
 
   get screening(): ScreeningStatus {
     return this._props.screening ?? 'ELIGIBLE';
+  }
+
+  get screeningReasons(): readonly ScreeningReason[] {
+    return this._props.screeningReasons ?? [];
   }
 
   get revision(): number {
@@ -86,7 +93,8 @@ export class Application extends AggregateRoot<string> {
     if (
       this._props.status === 'ACCEPTED' ||
       this._props.status === 'REJECTED' ||
-      this._props.status === 'CANCELLED'
+      this._props.status === 'CANCELLED' ||
+      this._props.status === 'WITHDRAWN'
     ) {
       throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
@@ -113,6 +121,7 @@ export class Application extends AggregateRoot<string> {
     payloadHash: string;
     consentId: string;
     screening?: ScreeningStatus;
+    screeningReasons?: readonly ScreeningReason[];
   }): Application {
     if (!this.canResubmit()) {
       throw DomainException.conflict(
@@ -121,10 +130,15 @@ export class Application extends AggregateRoot<string> {
       );
     }
 
+    const nextScreening = params.screening ?? 'ELIGIBLE';
+    const nextStatus: ApplicationStatus =
+      nextScreening === 'INELIGIBLE' ? 'INELIGIBLE' : 'SUBMITTED';
+
     return new Application(this.id, {
       ...this._props,
-      status: 'SUBMITTED',
-      screening: params.screening ?? 'ELIGIBLE',
+      status: nextStatus,
+      screening: nextScreening,
+      screeningReasons: Object.freeze([...(params.screeningReasons ?? [])]),
       previewId: params.previewId,
       snapshotId: params.snapshotId,
       profileVersion: params.profileVersion,

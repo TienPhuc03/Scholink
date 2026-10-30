@@ -25,16 +25,16 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
   ) {}
 
   async findById(id: string): Promise<Opportunity | null> {
-    const doc = await this.model.findOne({ id: String(id) }).lean().exec();
+    const doc = await this.model.findOne({ id: { $eq: String(id) } }).lean().exec();
     if (!doc) return null;
     return this.toDomain(doc);
   }
 
   async findMany(filter: OpportunityFilter): Promise<Opportunity[]> {
     const query: Record<string, unknown> = {};
-    if (filter.type) query.type = String(filter.type);
-    if (filter.status) query.status = String(filter.status);
-    if (filter.applyMode) query.applyMode = String(filter.applyMode);
+    if (filter.type) query.type = { $eq: String(filter.type) };
+    if (filter.status) query.status = { $eq: String(filter.status) };
+    if (filter.applyMode) query.applyMode = { $eq: String(filter.applyMode) };
     if (filter.keyword && filter.keyword.trim()) {
       query.title = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
     }
@@ -84,7 +84,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
   async update(opportunity: Opportunity): Promise<void> {
     await this.model
       .updateOne(
-        { id: String(opportunity.id) },
+        { id: { $eq: String(opportunity.id) } },
         {
           $set: {
             title: opportunity.title,
