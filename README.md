@@ -13,7 +13,16 @@ Dự án được xây dựng dựa trên đặc tả kỹ thuật **Scholink SR
 
 ---
 
-## 🏛️ Topology Kiến trúc 5 Microservices
+## 🏛️ Kiến trúc Phân Tách Độc Lập (Project Architecture)
+
+Hệ thống được tổ chức thành 2 module độc lập hoàn toàn trong repository:
+- 🟢 **`backend/`**: Hệ sinh thái Microservices xây dựng trên NestJS Monorepo (1 API Gateway + 5 Microservices cô lập database + 1 Shared Kernel).
+- 🟣 **`android/`**: Ứng dụng di động Native Android viết bằng Kotlin (Clean Architecture, MVVM, Jetpack Compose, Room, MQTT).
+- 📚 **`docs/`**: Toàn bộ tài liệu đặc tả (SRS v3.2), sổ tay phát triển và kịch bản vận hành.
+
+---
+
+## 🏛️ Topology Kiến trúc 5 Microservices (backend/)
 
 | Service | Port | Database cô lập | Module sở hữu & Trách nhiệm chính |
 |---|---|---|---|
@@ -43,7 +52,7 @@ Tất cả các client (Android mobile app, Web portal) đều giao tiếp duy n
 
 ---
 
-## 🚀 Khởi động nhanh (Quick Start)
+## 🚀 Khởi động nhanh Backend (Quick Start)
 
 ### 1. Yêu cầu môi trường
 - **Node.js**: v20+ hoặc v22+
@@ -51,7 +60,7 @@ Tất cả các client (Android mobile app, Web portal) đều giao tiếp duy n
 - **Docker & Docker Compose**
 - **Android Studio Ladybug / Koala** (cho app Android)
 
-### 2. Khởi chạy Hạ tầng Docker
+### 2. Khởi chạy Hạ tầng Docker (tại thư mục gốc)
 ```bash
 docker compose up -d
 ```
@@ -63,6 +72,9 @@ docker compose up -d
 
 ### 3. Cài đặt Dependencies & Khởi tạo Dữ liệu mẫu (Seed)
 ```bash
+# Di chuyển vào thư mục backend
+cd backend
+
 # Cài đặt thư viện
 pnpm install
 
@@ -75,9 +87,10 @@ pnpm run seed
 - **ORGANIZER:** `organizer@scholink.edu.vn` | Mật khẩu: `Organizer@2026`
 - **STUDENT:** `student@scholink.edu.vn` | Mật khẩu: `Student@2026`
 
-### 4. Chạy các Microservices
-Mở từng cửa sổ terminal để chạy các service cần phát triển:
+### 4. Chạy các Microservices (tại thư mục backend/)
+Mở từng cửa sổ terminal trong thư mục `backend/` để chạy các service cần phát triển:
 ```bash
+cd backend
 pnpm run start:gateway        # API Gateway (Port 3000)
 pnpm run start:identity       # Identity Service (Port 3001)
 pnpm run start:opportunity    # Opportunity Service (Port 3002)
@@ -104,10 +117,15 @@ Mã nguồn ứng dụng di động nằm trong thư mục `android/`:
 - **Room Database** lưu cache offline danh sách cơ hội và trạng thái hồ sơ
 - **EMQX Paho MQTT Client** nhận thông báo và tin nhắn chat theo thời gian thực
 
-👉 Xem hướng dẫn chi tiết cho mobile tại: **[android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md)**
+👉 Xem hướng dẫn chi tiết cho mobile tại: **[docs/HUONG_DAN_ANDROID.md](./docs/HUONG_DAN_ANDROID.md)** (hoặc [android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md))
 
 ---
 
-## 📖 Sổ tay phát triển cho Team
-👉 **[Tài liệu hướng dẫn phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./HUONG_DAN_PHAT_TRIEN.md)**  
-👉 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2](./Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+## 📖 Thư Mục Tài Liệu Kỹ Thuật Dự Án (docs/)
+Toàn bộ tài liệu kỹ thuật, đặc tả nghiệp vụ và hướng dẫn vận hành đã được quy hoạch tập trung trong thư mục **[`docs/`](./docs/README.md)**:
+
+- 📑 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2 (52 trang)](./docs/Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+- 📘 **[Sổ tay phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./docs/HUONG_DAN_PHAT_TRIEN.md)**
+- 📕 **[Runbook Vận hành Demo TV3 (RUNBOOK_VAN_HANH_DEMO_TV3.md)](./docs/RUNBOOK_VAN_HANH_DEMO_TV3.md)**
+- 📱 **[Hướng dẫn phát triển ứng dụng di động Android Native](./docs/HUONG_DAN_ANDROID.md)**
+- 🌐 **[Trang mục lục tài liệu (docs/README.md)](./docs/README.md)**

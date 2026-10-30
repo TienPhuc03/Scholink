@@ -1,0 +1,36 @@
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { Request, Response } from 'express';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class CorrelationIdInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    if (context.getType() !== 'http') {
+      return next.handle();
+    }
+
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+
+    if (!request || !request.headers) {
+      return next.handle();
+    }
+
+    const correlationId =
+      (request.headers['x-correlation-id'] as string) ||
+      `req-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    (request as any).correlationId = correlationId;
+    if (response && typeof response.setHeader === 'function') {
+      response.setHeader('x-correlation-id', correlationId);
+    }
+
+    return next.handle();
+  }
+}
