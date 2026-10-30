@@ -184,6 +184,9 @@ export const UpdatePassportDtoSchema = z.object({
 
 export type UpdatePassportDto = z.infer<typeof UpdatePassportDtoSchema>;
 
+export const ConsentScopeSchema = z.enum(['SNAPSHOT', 'ATTACHMENTS']);
+export type ConsentScope = z.infer<typeof ConsentScopeSchema>;
+
 export const CreateConsentDtoSchema = z.object({
   previewId: z.string().trim().min(1),
   snapshotId: z.string().trim().min(1),
@@ -193,6 +196,10 @@ export const CreateConsentDtoSchema = z.object({
   ruleVersion: z.number().int().min(1),
   payloadHash: z.string().trim().length(64, 'payloadHash phải là chuỗi SHA-256 64 ký tự hex'),
   manifestHash: z.string().trim().length(64, 'manifestHash phải là chuỗi SHA-256 64 ký tự hex'),
+  scope: z
+    .array(ConsentScopeSchema)
+    .min(1, 'Phạm vi đồng ý (scope) phải có ít nhất 1 mục')
+    .default(['SNAPSHOT', 'ATTACHMENTS']),
 });
 
 export type CreateConsentDto = z.infer<typeof CreateConsentDtoSchema>;

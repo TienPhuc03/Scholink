@@ -255,6 +255,7 @@ message CreateConsentRequest {
   int32 ruleVersion = 7;
   string payloadHash = 8;
   string manifestHash = 9;
+  repeated string scope = 10;
 }
 
 message ConsentResponse {
@@ -263,6 +264,7 @@ message ConsentResponse {
   string snapshotId = 3;
   string payloadHash = 4;
   string expiresAt = 5;
+  repeated string scope = 6;
 }
 
 message GetProfileSnapshotRequest {
@@ -288,6 +290,8 @@ message ValidateConsentRequest {
   string opportunityId = 5;
   int32 expectedRuleVersion = 6;
   string expectedPayloadHash = 7;
+  repeated string attachmentIds = 8;
+  repeated string requiredScope = 9;
 }
 
 message ValidateConsentResponse {
