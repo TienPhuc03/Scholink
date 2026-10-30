@@ -288,3 +288,19 @@ GET {{baseUrl}}/media/{{uploadedAssetId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
+### ==============================================================================
+### PHẦN BỔ SUNG F22 BACKEND (TUẦN 3): READINESS, SCREENING & APPLICATION DETAIL
+### ==============================================================================
+
+### 22. [F22] Kiểm tra độ sẵn sàng hồ sơ & dự báo Screening theo Cơ hội (FR-PROF-03 / FR-PROF-08)
+GET {{baseUrl}}/profiles/me/readiness?opportunityId={{opportunityId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 23. [F22] Xem chi tiết hồ sơ ứng tuyển kèm lịch sử Revisions bất biến và Events (FR-APP-03 / FR-APP-08)
+GET {{baseUrl}}/applications/{{applicationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+

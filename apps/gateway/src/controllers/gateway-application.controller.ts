@@ -147,6 +147,24 @@ export class GatewayApplicationController implements OnModuleInit {
     return res.items ?? [];
   }
 
+  @Get(':id')
+  @Roles('STUDENT')
+  @ApiOperation({
+    summary: 'Xem chi tiết hồ sơ ứng tuyển kèm lịch sử Revisions bất biến và Events (FR-APP-03 / FR-APP-08)',
+  })
+  @ApiResponse({ status: 200, description: 'Chi tiết hồ sơ ứng tuyển và lịch sử revisions' })
+  async getApplicationById(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.getApplicationById({
+        applicationId: id,
+        studentId: req.user.userId,
+      }),
+    );
+  }
+
   @Post(':id/withdraw')
   @Roles('STUDENT')
   @HttpCode(HttpStatus.OK)

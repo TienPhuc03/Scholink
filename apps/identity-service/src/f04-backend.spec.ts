@@ -759,6 +759,7 @@ describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-
         ruleVersion: preview.ruleVersion,
         manifestHash: preview.manifestHash,
         payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT', 'ATTACHMENTS'],
       });
 
       // Student modifies their Passport after creating Preview & Consent -> profileVersion becomes 2
@@ -781,6 +782,298 @@ describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-
       ).rejects.toMatchObject({
         code: ErrorCode.SNAPSHOT_STALE,
       });
+    });
+
+    it('F22: enforces Consent scope, re-verifies MediaAsset READY at commit, evaluates Screening rules (ELIGIBLE/NEEDS_REVIEW/INELIGIBLE), and commits Outbox atomically', async () => {
+      const outboxEvents: Array<Record<string, unknown>> = [];
+      const revisions: Array<Record<string, unknown>> = [];
+      const events: Array<Record<string, unknown>> = [];
+      const strictOppId = 'opp_strict_f22';
+
+      const strictOpportunity = new Opportunity(strictOppId, {
+        type: 'SCHOLARSHIP',
+        title: 'AI Research Fellowship 2026',
+        description: 'Strict GPA and English certificate rules',
+        organizationId: 'org_1',
+        createdBy: 'usr_org_1',
+        organizerName: 'AI Institute',
+        applyMode: 'IN_APP',
+        status: 'PUBLISHED',
+        registerDeadline: new Date(Date.now() + 7 * 86400000),
+        timezone: 'Asia/Ho_Chi_Minh',
+        requiredFields: ['fullName', 'education.gpa', 'skills'],
+        eligibilityRules: [
+          {
+            fieldKey: 'education.gpa',
+            operator: 'GTE',
+            value: 3.5,
+            scale: 4,
+            type: 'HARD',
+          },
+          {
+            fieldKey: 'certificates.type',
+            operator: 'EQ',
+            value: 'LANGUAGE',
+            type: 'SOFT',
+          },
+        ],
+        ruleVersion: 1,
+      });
+
+      const f22OpportunityRepo: IOpportunityRepository = {
+        findById: async (id) => (id === strictOppId ? strictOpportunity : null),
+        findMany: async () => [strictOpportunity],
+        save: async () => undefined,
+        update: async () => undefined,
+      };
+
+      const f22ApplicationRepo: IApplicationRepository = {
+        findById: async (id) => applications.get(id) ?? null,
+        findByOpportunityAndStudent: async (oppId, stuId) =>
+          Array.from(applications.values()).find(
+            (a) => a.opportunityId === oppId && a.studentId === stuId,
+          ) ?? null,
+        findManyByStudent: async (stuId) =>
+          Array.from(applications.values()).filter((a) => a.studentId === stuId),
+        findManyByOpportunity: async (oppId) =>
+          Array.from(applications.values()).filter((a) => a.opportunityId === oppId),
+        save: async (app) => {
+          applications.set(app.id, app);
+        },
+        update: async (app) => {
+          applications.set(app.id, app);
+        },
+        savePreview: async (prv) => {
+          previews.set(prv.previewId, prv);
+        },
+        findPreviewById: async (prvId) => previews.get(prvId) ?? null,
+        saveRevision: async (rev) => {
+          revisions.push(rev as unknown as Record<string, unknown>);
+        },
+        appendEvent: async (evt) => {
+          events.push(evt as unknown as Record<string, unknown>);
+        },
+        findRevisionsByApplicationId: async (appId) =>
+          revisions.filter((r) => r.applicationId === appId) as any,
+        findEventsByApplicationId: async (appId) =>
+          events.filter((e) => e.applicationId === appId) as any,
+        commitSubmissionWithOutbox: async ({ application, revision, event, outbox }) => {
+          applications.set(application.id, application);
+          revisions.push(revision as unknown as Record<string, unknown>);
+          events.push(event as unknown as Record<string, unknown>);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+        commitWithdrawalWithOutbox: async ({ application, event, outbox }) => {
+          applications.set(application.id, application);
+          events.push(event as unknown as Record<string, unknown>);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+      };
+
+      const f22GrpcClient = {
+        getService: () => ({
+          getProfileSnapshot: (req: { studentId: string; attachmentIds: string[] }) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .getProfileSnapshot(req.studentId, req.attachmentIds)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+          validateConsent: (req: any) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .validateConsent(req)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+        }),
+      };
+
+      const f22AppUseCase = new ApplicationUseCase(
+        f22ApplicationRepo,
+        f22OpportunityRepo,
+        cryptoService,
+        f22GrpcClient as any,
+      );
+      f22AppUseCase.onModuleInit();
+
+      // 1. Check Readiness (FR-PROF-03/08): Student has GPA 3.8 (scale 4) but no LANGUAGE certificate yet (SOFT rule)
+      const readiness1 = await f22AppUseCase.checkReadiness(studentId, strictOppId);
+      expect(readiness1.readinessScore).toBe(100);
+      expect(readiness1.isReady).toBe(true);
+      expect(readiness1.screening).toBe('NEEDS_REVIEW');
+      expect(readiness1.screeningReasons[0].reasonCode).toBe('SOFT_RULE_UNMET');
+
+      // 2. Upload READY attachment and create Preview
+      const attachment = await mediaUseCase.createUploadUrl(studentId, {
+        category: 'ATTACHMENT',
+        fileName: 'portfolio.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 95000,
+      });
+      await mediaUseCase.completeUpload(studentId, attachment.assetId, {
+        fileHeaderHex: '255044462d312e37',
+        sampleContent: '%PDF-1.7 Portfolio',
+      });
+
+      const preview = await f22AppUseCase.createPreview(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        attachmentIds: [attachment.assetId],
+        expectedRuleVersion: 1,
+      });
+      expect(preview.screening).toBe('NEEDS_REVIEW');
+
+      // 3. Consent missing 'ATTACHMENTS' scope when preview has attachmentIds -> 422 CONSENT_REQUIRED
+      const narrowConsent = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+
+      await expect(
+        f22AppUseCase.submit(studentId, {
+          opportunityId: strictOppId,
+          submissionId: 'sub_f22_1',
+          submissionType: 'INDIVIDUAL',
+          previewId: preview.previewId,
+          snapshotId: preview.snapshotId,
+          profileVersion: preview.profileVersion,
+          expectedRuleVersion: 1,
+          payloadHash: preview.payloadHash,
+          consentId: narrowConsent.consentId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.CONSENT_REQUIRED,
+      });
+
+      // 4. Create full-scope Consent ['SNAPSHOT', 'ATTACHMENTS']
+      const fullConsent = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT', 'ATTACHMENTS'],
+      });
+
+      // 5. Simulate attachment becoming REJECTED/revoked right before commit -> 409 ASSET_NOT_AVAILABLE
+      const currentAsset = mediaAssets.get(attachment.assetId)!;
+      mediaAssets.set(attachment.assetId, currentAsset.markRejected());
+
+      await expect(
+        f22AppUseCase.submit(studentId, {
+          opportunityId: strictOppId,
+          submissionId: 'sub_f22_1',
+          submissionType: 'INDIVIDUAL',
+          previewId: preview.previewId,
+          snapshotId: preview.snapshotId,
+          profileVersion: preview.profileVersion,
+          expectedRuleVersion: 1,
+          payloadHash: preview.payloadHash,
+          consentId: fullConsent.consentId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.ASSET_NOT_AVAILABLE,
+      });
+
+      // Restore asset to READY and commit Application -> succeeds and writes Outbox event
+      mediaAssets.set(attachment.assetId, currentAsset);
+      const committed = await f22AppUseCase.submit(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        submissionType: 'INDIVIDUAL',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: preview.payloadHash,
+        consentId: fullConsent.consentId,
+      });
+
+      expect(committed.status).toBe('SUBMITTED');
+      expect(committed.screening).toBe('NEEDS_REVIEW');
+      expect(outboxEvents).toHaveLength(1);
+      expect(outboxEvents[0].type).toBe('application.submitted');
+
+      // 6. GetApplicationById works for owner student, blocks another student with 403 FORBIDDEN_RESOURCE (FR-APP-08)
+      const detail = await f22AppUseCase.getApplicationById(committed.applicationId, studentId);
+      expect(detail.revisions).toHaveLength(1);
+      expect(detail.events).toHaveLength(1);
+
+      await expect(
+        f22AppUseCase.getApplicationById(committed.applicationId, 'another_student_id'),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 7. Withdraw & Resubmit when HARD rule fails (GPA 3.1 < 3.5) -> commits as status 'INELIGIBLE'
+      await f22AppUseCase.withdraw(committed.applicationId, studentId);
+      expect(outboxEvents).toHaveLength(2);
+      expect(outboxEvents[1].type).toBe('application.withdrawn');
+
+      await passportUseCase.updateMyPassport(studentId, {
+        education: {
+          institution: 'HCMUT',
+          major: 'Computer Science',
+          startYear: 2022,
+          gpa: 3.1,
+          gpaScale: 4,
+        },
+      });
+
+      const previewIneligible = await f22AppUseCase.createPreview(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        attachmentIds: [],
+        expectedRuleVersion: 1,
+      });
+      expect(previewIneligible.screening).toBe('INELIGIBLE');
+
+      const consentIneligible = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        previewId: previewIneligible.previewId,
+        snapshotId: previewIneligible.snapshotId,
+        profileVersion: previewIneligible.profileVersion,
+        ruleVersion: previewIneligible.ruleVersion,
+        manifestHash: previewIneligible.manifestHash,
+        payloadHash: previewIneligible.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+
+      const resubmittedIneligible = await f22AppUseCase.submit(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        submissionType: 'INDIVIDUAL',
+        previewId: previewIneligible.previewId,
+        snapshotId: previewIneligible.snapshotId,
+        profileVersion: previewIneligible.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: previewIneligible.payloadHash,
+        consentId: consentIneligible.consentId,
+      });
+
+      expect(resubmittedIneligible.revision).toBe(2);
+      expect(resubmittedIneligible.screening).toBe('INELIGIBLE');
+      expect(resubmittedIneligible.status).toBe('INELIGIBLE');
+      expect(outboxEvents).toHaveLength(3);
+      expect(outboxEvents[2].type).toBe('application.resubmitted');
     });
   });
 });

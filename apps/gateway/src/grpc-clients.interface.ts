@@ -69,8 +69,16 @@ export interface OpportunityGrpcClient {
     data: SubmitApplicationDto & { studentId: string },
   ): Observable<Record<string, unknown>>;
   getMyApplications(data: { studentId: string }): Observable<{ items?: unknown[] }>;
+  getApplicationById(data: {
+    applicationId: string;
+    studentId: string;
+  }): Observable<Record<string, unknown>>;
   withdrawApplication(data: {
     applicationId: string;
     studentId: string;
+  }): Observable<Record<string, unknown>>;
+  checkReadiness(data: {
+    studentId: string;
+    opportunityId: string;
   }): Observable<Record<string, unknown>>;
 }

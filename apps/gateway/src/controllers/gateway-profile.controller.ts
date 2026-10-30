@@ -4,13 +4,21 @@ import {
   Put,
   Post,
   Body,
+  Query,
   Req,
   Inject,
   OnModuleInit,
   UseGuards,
 } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import {
   ZodValidationPipe,
@@ -22,8 +30,15 @@ import {
   UpdatePassportDtoSchema,
   CreateConsentDto,
   CreateConsentDtoSchema,
+  CheckReadinessQueryDto,
+  CheckReadinessQueryDtoSchema,
 } from '@shared';
-import { GATEWAY_IDENTITY_GRPC, IdentityGrpcClient } from '../grpc-clients.interface';
+import {
+  GATEWAY_IDENTITY_GRPC,
+  GATEWAY_OPPORTUNITY_GRPC,
+  IdentityGrpcClient,
+  OpportunityGrpcClient,
+} from '../grpc-clients.interface';
 
 @ApiTags('Profile & Passport (Identity Service)')
 @ApiBearerAuth()
@@ -31,11 +46,17 @@ import { GATEWAY_IDENTITY_GRPC, IdentityGrpcClient } from '../grpc-clients.inter
 @Controller('api/v1/profiles')
 export class GatewayProfileController implements OnModuleInit {
   private identityService!: IdentityGrpcClient;
+  private opportunityService!: OpportunityGrpcClient;
 
-  constructor(@Inject(GATEWAY_IDENTITY_GRPC) private readonly client: ClientGrpc) {}
+  constructor(
+    @Inject(GATEWAY_IDENTITY_GRPC) private readonly client: ClientGrpc,
+    @Inject(GATEWAY_OPPORTUNITY_GRPC) private readonly opportunityClient: ClientGrpc,
+  ) {}
 
   onModuleInit() {
     this.identityService = this.client.getService<IdentityGrpcClient>('IdentityGrpcService');
+    this.opportunityService =
+      this.opportunityClient.getService<OpportunityGrpcClient>('OpportunityGrpcService');
   }
 
   @Get('me')
@@ -45,6 +66,33 @@ export class GatewayProfileController implements OnModuleInit {
   async getMyPassport(@Req() req: { user: AuthenticatedUser }) {
     return firstValueFrom(
       this.identityService.getMyPassport({ studentId: req.user.userId }),
+    );
+  }
+
+  @Get('me/readiness')
+  @Roles('STUDENT')
+  @ApiOperation({
+    summary: 'Kiểm tra độ sẵn sàng hồ sơ và dự báo kết quả sàng lọc theo Cơ hội (FR-PROF-03 / FR-PROF-08)',
+  })
+  @ApiQuery({
+    name: 'opportunityId',
+    required: true,
+    type: String,
+    example: 'opp_vinai_scholarship_2026',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Điểm sẵn sàng (readinessScore), trường còn thiếu và kết quả sàng lọc dự kiến',
+  })
+  async checkReadiness(
+    @Req() req: { user: AuthenticatedUser },
+    @Query(new ZodValidationPipe(CheckReadinessQueryDtoSchema)) query: CheckReadinessQueryDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.checkReadiness({
+        studentId: req.user.userId,
+        opportunityId: query.opportunityId,
+      }),
     );
   }
 
@@ -123,6 +171,11 @@ export class GatewayProfileController implements OnModuleInit {
         ruleVersion: { type: 'number', example: 1 },
         manifestHash: { type: 'string', example: 'hash_from_preview' },
         payloadHash: { type: 'string', example: 'hash_from_preview' },
+        scope: {
+          type: 'array',
+          items: { type: 'string', enum: ['SNAPSHOT', 'ATTACHMENTS'] },
+          example: ['SNAPSHOT', 'ATTACHMENTS'],
+        },
       },
       required: [
         'opportunityId',
