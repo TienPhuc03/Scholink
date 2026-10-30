@@ -282,6 +282,10 @@ export class MediaAsset extends AggregateRoot<string> {
     }
   }
 
+  public markRejected(): MediaAsset {
+    return this.withStatus('REJECTED');
+  }
+
   private withStatus(nextStatus: MediaAssetStatus, actualSizeBytes?: number): MediaAsset {
     return new MediaAsset(this.id, {
       ...this._props,

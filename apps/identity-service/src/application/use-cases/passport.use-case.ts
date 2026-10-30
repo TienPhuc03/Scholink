@@ -120,6 +120,7 @@ export class PassportUseCase {
       ruleVersion: dto.ruleVersion,
       manifestHash: dto.manifestHash,
       payloadHash: dto.payloadHash,
+      scope: dto.scope ?? ['SNAPSHOT', 'ATTACHMENTS'],
       expiresAt,
     });
 
@@ -130,6 +131,7 @@ export class PassportUseCase {
       previewId: consent.previewId,
       snapshotId: consent.snapshotId,
       payloadHash: consent.payloadHash,
+      scope: consent.scope,
       expiresAt: expiresAt.toISOString(),
     });
   }
@@ -184,7 +186,8 @@ export class PassportUseCase {
   }
 
   /**
-   * Mục 26 SRS: Xác thực Consent qua gRPC trước khi Opportunity Service commit Application
+   * Mục 26 SRS: Xác thực Consent, phạm vi scope và hậu kiểm trạng thái tệp READY qua gRPC
+   * ngay trước khi Opportunity Service commit Application
    */
   async validateConsent(params: {
     studentId: string;
@@ -194,6 +197,8 @@ export class PassportUseCase {
     opportunityId: string;
     expectedRuleVersion: number;
     expectedPayloadHash: string;
+    attachmentIds?: readonly string[];
+    requiredScope?: readonly string[];
   }) {
     const [passport, consent] = await Promise.all([
       this.passportRepo.findByStudentId(params.studentId),
@@ -215,7 +220,29 @@ export class PassportUseCase {
       currentProfileVersion: passport.version,
       expectedRuleVersion: params.expectedRuleVersion,
       expectedPayloadHash: params.expectedPayloadHash,
+      requiredScope: params.requiredScope,
     });
+
+    // Hậu kiểm toàn bộ tệp đính kèm trong Preview và tệp ast_* trong Passport vẫn ở trạng thái READY
+    const assetIdsToReverify = new Set<string>(params.attachmentIds ?? []);
+    if (passport.props.cvAssetId?.startsWith('ast_')) {
+      assetIdsToReverify.add(passport.props.cvAssetId);
+    }
+    if (passport.props.pitchVideoAssetId?.startsWith('ast_')) {
+      assetIdsToReverify.add(passport.props.pitchVideoAssetId);
+    }
+    for (const cert of passport.props.certificates ?? []) {
+      if (cert.assetId?.startsWith('ast_')) {
+        assetIdsToReverify.add(cert.assetId);
+      }
+    }
+
+    if (assetIdsToReverify.size > 0) {
+      await this.mediaUseCase.verifyAssetsUsableByStudent(
+        params.studentId,
+        Array.from(assetIdsToReverify),
+      );
+    }
 
     return Object.freeze({
       valid: true,
