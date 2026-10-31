@@ -547,43 +547,70 @@ export class PortalController {
       </div>
     </div>
 
-    <!-- TAB 3: TEAMS & ROSTER FREEZE (F15 + F33) -->
+    <!-- TAB 3: TEAMS, RECRUITMENT & ROSTER FREEZE (SCHOL-32 & SCHOL-33) -->
     <div id="tab-teams" class="tab-content">
-      <div class="card">
-        <div class="card-header">
+      <!-- Persona Switcher -->
+      <div class="card" style="background: rgba(30, 41, 59, 0.7); border-color: rgba(96, 165, 250, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <h2 class="card-title">🤝 Đội Thi, Tuyển Thành Viên & Roster Freeze (F15 & F33)</h2>
-            <p class="card-desc">Kiểm thử tính nguyên tử khi duyệt thành viên, khóa roster 10 phút, cấp fencingToken và thu thập Consent đội.</p>
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 700;">
+              👤 Chuyển Đổi Tài Khoản Kiểm Thử (Demo 3 Tài Khoản SCHOL-33)
+            </div>
+            <div style="margin-top: 0.3rem; font-size: 0.95rem; font-weight: 600;">
+              Đang thao tác với tư cách: <span id="currentPersonaBadge" class="badge badge-blue">Đang tải...</span>
+              <span id="currentPersonaEmail" style="color: var(--text-muted); font-family: var(--mono); font-size: 0.8rem; margin-left: 0.5rem;"></span>
+            </div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="loadTeams()">🔄 Tải lại</button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-secondary" id="btnPersona1" onclick="switchPersona('student@scholink.edu.vn', 'Student@2026', 'Trưởng Đội BK AI (usr_student_001)', this)">
+              👑 Trưởng Đội (Student 1)
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btnPersona2" onclick="switchPersona('applicant1@scholink.edu.vn', 'Student@2026', 'Ứng Viên A (usr_student_002)', this)">
+              🙋 Ứng Viên A (Student 2)
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btnPersona3" onclick="switchPersona('applicant2@scholink.edu.vn', 'Student@2026', 'Ứng Viên B (usr_student_003)', this)">
+              🙋‍♂️ Ứng Viên B (Tranh Slot Cuối)
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div class="grid-2">
-          <div>
-            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">➕ Tạo Đội Thi Mới (Scholink AI Challenge 2026)</h3>
-            <div class="form-group">
-              <label>Tên Đội Thi *</label>
-              <input type="text" id="teamName" placeholder="Ví dụ: DeepLearning BK Team">
+      <!-- Main Layout -->
+      <div class="grid-2">
+        <!-- Col 1: Form Tạo Đội & Roster Freeze -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">➕ Tạo Đội Thi Mới (Scholink AI Challenge)</h2>
+              <span class="badge badge-purple">Trưởng đội chiếm 1 slot</span>
             </div>
             <div class="form-group">
-              <label>Mô tả mục tiêu</label>
-              <textarea id="teamDesc" rows="2" placeholder="Đội thi nghiên cứu mô hình Transformer"></textarea>
+              <label>Tên Đội Thi *</label>
+              <input type="text" id="teamName" placeholder="Ví dụ: AI Vision Innovators">
+            </div>
+            <div class="form-group">
+              <label>Mô tả & Vị trí/Kỹ năng cần tuyển</label>
+              <textarea id="teamDesc" rows="2" placeholder="Cần tuyển: 1 Computer Vision Engineer (PyTorch), 1 UI/UX"></textarea>
             </div>
             <div class="grid-2">
               <div class="form-group">
                 <label>Kích thước tối thiểu (minSize)</label>
-                <input type="number" id="teamMin" value="2">
+                <input type="number" id="teamMin" value="2" min="1" max="10">
               </div>
               <div class="form-group">
                 <label>Kích thước tối đa (maxSize)</label>
-                <input type="number" id="teamMax" value="4">
+                <input type="number" id="teamMax" value="2" min="2" max="10">
               </div>
             </div>
-            <button class="btn" onclick="createTeam()">Tạo Đội Thi Mới</button>
+            <button class="btn" id="btnCreateTeam" onclick="createTeam()">🚀 Tạo Đội Thi Mới</button>
           </div>
 
-          <div>
-            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">🔒 Kiểm Thử Roster Freeze & Nộp Đội (F33)</h3>
+          <!-- Roster Freeze Module (F33) -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🔒 Khóa Roster Freeze & Nộp Đội (F33)</h2>
+              <span class="badge badge-blue">Lease 10 Phút</span>
+            </div>
             <div class="form-group">
               <label>Chọn Đội Thi</label>
               <select id="freezeTeamSelect" onchange="showTeamDetails()">
@@ -595,6 +622,37 @@ export class PortalController {
               <button class="btn btn-danger btn-sm" onclick="prepareSubmission()">🔒 Khóa Roster Freeze (10 phút)</button>
               <button class="btn btn-success btn-sm" onclick="submitConsentTeam()">✍️ Gửi Consent Thành Viên</button>
               <button class="btn btn-secondary btn-sm" onclick="abortSubmission()">🔓 Mở Khóa Đội (Abort)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col 2: Danh Sách Đội & Quản Lý JoinRequest (SCHOL-33) -->
+        <div>
+          <!-- Leader Join Request Review Box (Chỉ hiện khi là Trưởng Đội) -->
+          <div class="card" id="leaderRequestCard" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05); display: none;">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" style="color: #34d399;">📋 Yêu Cầu Xin Vào Đội (Dành Cho Trưởng Đội)</h2>
+                <p class="card-desc" id="leaderRequestTeamDesc">Đội: Đang tải...</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="loadLeaderJoinRequests()">🔄 Làm mới</button>
+            </div>
+            <div id="leaderRequestsContainer">
+              <div style="color: var(--text-muted); font-size: 0.85rem;">Đang kiểm tra yêu cầu xin gia nhập...</div>
+            </div>
+          </div>
+
+          <!-- Team List Card -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">👥 Danh Sách Đội Thi Theo Cuộc Thi</h2>
+                <p class="card-desc">Cập nhật số slot theo thời gian thực từ máy chủ.</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="loadTeams()">🔄 Tải lại</button>
+            </div>
+            <div id="teamsListContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+              <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 2rem;">Đang tải danh sách đội thi...</div>
             </div>
           </div>
         </div>
@@ -848,18 +906,303 @@ export class PortalController {
     }
 
     // ==========================================
-    // 3. TEAMS & ROSTER FREEZE (F15 + F33)
+    // 3. TEAMS, JOIN REQUESTS & DEMO (SCHOL-32 & SCHOL-33)
     // ==========================================
+    let currentAuthToken = '';
+    let currentUserId = 'usr_student_001';
+    let currentUserName = 'Trưởng Đội BK AI (usr_student_001)';
+    let currentLeaderTeam = null;
+
+    async function switchPersona(email, password, name, btn) {
+      document.querySelectorAll('#btnPersona1, #btnPersona2, #btnPersona3').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-secondary');
+      });
+      if (btn) {
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+      }
+
+      const badge = document.getElementById('currentPersonaBadge');
+      const emailSpan = document.getElementById('currentPersonaEmail');
+      badge.innerText = 'Đang đăng nhập...';
+
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Đăng nhập thất bại');
+
+        currentAuthToken = data.accessToken;
+        currentUserId = data.user.id;
+        currentUserName = name;
+
+        badge.innerText = name;
+        emailSpan.innerText = '(' + email + ')';
+        badge.className = 'badge badge-green';
+
+        loadTeams();
+      } catch (err) {
+        badge.innerText = 'Lỗi xác thực';
+        badge.className = 'badge badge-danger';
+        alert('❌ Không thể đăng nhập Persona: ' + err.message);
+      }
+    }
+
     async function loadTeams() {
+      const container = document.getElementById('teamsListContainer');
+      const select = document.getElementById('freezeTeamSelect');
+      if (!currentAuthToken) {
+        // Tự động khởi tạo Persona 1 mặc định khi mở tab
+        await switchPersona('student@scholink.edu.vn', 'Student@2026', 'Trưởng Đội BK AI (usr_student_001)', document.getElementById('btnPersona1'));
+        return;
+      }
+
       try {
         const res = await fetch('/api/v1/teams/competitions/opp_scholink_ai_challenge_2026');
-        if (!res.ok) throw new Error('Không thể tải danh sách đội');
+        if (!res.ok) throw new Error('Không thể tải danh sách đội thi');
         cachedTeams = await res.json();
-        const select = document.getElementById('freezeTeamSelect');
-        select.innerHTML = '<option value="">-- Chọn đội thi --</option>' + 
+
+        // Update select for Roster Freeze
+        select.innerHTML = '<option value="">-- Chọn đội thi để xem chi tiết --</option>' + 
           cachedTeams.map(t => \`<option value="\${t.id}">\${t.name} (Status: \${t.status}, Thành viên: \${t.members.length}/\${t.maxSize})</option>\`).join('');
+
+        // Find if current user is leader of any team
+        currentLeaderTeam = cachedTeams.find(t => t.leaderId === currentUserId);
+        const leaderCard = document.getElementById('leaderRequestCard');
+        if (currentLeaderTeam) {
+          leaderCard.style.display = 'block';
+          document.getElementById('leaderRequestTeamDesc').innerText = 'Đội: ' + currentLeaderTeam.name + ' (' + currentLeaderTeam.members.length + '/' + currentLeaderTeam.maxSize + ' thành viên)';
+          loadLeaderJoinRequests();
+        } else {
+          leaderCard.style.display = 'none';
+        }
+
+        if (!cachedTeams || cachedTeams.length === 0) {
+          container.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">Chưa có đội thi nào. Hãy tạo đội mới bên trái!</div>';
+          return;
+        }
+
+        container.innerHTML = cachedTeams.map(team => {
+          const isMember = team.members.some(m => m.studentId === currentUserId);
+          const isLeader = team.leaderId === currentUserId;
+          const isFull = team.members.length >= team.maxSize;
+          const isSubmitting = team.status === 'SUBMITTING' || team.status === 'SUBMITTED';
+
+          let actionBtnHtml = '';
+          if (isLeader) {
+            actionBtnHtml = '<span class="badge badge-purple">👑 Bạn là Trưởng đội</span>';
+          } else if (isMember) {
+            actionBtnHtml = '<span class="badge badge-green" style="margin-right: 0.5rem;">✅ Thành viên</span>' +
+              '<button class="btn btn-danger btn-sm" onclick="leaveTeam(\'' + team.id + '\')">Rời Đội</button>';
+          } else if (isFull) {
+            actionBtnHtml = '<span class="badge badge-danger">🔒 Đã đủ slot (' + team.members.length + '/' + team.maxSize + ')</span>';
+          } else if (isSubmitting) {
+            actionBtnHtml = '<span class="badge badge-blue">⏳ Đang nộp hồ sơ</span>';
+          } else {
+            actionBtnHtml = '<button class="btn btn-sm" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6);" onclick="sendJoinRequestPrompt(\'' + team.id + '\', \'' + team.name + '\')">' +
+              '➕ Xin Vào Đội' +
+              '</button>';
+          }
+
+          const membersListHtml = team.members.map(m => 
+            '<span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.06); font-family: var(--mono);">' +
+              (m.role === 'LEADER' ? '👑 ' : '👤 ') + m.studentId + ' (' + m.role + ')' +
+            '</span>'
+          ).join(' ');
+
+          return '<div class="card" style="margin-bottom: 0; background: rgba(15, 23, 42, 0.6); border-color: ' + (isLeader ? 'rgba(139, 92, 246, 0.5)' : 'var(--card-border)') + ';">' +
+            '<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">' +
+              '<div>' +
+                '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
+                  '<strong style="font-size: 1.05rem;">' + team.name + '</strong>' +
+                  '<span class="badge ' + (team.status === 'FORMING' ? 'badge-blue' : (team.status === 'ACTIVE' ? 'badge-green' : 'badge-purple')) + '">' + team.status + '</span>' +
+                '</div>' +
+                '<div style="font-size: 0.85rem; color: var(--text-muted); margin: 0.35rem 0;">' +
+                  (team.description || 'Chưa có mô tả mục tiêu.') +
+                '</div>' +
+                '<div style="font-size: 0.8rem; color: #60a5fa; margin-bottom: 0.5rem;">' +
+                  '🎯 Slots: <strong>' + team.members.length + '/' + team.maxSize + '</strong> (Yêu cầu min: ' + team.minSize + ')' +
+                '</div>' +
+                '<div style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">' +
+                  '<span style="font-size: 0.75rem; color: var(--text-muted);">Thành viên:</span>' +
+                  membersListHtml +
+                '</div>' +
+              '</div>' +
+              '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">' +
+                actionBtnHtml +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
       } catch (err) {
-        console.error(err);
+        container.innerHTML = '<div style="color: var(--danger); text-align: center; padding: 1rem;">' + err.message + '</div>';
+      }
+    }
+
+    async function sendJoinRequestPrompt(teamId, teamName) {
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử Persona trước!');
+      const message = prompt('Nhập lời nhắn xin gia nhập đội [' + teamName + ']:', 'Em chào anh, em muốn tham gia mảng Computer Vision');
+      if (message === null) return;
+
+      try {
+        const res = await fetch('/api/v1/teams/' + teamId + '/join-requests', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_' + Date.now()
+          },
+          body: JSON.stringify({ message })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'Lỗi gửi yêu cầu gia nhập');
+        }
+        alert('✅ Đã gửi yêu cầu gia nhập thành công tới đội [' + teamName + ']!');
+        loadTeams();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    async function loadLeaderJoinRequests() {
+      if (!currentLeaderTeam || !currentAuthToken) return;
+      const container = document.getElementById('leaderRequestsContainer');
+      try {
+        const res = await fetch('/api/v1/teams/' + currentLeaderTeam.id + '/join-requests', {
+          headers: { 'Authorization': 'Bearer ' + currentAuthToken }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Không thể tải yêu cầu');
+
+        const pendingRequests = data.filter(r => r.status === 'PENDING');
+        if (!pendingRequests || pendingRequests.length === 0) {
+          container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">Hiện không có yêu cầu nào đang chờ duyệt.</div>';
+          return;
+        }
+
+        container.innerHTML = pendingRequests.map(r => 
+          '<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">' +
+            '<div>' +
+              '<div style="font-weight: 700; font-size: 0.85rem; color: #38bdf8;">👤 ' + r.applicantId + '</div>' +
+              '<div style="font-size: 0.8rem; color: var(--text); margin: 0.2rem 0;">"' + (r.message || 'Không có lời nhắn') + '"</div>' +
+              '<div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--mono);">' + new Date(r.appliedAt).toLocaleString('vi-VN') + '</div>' +
+            '</div>' +
+            '<div style="display: flex; gap: 0.4rem;">' +
+              '<button class="btn btn-success btn-sm" id="btnAccept_' + r.id + '" onclick="reviewJoinRequest(\'' + currentLeaderTeam.id + '\', \'' + r.id + '\', \'ACCEPT\', this)">' +
+                '✅ Duyệt Vào Đội' +
+              '</button>' +
+              '<button class="btn btn-danger btn-sm" id="btnReject_' + r.id + '" onclick="reviewJoinRequest(\'' + currentLeaderTeam.id + '\', \'' + r.id + '\', \'REJECT\', this)">' +
+                '❌ Từ Chối' +
+              '</button>' +
+            '</div>' +
+          '</div>'
+        ).join('');
+      } catch (err) {
+        container.innerHTML = '<div style="color: var(--danger); font-size: 0.85rem;">' + err.message + '</div>';
+      }
+    }
+
+    async function reviewJoinRequest(teamId, requestId, decision, btn) {
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản trưởng đội!');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Đang xử lý...';
+      }
+
+      try {
+        const res = await fetch('/api/v1/teams/' + teamId + '/join-requests/' + requestId + '/review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_review_' + Date.now()
+          },
+          body: JSON.stringify({ decision })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'Lỗi xử lý yêu cầu gia nhập');
+        }
+
+        alert('✅ Đã ' + (decision === 'ACCEPT' ? 'DUYỆT THÀNH VIÊN VÀO ĐỘI' : 'TỪ CHỐI YÊU CẦU') + ' thành công!');
+        loadTeams();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = decision === 'ACCEPT' ? '✅ Duyệt Vào Đội' : '❌ Từ Chối';
+        }
+      }
+    }
+
+    async function leaveTeam(teamId) {
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử!');
+      if (!confirm('Bạn có chắc chắn muốn rời đội thi này không?')) return;
+
+      try {
+        const res = await fetch('/api/v1/teams/' + teamId + '/leave', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_leave_' + Date.now()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Lỗi rời đội');
+
+        alert('✅ Đã rời đội thi thành công!');
+        loadTeams();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    async function createTeam() {
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử trước!');
+      const name = document.getElementById('teamName').value.trim();
+      const description = document.getElementById('teamDesc').value.trim();
+      const minSize = parseInt(document.getElementById('teamMin').value, 10);
+      const maxSize = parseInt(document.getElementById('teamMax').value, 10);
+
+      if (!name) return alert('Vui lòng nhập tên đội thi');
+      const btn = document.getElementById('btnCreateTeam');
+      btn.disabled = true;
+      btn.innerText = 'Đang tạo đội...';
+
+      try {
+        const res = await fetch('/api/v1/teams', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_create_' + Date.now()
+          },
+          body: JSON.stringify({
+            competitionId: 'opp_scholink_ai_challenge_2026',
+            name,
+            description,
+            minSize,
+            maxSize
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Lỗi tạo đội');
+
+        alert('✅ Đã tạo đội thành công: ' + data.name);
+        document.getElementById('teamName').value = '';
+        document.getElementById('teamDesc').value = '';
+        loadTeams();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '🚀 Tạo Đội Thi Mới';
       }
     }
 
@@ -884,48 +1227,24 @@ export class PortalController {
       }, null, 2);
     }
 
-    async function createTeam() {
-      const name = document.getElementById('teamName').value.trim();
-      const description = document.getElementById('teamDesc').value.trim();
-      const minSize = parseInt(document.getElementById('teamMin').value, 10);
-      const maxSize = parseInt(document.getElementById('teamMax').value, 10);
-
-      if (!name) return alert('Vui lòng nhập tên đội thi');
-
-      try {
-        const res = await fetch('/api/v1/teams', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            competitionId: 'opp_scholink_ai_challenge_2026',
-            name,
-            description,
-            minSize,
-            maxSize
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message || 'Lỗi tạo đội');
-
-        alert('✅ Đã tạo đội thành công: ' + data.name);
-        document.getElementById('teamName').value = '';
-        loadTeams();
-      } catch (err) {
-        alert('❌ Lỗi: ' + err.message);
-      }
-    }
-
     async function prepareSubmission() {
       const teamId = document.getElementById('freezeTeamSelect').value;
       if (!teamId) return alert('Vui lòng chọn đội thi trước');
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử!');
 
       try {
-        const res = await fetch(\`/api/v1/teams/\${teamId}/prepare-submission\`, { method: 'POST' });
+        const res = await fetch('/api/v1/teams/' + teamId + '/prepare-submission', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_freeze_' + Date.now()
+          }
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error?.message || 'Lỗi chuẩn bị nộp');
 
         currentReservation = data;
-        alert(\`🔒 Đã Khóa Roster Freeze thành công!\\nReservation ID: \${data.reservationId}\\nFencing Token: \${data.fencingToken}\\nThời hạn Lease: 10 phút\`);
+        alert('🔒 Đã Khóa Roster Freeze thành công!\nReservation ID: ' + data.reservationId + '\nFencing Token: ' + data.fencingToken + '\nThời hạn Lease: 10 phút');
         loadTeams();
       } catch (err) {
         alert('❌ Lỗi: ' + err.message);
@@ -934,10 +1253,15 @@ export class PortalController {
 
     async function submitConsentTeam() {
       if (!currentReservation) return alert('Chưa có Reservation nào đang chuẩn bị nộp');
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử!');
       try {
-        const res = await fetch(\`/api/v1/teams/submissions/\${currentReservation.reservationId}/consents\`, {
+        const res = await fetch('/api/v1/teams/submissions/' + currentReservation.reservationId + '/consents', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_consent_' + Date.now()
+          },
           body: JSON.stringify({
             snapshotId: 'snp_demo_2026',
             payloadHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
@@ -945,7 +1269,7 @@ export class PortalController {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error?.message || 'Lỗi gửi consent');
-        alert(\`✍️ Ghi nhận Consent thành công! (\${data.consentsCount}/\${data.totalMembers} thành viên đã ký). Đủ điều kiện: \${data.hasAllConsents ? 'CÓ' : 'CHƯA'}\`);
+        alert('✍️ Ghi nhận Consent thành công! (' + data.consentsCount + '/' + data.totalMembers + ' thành viên đã ký). Đủ điều kiện: ' + (data.hasAllConsents ? 'CÓ' : 'CHƯA'));
       } catch (err) {
         alert('❌ Lỗi: ' + err.message);
       }
@@ -953,8 +1277,15 @@ export class PortalController {
 
     async function abortSubmission() {
       if (!currentReservation) return alert('Chưa có Reservation nào');
+      if (!currentAuthToken) return alert('Vui lòng chọn tài khoản kiểm thử!');
       try {
-        const res = await fetch(\`/api/v1/teams/submissions/\${currentReservation.reservationId}/abort\`, { method: 'POST' });
+        const res = await fetch('/api/v1/teams/submissions/' + currentReservation.reservationId + '/abort', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + currentAuthToken,
+            'Idempotency-Key': 'idemp_abort_' + Date.now()
+          }
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error?.message || 'Lỗi hủy nộp');
         alert('🔓 Đã giải phóng Roster Freeze cho đội!');

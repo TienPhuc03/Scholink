@@ -11,6 +11,7 @@ async function bootstrap() {
   app.enableCors({ origin: '*' });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.enableShutdownHooks();
 
   const config = new DocumentBuilder()
     .setTitle('Billing Microservice (Port 3004)')

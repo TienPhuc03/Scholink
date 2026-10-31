@@ -13,6 +13,7 @@ async function bootstrap() {
   app.enableCors({ origin: '*' });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.enableShutdownHooks();
 
   // Connect gRPC Transport for East-West Microservices Communication
   const grpcPort = process.env.IDENTITY_GRPC_PORT || 50051;

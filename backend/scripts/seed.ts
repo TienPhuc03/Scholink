@@ -223,8 +223,78 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { upsert: true },
   );
 
+  // 5. Sinh viên 2 (Ứng viên A)
+  await User.updateOne(
+    { id: 'usr_student_002' },
+    {
+      $setOnInsert: {
+        id: 'usr_student_002',
+        email: 'applicant1@scholink.edu.vn',
+        normalizedEmail: 'applicant1@scholink.edu.vn',
+        passwordHash: studentHash,
+        fullName: 'Trần Thị Ứng Viên 1',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+  await Passport.updateOne(
+    { studentId: 'usr_student_002' },
+    {
+      $setOnInsert: {
+        id: 'psp_usr_student_002',
+        studentId: 'usr_student_002',
+        fullName: 'Trần Thị Ứng Viên 1',
+        bio: 'Sinh viên năm 2 ngành Trí tuệ Nhân tạo',
+        skills: ['Python', 'FastAPI', 'PyTorch'],
+        completionScore: 90,
+        scoreVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 6. Sinh viên 3 (Ứng viên B)
+  await User.updateOne(
+    { id: 'usr_student_003' },
+    {
+      $setOnInsert: {
+        id: 'usr_student_003',
+        email: 'applicant2@scholink.edu.vn',
+        normalizedEmail: 'applicant2@scholink.edu.vn',
+        passwordHash: studentHash,
+        fullName: 'Lê Văn Ứng Viên 2',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+  await Passport.updateOne(
+    { studentId: 'usr_student_003' },
+    {
+      $setOnInsert: {
+        id: 'psp_usr_student_003',
+        studentId: 'usr_student_003',
+        fullName: 'Lê Văn Ứng Viên 2',
+        bio: 'Sinh viên năm 3 ngành Kỹ thuật Phần mềm',
+        skills: ['Flutter', 'React', 'NodeJS'],
+        completionScore: 85,
+        scoreVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
   await conn.close();
-  console.log('  ✅ Hoàn tất Seed cho Identity Database (Users, Organization, Membership, Passport 100%)');
+  console.log('  ✅ Hoàn tất Seed cho Identity Database (Users, Organization, Membership, 3 Students & Passports)');
 }
 
 async function seedOpportunities(organizerId: string, orgId: string) {
@@ -499,11 +569,10 @@ async function seedCollaboration(studentId: string) {
         description: 'Đội thi Đại học Bách Khoa tham gia giải quyết bài toán thị giác máy tính',
         leaderId: studentId,
         minSize: 2,
-        maxSize: 4,
-        status: 'ACTIVE',
+        maxSize: 2,
+        status: 'FORMING',
         members: [
           { studentId, role: 'LEADER', joinedAt: new Date() },
-          { studentId: 'usr_student_002', role: 'MEMBER', joinedAt: new Date() },
         ],
         rosterVersion: 1,
         fencingToken: 0,
@@ -534,7 +603,7 @@ async function seedCollaboration(studentId: string) {
         id: roomId,
         type: 'TEAM',
         refId: teamId,
-        participants: [studentId, 'usr_student_002'],
+        participants: [studentId],
         lastSeq: 2,
         lastMessageSnippet: 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
         lastMessageAt: new Date(),
@@ -576,7 +645,7 @@ async function seedCollaboration(studentId: string) {
   );
 
   await collabConn.close();
-  console.log('  ✅ Hoàn tất Seed cho Collaboration Database (Team, Members, Chat room & Messages Seq #1, #2)');
+  console.log('  ✅ Hoàn tất Seed cho Collaboration Database (Team FORMING 1/2 slot, Chat room & Messages)');
 }
 
 async function seed() {
@@ -594,9 +663,11 @@ async function seed() {
   console.log('\n🎉 Hoàn thành khởi tạo dữ liệu mẫu thành công!');
   console.log('----------------------------------------------------');
   console.log('Tài khoản kiểm thử đã sẵn sàng:');
-  console.log('  1. ADMIN:     admin@scholink.edu.vn     / ScholinkAdmin@2026');
-  console.log('  2. ORGANIZER: organizer@scholink.edu.vn / Organizer@2026');
-  console.log('  3. STUDENT:   student@scholink.edu.vn   / Student@2026');
+  console.log('  1. ADMIN:       admin@scholink.edu.vn      / ScholinkAdmin@2026');
+  console.log('  2. ORGANIZER:   organizer@scholink.edu.vn  / Organizer@2026');
+  console.log('  3. STUDENT 1:   student@scholink.edu.vn    / Student@2026 (Trưởng đội BK AI)');
+  console.log('  4. STUDENT 2:   applicant1@scholink.edu.vn / Student@2026 (Ứng viên A)');
+  console.log('  5. STUDENT 3:   applicant2@scholink.edu.vn / Student@2026 (Ứng viên B - Tranh slot)');
   console.log('----------------------------------------------------');
 }
 

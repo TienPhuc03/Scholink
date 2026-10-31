@@ -16,6 +16,7 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.enableShutdownHooks();
 
   const config = new DocumentBuilder()
     .setTitle('Scholink Microservices API Gateway')

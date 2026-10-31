@@ -116,6 +116,10 @@ export class Team extends AggregateRoot<string> {
   }
 
   public transferLeader(newLeaderId: string, currentLeaderId: string): void {
+    if (this._props.status === 'SUBMITTING' || this._props.status === 'SUBMITTED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Không thể chuyển quyền trưởng đội khi đang nộp hồ sơ (Roster Freeze)', 409);
+    }
+
     if (currentLeaderId !== this._props.leaderId) {
       throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Chỉ trưởng đội mới có quyền chuyển giao vai trò', 403);
     }

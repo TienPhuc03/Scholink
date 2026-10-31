@@ -124,6 +124,7 @@ Mã nguồn ứng dụng di động nằm trong thư mục `android/`:
 ## 📖 Thư Mục Tài Liệu Kỹ Thuật Dự Án (docs/)
 Toàn bộ tài liệu kỹ thuật, đặc tả nghiệp vụ và hướng dẫn vận hành đã được quy hoạch tập trung trong thư mục **[`docs/`](./docs/README.md)**:
 
+- 🌟 **[Tài liệu Tổng quan Toàn diện Dự án (TONG_QUAN_DU_AN.md)](./docs/TONG_QUAN_DU_AN.md)**
 - 📑 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2 (52 trang)](./docs/Scholink_Tai_Lieu_Phat_Trien_Team.md)**
 - 📘 **[Sổ tay phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./docs/HUONG_DAN_PHAT_TRIEN.md)**
 - 📕 **[Runbook Vận hành Demo TV3 (RUNBOOK_VAN_HANH_DEMO_TV3.md)](./docs/RUNBOOK_VAN_HANH_DEMO_TV3.md)**
