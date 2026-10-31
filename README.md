@@ -4,20 +4,20 @@
 [![NestJS](https://img.shields.io/badge/NestJS-v11-red.svg)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-v5-blue.svg)](https://www.typescriptlang.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-v7-brightgreen.svg)](https://www.mongodb.com/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-Native%20Android-purple.svg)](https://kotlinlang.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-Dart%203.x%20MVVM-blue.svg)](https://flutter.dev/)
 [![Clean Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20Hexagonal-orange.svg)]()
 
 Nền tảng hỗ trợ sinh viên tìm kiếm học bổng & cuộc thi, quản lý hồ sơ Passport số hóa, tìm kiếm đồng đội (Team-Up), nộp hồ sơ trực tuyến, liên lạc thời gian thực và quản lý tài chính ví tích hợp.
 
-Dự án được xây dựng dựa trên đặc tả kỹ thuật **Scholink SRS v3.2** (17/10/2026) theo kiến trúc **Clean Architecture / Hexagonal Architecture** với **1 API Gateway + 5 Microservices nghiệp vụ độc lập** và ứng dụng **Android Kotlin Native**.
+Dự án được xây dựng dựa trên đặc tả kỹ thuật **Scholink SRS v3.2** (17/10/2026) theo kiến trúc **Clean Architecture / Hexagonal Architecture** với **1 API Gateway + 5 Microservices nghiệp vụ độc lập** và ứng dụng di động **Flutter (Dart 3.x, MVVM)**.
 
 ---
 
 ## 🏛️ Kiến trúc Phân Tách Độc Lập (Project Architecture)
 
-Hệ thống được tổ chức thành 2 module độc lập hoàn toàn trong repository:
+Hệ thống được tổ chức thành các module độc lập trong repository:
 - 🟢 **`backend/`**: Hệ sinh thái Microservices xây dựng trên NestJS Monorepo (1 API Gateway + 5 Microservices cô lập database + 1 Shared Kernel).
-- 🟣 **`android/`**: Ứng dụng di động Native Android viết bằng Kotlin (Clean Architecture, MVVM, Jetpack Compose, Room, MQTT).
+- 🔵 **`mobile/`**: Ứng dụng di động đa nền tảng Flutter (Clean Architecture, MVVM, Sound Null-Safety, Secure Storage, MQTT).
 - 📚 **`docs/`**: Toàn bộ tài liệu đặc tả (SRS v3.2), sổ tay phát triển và kịch bản vận hành.
 
 ---

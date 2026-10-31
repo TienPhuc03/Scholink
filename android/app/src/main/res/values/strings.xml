@@ -1,8 +1,0 @@
-<resources>
-    <string name="app_name">Scholink</string>
-    <string name="tab_opportunities">Cơ hội</string>
-    <string name="tab_passport">Passport</string>
-    <string name="tab_team">Đội thi</string>
-    <string name="tab_chat">Tin nhắn</string>
-    <string name="tab_wallet">Ví</string>
-</resources>
