@@ -28,6 +28,7 @@ class ScholinkApp extends StatefulWidget {
 
 class _ScholinkAppState extends State<ScholinkApp> {
   late bool _isAuthenticated;
+  bool _isGuest = false;
   int _currentTabIndex = 0;
 
   @override
@@ -39,6 +40,13 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _onLoginSuccess() {
     setState(() {
       _isAuthenticated = true;
+      _isGuest = false;
+    });
+  }
+
+  void _onEnterGuestMode() {
+    setState(() {
+      _isGuest = true;
     });
   }
 
@@ -46,6 +54,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
     await sl<SecureStorageHelper>().clear();
     setState(() {
       _isAuthenticated = false;
+      _isGuest = false;
       _currentTabIndex = 0;
     });
   }
@@ -56,7 +65,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
       title: 'Scholink Mobile',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: _isAuthenticated ? _buildMainNavigationScaffold() : _buildLoginView(),
+      home: (_isAuthenticated || _isGuest)
+          ? _buildMainNavigationScaffold()
+          : _buildLoginView(),
     );
   }
 
@@ -64,6 +75,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
     return LoginView(
       viewModel: sl<LoginViewModel>(),
       onLoginSuccess: _onLoginSuccess,
+      onNavigateToGuest: _onEnterGuestMode,
+      onNavigateToRegister: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tính năng đăng ký tài khoản sinh viên (FR-AUTH-02)'),
+          ),
+        );
+      },
     );
   }
 

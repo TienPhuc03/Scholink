@@ -3,6 +3,7 @@
  * Chạy kiểm thử luồng thực tế thông qua HTTP API Gateway (http://localhost:3000)
  */
 
+export {};
 const BASE_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
 
 async function request(path: string, options: RequestInit = {}) {
