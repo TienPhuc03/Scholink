@@ -1,0 +1,42 @@
+name: scholink_mobile
+description: "Scholink Mobile Platform - Flutter MVVM Clean Architecture with Defensive Null-Safety"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Networking & HTTP
+  dio: ^5.4.3+1
+  uuid: ^4.4.0
+
+  # State Management & MVVM
+  provider: ^6.1.2
+
+  # Dependency Injection / Service Locator
+  get_it: ^7.7.0
+
+  # Security & Storage
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.3
+
+  # Realtime Communication
+  mqtt_client: ^10.3.0
+
+  # Utilities & Crypto
+  crypto: ^3.0.5
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

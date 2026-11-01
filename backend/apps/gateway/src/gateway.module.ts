@@ -16,6 +16,11 @@ import { GatewayProfileController } from './controllers/gateway-profile.controll
 import { GatewayMediaController } from './controllers/gateway-media.controller';
 import { GatewayOpportunityController } from './controllers/gateway-opportunity.controller';
 import { GatewayApplicationController } from './controllers/gateway-application.controller';
+import { GatewayTeamController } from './controllers/gateway-team.controller';
+import { GatewayChatController } from './controllers/gateway-chat.controller';
+import { GatewayBillingController } from './controllers/gateway-billing.controller';
+import { GatewayNotificationController } from './controllers/gateway-notification.controller';
+import { GatewayAdminOrgController } from './controllers/gateway-admin-org.controller';
 
 @Module({
   imports: [
@@ -88,6 +93,11 @@ import { GatewayApplicationController } from './controllers/gateway-application.
     GatewayMediaController,
     GatewayOpportunityController,
     GatewayApplicationController,
+    GatewayTeamController,
+    GatewayChatController,
+    GatewayBillingController,
+    GatewayNotificationController,
+    GatewayAdminOrgController,
   ],
   providers: [ReverseProxyMiddleware],
 })

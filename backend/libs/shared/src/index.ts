@@ -12,6 +12,7 @@ export * from './infrastructure/guards/jwt-auth.guard';
 export * from './infrastructure/guards/roles.guard';
 export * from './infrastructure/guards/idempotency.guard';
 export * from './infrastructure/interceptors/correlation-id.interceptor';
+export * from './infrastructure/redis/redis.service';
 export * from './infrastructure/security/crypto.service';
 export * from './infrastructure/database/database.module';
 export * from './infrastructure/database/common.schema';
