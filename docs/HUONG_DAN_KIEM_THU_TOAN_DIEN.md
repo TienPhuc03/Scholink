@@ -21,8 +21,8 @@ cd backend
 | Loại kiểm thử | Lệnh thực thi (`pnpm`) | Tệp kiểm thử phụ trách | Mục tiêu kiểm tra |
 |---|---|---|---|
 | **1. Unit Tests** | `pnpm run test:unit` (hoặc `pnpm run test`) | `passport.entity.spec.ts`<br>`wallet.entity.spec.ts`<br>`reservation.entity.spec.ts`<br>`zod-validation.pipe.spec.ts` | Tính toán điểm Passport 7 thành phần, quy tắc bất biến số dư ví (`balance >= held >= 0`), khóa nộp đội Roster Freeze, lọc XSS & NoSQL. |
-| **2. Integration Tests** | `pnpm run test` | `auth.use-case.spec.ts` | Xác thực đăng ký, phân quyền cố định STUDENT, JWT token rotation, replay attack, OTP cooldown 60s. |
-| **3. Live E2E Tests** | `pnpm run test:e2e` | `scripts/test-e2e.ts` | 14 bước xuyên suốt API Gateway: Đăng ký, OTP, Upload PDF an toàn, Passport 100%, Consent SHA-256, Nộp đơn, Rút đơn, Nộp lại. |
+| **2. Integration Tests** | `pnpm run test` | `auth.use-case.spec.ts`<br>`chat-schol26.spec.ts` | Xác thực đăng ký, JWT token rotation, replay attack, OTP cooldown 60s.<br>**SCHOL-26:** Gửi đồng thời seq không trùng, clientMsgId dedup, outbox crash recovery, read cursor tăng đơn điệu, rời đội cấm chat & MQTT ACL. |
+| **3. Live E2E Tests** | `pnpm run test:e2e` | `scripts/test-e2e.ts` | 14 bước cơ sở + các bước SCHOL-26 xuyên suốt API Gateway: Đăng ký, OTP, Upload PDF an toàn, Passport 100%, Consent SHA-256, Nộp đơn, Rút đơn, Nộp lại, Chat nhóm, MQTT Webhook Auth/ACL. |
 | **4. Load / Benchmark** | `pnpm run test:load` | `scripts/load-test.ts` | Đo lường độ trễ mạng, thông lượng RPS, và các phân vị p50, p90, p95, p99 dưới tải đồng thời (CCU). |
 | **5. Security / OWASP** | `pnpm run test:security` | `scripts/security-test.ts` | Kiểm thử BOLA/IDOR, chống leo quyền (Privilege Escalation), NoSQL Injection (`$gt`), giả mạo JWT, file độc hại `.exe`, và spam OTP (429). |
 | **6. Regression Tests** | `pnpm run test:regression` | `scripts/regression-test.ts` | Kiểm tra tính toàn vẹn của hệ sinh thái sau mỗi bản release, đảm bảo logic cũ không bị lỗi. |
@@ -50,11 +50,23 @@ cd backend
 
 ---
 
-### 2. Integration Testing (Kiểm thử tích hợp Use Case)
+### 2. Integration Testing (Kiểm thử tích hợp Use Case & SCHOL-26)
 - **Xác thực & Bảo mật phiên** ([`auth.use-case.spec.ts`](file:///C:/Users/Administrator/Desktop/PROJECT/Scholink/backend/apps/identity-service/src/application/use-cases/auth.use-case.spec.ts)):
   - Kiểm tra ép quyền sinh viên (`role: STUDENT`), chặn client gửi role giả mạo.
   - Kiểm tra mã băm mật khẩu `bcrypt` và cấp cặp khóa Access/Refresh JWT Token.
   - Kiểm tra bộ đếm Cooldown 60 giây khi gửi OTP (trả về mã lỗi 429).
+- **Chat Nhóm & MQTT Reconnect SCHOL-26** ([`chat-schol26.spec.ts`](file:///C:/Users/Administrator/Desktop/PROJECT/Scholink/backend/apps/collaboration-service/src/chat-schol26.spec.ts)):
+  - **Mongoose Schemas & Unique Indexes:** Kiểm tra index `{ roomId: 1, seq: 1 }` (unique), `{ roomId: 1, senderId: 1, clientMsgId: 1 }` (unique partial), `{ roomId: 1, userId: 1 }` (unique read receipt) và `{ status: 1, nextRetryAt: 1, createdAt: 1 }`.
+  - **Gửi đồng thời (Concurrent send 10 tin nhắn):** Kiểm tra `seq` tăng đơn điệu tuyệt đối `[1..10]`, không trùng lặp.
+  - **Idempotency với `clientMsgId`:** Cùng payload trả tin cũ (`isDuplicate: true`); khác payload trả 409 `CLIENT_MESSAGE_CONFLICT`; hai người gửi khác nhau không bị gộp.
+  - **Crash Simulation (Outbox Pattern):** Phục hồi bản ghi `PENDING` sau crash commit DB, phát lại thành công và cập nhật `PUBLISHED`.
+  - **Worker Retry Safety:** Exponential backoff `2^retryCount * 1000`, chuyển `FAILED` sau 5 lần thất bại.
+  - **Notification Coordination:** Gắn `businessKey: 'chat_msg_' + messageId` đảm bảo không phát duplicate inbox.
+  - **Reconnect sync `afterSeq`:** Kéo bù tin nhắn sau seq đã nhận.
+  - **Read cursor tăng đơn điệu:** Sử dụng `$max`, không bị lùi khi nhận ack trễ.
+  - **Rời đội & Thu hồi quyền:** Sau khi rời đội bị chặn 403 khi gửi tin, chặn 403 khi đọc tin, và MQTT ACL từ chối subscribe (`deny`).
+  - **Phòng chat 1-1 (Direct Room):** Kiểm tra tạo phòng, người ngoài không thể đọc/gửi.
+  - **ChatController HTTP & EMQX Webhooks:** Tích hợp kiểm thử `mqttAuth` và `mqttAcl`.
 
 ---
 

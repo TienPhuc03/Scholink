@@ -101,7 +101,7 @@ export class CollaborationGrpcController {
       client_msg_id: result.clientMsgId || '',
       content: result.content,
       created_at: result.createdAt ? new Date(result.createdAt).getTime() : Date.now(),
-      is_duplicate: false,
+      is_duplicate: result.isDuplicate || false,
     };
   }
 

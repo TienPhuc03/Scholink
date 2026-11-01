@@ -29,6 +29,7 @@ import { MongooseChatRepository } from './infrastructure/persistence/chat.reposi
 import { TeamUseCase } from './application/use-cases/team.use-case';
 import { ChatUseCase } from './application/use-cases/chat.use-case';
 import { ReservationWorkerService } from './infrastructure/workers/reservation-worker.service';
+import { ChatOutboxWorkerService } from './infrastructure/workers/chat-outbox-worker.service';
 import { TeamController } from './presentation/team.controller';
 import { ChatController } from './presentation/chat.controller';
 import { CollaborationGrpcController } from './presentation/collaboration-grpc.controller';
@@ -57,6 +58,7 @@ import { CollaborationGrpcController } from './presentation/collaboration-grpc.c
     TeamUseCase,
     ChatUseCase,
     ReservationWorkerService,
+    ChatOutboxWorkerService,
     {
       provide: TEAM_REPOSITORY,
       useClass: MongooseTeamRepository,
@@ -66,6 +68,6 @@ import { CollaborationGrpcController } from './presentation/collaboration-grpc.c
       useClass: MongooseChatRepository,
     },
   ],
-  exports: [TeamUseCase, ChatUseCase, TEAM_REPOSITORY, CHAT_REPOSITORY],
+  exports: [TeamUseCase, ChatUseCase, TEAM_REPOSITORY, CHAT_REPOSITORY, ChatOutboxWorkerService],
 })
 export class CollaborationServiceModule {}
