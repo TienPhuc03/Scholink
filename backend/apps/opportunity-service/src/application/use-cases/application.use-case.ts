@@ -54,7 +54,7 @@ export class ApplicationUseCase implements OnModuleInit {
     @Inject(APPLICATION_REPOSITORY)
     private readonly applicationRepo: IApplicationRepository,
     @Inject(OPPORTUNITY_REPOSITORY)
-    private readonly opportunityRepo: IOpportunityRepository,
+    private readonly opportunityRepo: IOPORTUNITY_REPOSITORY,
     private readonly cryptoService: CryptoService,
     @Optional()
     @Inject(IDENTITY_GRPC_CLIENT)
@@ -162,6 +162,17 @@ export class ApplicationUseCase implements OnModuleInit {
       throw DomainException.conflict(ErrorCode.DEADLINE_PASSED, 'Đã hết hạn đăng ký nộp hồ sơ');
     }
 
+    // SCHOL-20: Team submission intent check to resolve concurrent commit/abort race
+    if (dto.submissionType === 'TEAM' && dto.teamId) {
+      const intent = await this.applicationRepo.findSubmissionIntent(dto.teamId, dto.submissionId);
+      if (intent?.status === 'ABORTED') {
+        throw DomainException.conflict(
+          ErrorCode.HOLD_EXPIRED,
+          'Phiên nộp hồ sơ đội đã bị hủy do quá hạn thời gian giữ chỗ (Lease Expired)',
+        );
+      }
+    }
+
     const preview = await this.applicationRepo.findPreviewById(dto.previewId);
     if (preview) {
       this.verifyPreviewMatch(preview, studentId, dto, opportunity.ruleVersion);
@@ -226,6 +237,18 @@ export class ApplicationUseCase implements OnModuleInit {
       await this.applicationRepo.save(application);
     }
 
+    // SCHOL-20: Atomic record/commit of submission intent
+    if (dto.submissionType === 'TEAM' && dto.teamId) {
+      await this.applicationRepo.upsertSubmissionIntent({
+        submissionId: dto.submissionId,
+        opportunityId: dto.opportunityId,
+        teamId: dto.teamId,
+        leaderId: studentId,
+        status: 'COMMITTED',
+        applicationId: application.id,
+      });
+    }
+
     await this.applicationRepo.saveRevision({
       id: `rev_${crypto.randomUUID()}`,
       applicationId: application.id,
@@ -264,6 +287,45 @@ export class ApplicationUseCase implements OnModuleInit {
       payloadHash: application.props.payloadHash,
       consentId: application.props.consentId,
     });
+  }
+
+  // SCHOL-20 requirement 5: Opportunity AbortSubmissionIntent resolution
+  async abortSubmissionIntent(data: {
+    teamId: string;
+    reservationId: string;
+    fencingToken: number;
+    reason?: string;
+  }): Promise<{ outcome: 'ABORTED' | 'COMMITTED'; message: string }> {
+    // 1. Check if application is already committed
+    const existing = await this.applicationRepo.findApplicationByTeamId(data.teamId);
+    if (existing && existing.status === 'SUBMITTED') {
+      return {
+        outcome: 'COMMITTED',
+        message: 'Hồ sơ đội đã được nộp thành công trước đó (COMMITTED)',
+      };
+    }
+
+    const intent = await this.applicationRepo.findSubmissionIntent(data.teamId, data.reservationId);
+    if (intent?.status === 'COMMITTED') {
+      return {
+        outcome: 'COMMITTED',
+        message: 'Intent đã được ghi nhận COMMITTED',
+      };
+    }
+
+    // 2. Abort intent atomically so subsequent commit is rejected
+    await this.applicationRepo.upsertSubmissionIntent({
+      submissionId: data.reservationId,
+      opportunityId: '',
+      teamId: data.teamId,
+      leaderId: '',
+      status: 'ABORTED',
+    });
+
+    return {
+      outcome: 'ABORTED',
+      message: `Intent đã bị hủy thành công (${data.reason || 'Timeout Worker'})`,
+    };
   }
 
   async getMyApplications(studentId: string) {

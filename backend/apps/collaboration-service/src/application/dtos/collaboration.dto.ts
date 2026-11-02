@@ -52,6 +52,8 @@ export type MarkReadDto = z.infer<typeof MarkReadDtoSchema>;
 export const SubmitTeamConsentDtoSchema = z.object({
   snapshotId: z.string().min(1),
   payloadHash: z.string().min(64),
+  profileVersion: z.number().int().min(1).default(1),
+  rosterVersion: z.number().int().min(1),
 });
 
 export type SubmitTeamConsentDto = z.infer<typeof SubmitTeamConsentDtoSchema>;

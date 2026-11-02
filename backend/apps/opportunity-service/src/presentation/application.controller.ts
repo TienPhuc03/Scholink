@@ -52,6 +52,22 @@ export class ApplicationController {
     return this.applicationUseCase.withdraw(data.applicationId, data.studentId);
   }
 
+  // SCHOL-20: Team Submission Intent Abort RPC (Collaboration Worker -> Opportunity Service)
+  @GrpcMethod('OpportunityGrpcService', 'AbortSubmissionIntent')
+  async abortSubmissionIntent(data: {
+    team_id: string;
+    reservation_id: string;
+    fencing_token: number;
+    reason?: string;
+  }) {
+    return this.applicationUseCase.abortSubmissionIntent({
+      teamId: data.team_id,
+      reservationId: data.reservation_id,
+      fencingToken: Number(data.fencing_token),
+      reason: data.reason,
+    });
+  }
+
   // ================= HTTP Handlers (F24: Organizer Kanban) =================
   @Get('organizer/kanban/:opportunityId')
   @ApiBearerAuth()

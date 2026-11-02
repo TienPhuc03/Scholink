@@ -14,6 +14,9 @@ service OpportunityGrpcService {
   rpc SubmitApplication (SubmitApplicationRequest) returns (SubmitApplicationResponse);
   rpc GetMyApplications (GetMyApplicationsRequest) returns (GetMyApplicationsResponse);
   rpc WithdrawApplication (WithdrawApplicationRequest) returns (WithdrawApplicationResponse);
+
+  // Team Submission Intent RPC (Collaboration Service Timeout Worker -> Opportunity Service)
+  rpc AbortSubmissionIntent (AbortSubmissionIntentRequest) returns (AbortSubmissionIntentResponse);
 }
 
 message ListOpportunitiesRequest {
@@ -168,4 +171,16 @@ message WithdrawApplicationResponse {
   string status = 2;
   int32 revision = 3;
   int32 version = 4;
+}
+
+message AbortSubmissionIntentRequest {
+  string team_id = 1;
+  string reservation_id = 2;
+  int64 fencing_token = 3;
+  string reason = 4;
+}
+
+message AbortSubmissionIntentResponse {
+  string outcome = 1; // "ABORTED" or "COMMITTED"
+  string message = 2;
 }

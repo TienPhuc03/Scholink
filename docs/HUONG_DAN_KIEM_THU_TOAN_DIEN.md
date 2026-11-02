@@ -21,8 +21,8 @@ cd backend
 | Loại kiểm thử | Lệnh thực thi (`pnpm`) | Tệp kiểm thử phụ trách | Mục tiêu kiểm tra |
 |---|---|---|---|
 | **1. Unit Tests** | `pnpm run test:unit` (hoặc `pnpm run test`) | `passport.entity.spec.ts`<br>`wallet.entity.spec.ts`<br>`reservation.entity.spec.ts`<br>`zod-validation.pipe.spec.ts` | Tính toán điểm Passport 7 thành phần, quy tắc bất biến số dư ví (`balance >= held >= 0`), khóa nộp đội Roster Freeze, lọc XSS & NoSQL. |
-| **2. Integration Tests** | `pnpm run test` | `auth.use-case.spec.ts`<br>`chat-schol26.spec.ts` | Xác thực đăng ký, JWT token rotation, replay attack, OTP cooldown 60s.<br>**SCHOL-26:** Gửi đồng thời seq không trùng, clientMsgId dedup, outbox crash recovery, read cursor tăng đơn điệu, rời đội cấm chat & MQTT ACL. |
-| **3. Live E2E Tests** | `pnpm run test:e2e` | `scripts/test-e2e.ts` | 14 bước cơ sở + các bước SCHOL-26 xuyên suốt API Gateway: Đăng ký, OTP, Upload PDF an toàn, Passport 100%, Consent SHA-256, Nộp đơn, Rút đơn, Nộp lại, Chat nhóm, MQTT Webhook Auth/ACL. |
+| **2. Integration Tests** | `pnpm run test` | `auth.use-case.spec.ts`<br>`chat-schol26.spec.ts`<br>`team-schol20.spec.ts` | Xác thực đăng ký, JWT token rotation, replay attack, OTP cooldown 60s.<br>**SCHOL-26:** Gửi đồng thời seq không trùng, clientMsgId dedup, outbox crash recovery, read cursor tăng đơn điệu, rời đội cấm chat & MQTT ACL.<br>**SCHOL-20:** PrepareSubmission kiểm leader & membership hợp lệ, thu consent gắn profile/snapshot/roster, conditional transition sang SUBMITTING, validate token/lease/consents, worker timeout gọi Opportunity AbortSubmissionIntent (COMMITTED reconcile, ABORTED mở khóa, mất mạng giữ khóa retry), rời/chuyển trưởng tuân thủ Roster Freeze & thu hồi quyền chat. |
+| **3. Live E2E Tests** | `pnpm run test:e2e` | `scripts/test-e2e.ts` | 14 bước cơ sở + các bước SCHOL-20 & SCHOL-26 xuyên suốt API Gateway: Đăng ký, OTP, Upload PDF an toàn, Passport 100%, Consent SHA-256, Nộp đơn, Rút đơn, Nộp lại, Chat nhóm, MQTT Webhook Auth/ACL. |
 | **4. Load / Benchmark** | `pnpm run test:load` | `scripts/load-test.ts` | Đo lường độ trễ mạng, thông lượng RPS, và các phân vị p50, p90, p95, p99 dưới tải đồng thời (CCU). |
 | **5. Security / OWASP** | `pnpm run test:security` | `scripts/security-test.ts` | Kiểm thử BOLA/IDOR, chống leo quyền (Privilege Escalation), NoSQL Injection (`$gt`), giả mạo JWT, file độc hại `.exe`, và spam OTP (429). |
 | **6. Regression Tests** | `pnpm run test:regression` | `scripts/regression-test.ts` | Kiểm tra tính toàn vẹn của hệ sinh thái sau mỗi bản release, đảm bảo logic cũ không bị lỗi. |
@@ -50,7 +50,7 @@ cd backend
 
 ---
 
-### 2. Integration Testing (Kiểm thử tích hợp Use Case & SCHOL-26)
+### 2. Integration Testing (Kiểm thử tích hợp Use Case, SCHOL-26 & SCHOL-20)
 - **Xác thực & Bảo mật phiên** ([`auth.use-case.spec.ts`](file:///C:/Users/Administrator/Desktop/PROJECT/Scholink/backend/apps/identity-service/src/application/use-cases/auth.use-case.spec.ts)):
   - Kiểm tra ép quyền sinh viên (`role: STUDENT`), chặn client gửi role giả mạo.
   - Kiểm tra mã băm mật khẩu `bcrypt` và cấp cặp khóa Access/Refresh JWT Token.
@@ -65,8 +65,16 @@ cd backend
   - **Reconnect sync `afterSeq`:** Kéo bù tin nhắn sau seq đã nhận.
   - **Read cursor tăng đơn điệu:** Sử dụng `$max`, không bị lùi khi nhận ack trễ.
   - **Rời đội & Thu hồi quyền:** Sau khi rời đội bị chặn 403 khi gửi tin, chặn 403 khi đọc tin, và MQTT ACL từ chối subscribe (`deny`).
-  - **Phòng chat 1-1 (Direct Room):** Kiểm tra tạo phòng, người ngoài không thể đọc/gửi.
-  - **ChatController HTTP & EMQX Webhooks:** Tích hợp kiểm thử `mqttAuth` và `mqttAcl`.
+- **Consent Đội, Roster Freeze & Reservation SCHOL-20** ([`team-schol20.spec.ts`](file:///C:/Users/Administrator/Desktop/PROJECT/Scholink/backend/apps/collaboration-service/src/team-schol20.spec.ts)):
+  - **PrepareSubmission:** Kiểm tra quyền trưởng đội (403), ngưỡng minSize/maxSize (422), kiểm tra toàn bộ thành viên có active membership hợp lệ trong đội (409 nếu thiếu hoặc sai đội). Cấp lease 10 phút, tăng `fencingToken` và `rosterVersion`.
+  - **Cập nhật có điều kiện (Optimistic Concurrency):** Ngăn chặn race condition khi 2 tiến trình gọi `prepareSubmission` đồng thời, chỉ 1 tiến trình được phép chuyển sang `SUBMITTING`.
+  - **Thu thập Consent:** Gắn `snapshotId`, `payloadHash`, `profileVersion` và `rosterVersion`. Từ chối người ngoài (403) và từ chối nếu `rosterVersion` không khớp (409 `VERSION_MISMATCH`). Đủ 100% consent mới cho phép nộp.
+  - **Roster Freeze:** Chặn `leaveTeam` và `transferLeader` khi đội đang ở trạng thái `SUBMITTING` (409 `STATE_CONFLICT`).
+  - **Rời đội ở ACTIVE:** Cập nhật đội hình, xóa `ActiveMembership`, thu hồi quyền phòng chat tức thì, tăng `rosterVersion` và hủy phiên giữ chỗ chưa hoàn tất.
+  - **ValidateReservation & Confirm:** Kiểm tra fencingToken, thời hạn lease, rosterVersion và điều kiện 100% consent. Confirm chuyển `CONFIRMED` và `SUBMITTED`, an toàn không giữ transaction khi gọi network. Chặn confirm sau khi đã abort.
+  - **Worker Timeout & Opportunity Intent:** Gọi `AbortSubmissionIntent` khi lease hết hạn. Nếu Opportunity trả `ABORTED` -> worker mở khóa đội về `ACTIVE`. Nếu Opportunity trả `COMMITTED` -> worker đối chiếu và xác nhận đội `SUBMITTED`. Nếu mất kết nối mạng -> giữ nguyên khóa (`status: SUBMITTING`), an toàn retry chu kỳ sau mà không mở khóa bậy.
+  - **Ràng buộc 1 thành viên 1 đội:** Ngăn chặn sinh viên tham gia hoặc tạo 2 đội trong cùng 1 cuộc thi.
+  - **Mở lại đội (Reopen from Withdrawal):** Trưởng đội có thể mở lại đội từ hồ sơ đã rút về `ACTIVE` kèm tăng `rosterVersion`.
 
 ---
 

@@ -86,6 +86,39 @@ export class MongooseTeamRepository implements ITeamRepository {
       .exec();
   }
 
+  async conditionalPrepareSubmission(
+    teamId: string,
+    leaderId: string,
+    reservationId: string,
+    currentVersion: number,
+    nextFencingToken: number,
+    nextRosterVersion: number,
+  ): Promise<Team | null> {
+    const doc = await this.teamModel
+      .findOneAndUpdate(
+        {
+          id: teamId,
+          leaderId: leaderId,
+          status: { $in: ['FORMING', 'ACTIVE'] },
+          version: currentVersion,
+        },
+        {
+          $set: {
+            status: 'SUBMITTING',
+            currentReservationId: reservationId,
+            fencingToken: nextFencingToken,
+            rosterVersion: nextRosterVersion,
+          },
+          $inc: { version: 1 },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!doc) return null;
+    return this.toDomain(doc);
+  }
+
   // Active Memberships
   async saveActiveMembership(record: ActiveMembershipRecord): Promise<void> {
     await this.membershipModel.create(record);
