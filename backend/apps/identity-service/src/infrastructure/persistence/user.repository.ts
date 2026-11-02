@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { OtpPurpose } from '@shared';
+import { OtpPurpose, RedisService } from '@shared';
 import { IUserRepository, SessionRecord } from '../../domain/ports/user.repository.port';
 import { User, UserRole, UserStatus } from '../../domain/user.entity';
 import { OtpRecord } from '../../domain/otp-record.entity';
@@ -23,6 +23,8 @@ export class MongooseUserRepository implements IUserRepository {
     private readonly sessionModel: Model<SessionDocument>,
     @InjectModel(OtpRecordModel.name)
     private readonly otpRecordModel: Model<OtpRecordDocument>,
+    @Optional()
+    private readonly redisService?: RedisService,
   ) {}
 
   async findById(id: string): Promise<User | null> {
@@ -129,6 +131,11 @@ export class MongooseUserRepository implements IUserRepository {
         { $set: { isRevoked: true, revokedReason: String(reason) } },
       )
       .exec();
+
+    // SCHOL-14: Invalidate token instantly in Redis cache if available (7 days TTL)
+    if (this.redisService?.isAvailable) {
+      await this.redisService.set(`revoked_user:${userId}`, String(reason), 7 * 24 * 3600);
+    }
   }
 
   async findOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<OtpRecord | null> {

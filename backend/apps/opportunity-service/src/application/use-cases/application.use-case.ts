@@ -13,7 +13,7 @@ import {
 } from '../../domain/ports/opportunity.repository.port';
 import { Application } from '../../domain/application.entity';
 import { CreatePreviewDto, SubmitApplicationDto } from '../dtos/opportunity.dto';
-import { DomainException, ErrorCode, CryptoService } from '@shared';
+import { DomainException, ErrorCode, CryptoService, AuthenticatedUser } from '@shared';
 
 export const IDENTITY_GRPC_CLIENT = Symbol('IDENTITY_GRPC_CLIENT');
 
@@ -54,7 +54,7 @@ export class ApplicationUseCase implements OnModuleInit {
     @Inject(APPLICATION_REPOSITORY)
     private readonly applicationRepo: IApplicationRepository,
     @Inject(OPPORTUNITY_REPOSITORY)
-    private readonly opportunityRepo: IOPORTUNITY_REPOSITORY,
+    private readonly opportunityRepo: IOpportunityRepository,
     private readonly cryptoService: CryptoService,
     @Optional()
     @Inject(IDENTITY_GRPC_CLIENT)
@@ -428,13 +428,20 @@ export class ApplicationUseCase implements OnModuleInit {
     };
   }
 
-  // ==========================================
-  // F24: ORGANIZER KANBAN & STATUS MANAGEMENT
-  // ==========================================
-  async getOpportunityKanban(opportunityId: string) {
+  // =========================================================================
+  // SCHOL-14: ORGANIZER KANBAN, DETAIL, ATTACHMENTS & STATUS MANAGEMENT
+  // =========================================================================
+  async getOpportunityKanban(opportunityId: string, caller: AuthenticatedUser) {
     const opportunity = await this.opportunityRepo.findById(opportunityId);
     if (!opportunity) {
       throw DomainException.notFound('Cơ hội (Học bổng / Cuộc thi)');
+    }
+
+    // SCHOL-14: Scoped strictly to caller organization (unless Admin)
+    if (caller.role !== 'ADMIN') {
+      if (!caller.organizationId || opportunity.props.organizationId !== caller.organizationId) {
+        throw DomainException.forbidden('Bạn không có quyền truy cập hồ sơ của đơn vị khác');
+      }
     }
 
     const applications = await this.applicationRepo.findManyByOpportunity(opportunityId);
@@ -472,9 +479,78 @@ export class ApplicationUseCase implements OnModuleInit {
     };
   }
 
+  async getApplicationDetail(applicationId: string, caller: AuthenticatedUser) {
+    const application = await this.applicationRepo.findById(applicationId);
+    if (!application) {
+      throw DomainException.notFound('Hồ sơ ứng tuyển');
+    }
+
+    const opportunity = await this.opportunityRepo.findById(application.opportunityId);
+    if (!opportunity) {
+      throw DomainException.notFound('Cơ hội');
+    }
+
+    // SCHOL-14: Scoped strictly to caller organization (unless Admin)
+    if (caller.role !== 'ADMIN') {
+      if (!caller.organizationId || opportunity.props.organizationId !== caller.organizationId) {
+        throw DomainException.forbidden('Bạn không có quyền xem chi tiết hồ sơ của đơn vị khác');
+      }
+    }
+
+    const latestRevision = await this.applicationRepo.findLatestRevision(applicationId);
+    const events = await this.applicationRepo.findEventsByApplication(applicationId);
+
+    return {
+      ...application.props,
+      id: application.id,
+      version: application.version,
+      opportunityTitle: opportunity.props.title,
+      organizationId: opportunity.props.organizationId,
+      revision: latestRevision,
+      history: events,
+    };
+  }
+
+  async getApplicationAttachments(applicationId: string, caller: AuthenticatedUser) {
+    const application = await this.applicationRepo.findById(applicationId);
+    if (!application) {
+      throw DomainException.notFound('Hồ sơ ứng tuyển');
+    }
+
+    const opportunity = await this.opportunityRepo.findById(application.opportunityId);
+    if (!opportunity) {
+      throw DomainException.notFound('Cơ hội');
+    }
+
+    // SCHOL-14: Scoped strictly to caller organization (unless Admin)
+    if (caller.role !== 'ADMIN') {
+      if (!caller.organizationId || opportunity.props.organizationId !== caller.organizationId) {
+        throw DomainException.forbidden('Bạn không có quyền truy cập tệp hồ sơ của đơn vị khác');
+      }
+    }
+
+    const latestRevision = await this.applicationRepo.findLatestRevision(applicationId);
+    let attachments: any[] = [];
+    if (latestRevision?.manifestJson) {
+      try {
+        attachments = JSON.parse(latestRevision.manifestJson);
+      } catch {
+        attachments = [];
+      }
+    }
+
+    return {
+      applicationId: application.id,
+      opportunityId: opportunity.id,
+      opportunityTitle: opportunity.props.title,
+      manifestHash: latestRevision?.payloadHash,
+      attachments,
+    };
+  }
+
   async updateStatus(
     applicationId: string,
-    organizerId: string,
+    caller: AuthenticatedUser,
     dto: { status: string; expectedVersion?: number; note?: string },
   ) {
     const application = await this.applicationRepo.findById(applicationId);
@@ -482,6 +558,27 @@ export class ApplicationUseCase implements OnModuleInit {
       throw DomainException.notFound('Hồ sơ ứng tuyển');
     }
 
+    const opportunity = await this.opportunityRepo.findById(application.opportunityId);
+    if (!opportunity) {
+      throw DomainException.notFound('Cơ hội');
+    }
+
+    // SCHOL-14: Scoped strictly to caller organization (unless Admin)
+    if (caller.role !== 'ADMIN') {
+      if (!caller.organizationId || opportunity.props.organizationId !== caller.organizationId) {
+        throw DomainException.forbidden('Bạn không có quyền thay đổi trạng thái hồ sơ của đơn vị khác');
+      }
+    }
+
+    // SCHOL-14: Yêu cầu lý do/ghi chú khi từ chối hồ sơ
+    if (dto.status === 'REJECTED' && (!dto.note || !dto.note.trim())) {
+      throw DomainException.unprocessable(
+        ErrorCode.VALIDATION_ERROR,
+        'Lý do từ chối (note) là bắt buộc khi chuyển trạng thái sang REJECTED',
+      );
+    }
+
+    // SCHOL-14: Optimistic locking version
     if (dto.expectedVersion !== undefined && application.version !== dto.expectedVersion) {
       throw new DomainException(
         ErrorCode.VERSION_MISMATCH,
@@ -496,7 +593,7 @@ export class ApplicationUseCase implements OnModuleInit {
     await this.applicationRepo.appendEvent({
       id: `evt_${crypto.randomUUID()}`,
       applicationId: updated.id,
-      actorId: organizerId,
+      actorId: caller.userId,
       fromStatus: application.status,
       toStatus: updated.status,
       revision: updated.revision,

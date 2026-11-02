@@ -48,6 +48,7 @@ export interface IApplicationRepository {
   savePreview(preview: SubmissionPreviewRecord): Promise<void>;
   findPreviewById(previewId: string): Promise<SubmissionPreviewRecord | null>;
   saveRevision(revision: ApplicationRevisionRecord): Promise<void>;
+  findLatestRevision(applicationId: string): Promise<ApplicationRevisionRecord | null>;
   appendEvent(event: {
     id: string;
     applicationId: string;
@@ -57,6 +58,7 @@ export interface IApplicationRepository {
     revision: number;
     reason?: string;
   }): Promise<void>;
+  findEventsByApplication(applicationId: string): Promise<any[]>;
 
   // Submission Intent tracking (SCHOL-20 & WF07 race resolution)
   findSubmissionIntent(teamId: string, submissionId: string): Promise<{ status: string } | null>;

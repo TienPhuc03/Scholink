@@ -69,6 +69,11 @@ export class ReverseProxyMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const originalUrl = req.originalUrl || req.url;
 
+    // SCHOL-14: Admin organizations endpoint is explicitly managed by GatewayAdminOrgController
+    if (originalUrl.startsWith('/api/v1/admin/organizations')) {
+      return next();
+    }
+
     // Check if request matches any downstream microservice route
     const matchedRoute = MICROSERVICE_ROUTES.find((route) =>
       originalUrl.startsWith(route.prefix),

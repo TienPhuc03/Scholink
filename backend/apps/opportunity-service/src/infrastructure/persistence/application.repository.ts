@@ -166,6 +166,30 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     await this.revisionModel.create({ ...revision });
   }
 
+  async findLatestRevision(applicationId: string): Promise<ApplicationRevisionRecord | null> {
+    const doc = await this.revisionModel
+      .findOne({ applicationId: String(applicationId) })
+      .sort({ revision: -1 })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return Object.freeze({
+      id: doc.id,
+      applicationId: doc.applicationId,
+      revision: doc.revision,
+      previewId: doc.previewId,
+      snapshotId: doc.snapshotId,
+      profileVersion: doc.profileVersion,
+      ruleVersion: doc.ruleVersion,
+      snapshotJson: doc.snapshotJson,
+      manifestJson: doc.manifestJson,
+      payloadHash: doc.payloadHash,
+      consentId: doc.consentId,
+      screening: doc.screening as any,
+      submittedAt: new Date(doc.submittedAt),
+    });
+  }
+
   async appendEvent(event: {
     id: string;
     applicationId: string;
@@ -176,6 +200,24 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     reason?: string;
   }): Promise<void> {
     await this.eventModel.create({ ...event });
+  }
+
+  async findEventsByApplication(applicationId: string): Promise<any[]> {
+    const docs = await this.eventModel
+      .find({ applicationId: String(applicationId) })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({
+      id: d.id,
+      applicationId: d.applicationId,
+      actorId: d.actorId,
+      fromStatus: d.fromStatus,
+      toStatus: d.toStatus,
+      revision: d.revision,
+      reason: d.reason,
+      createdAt: d.createdAt,
+    }));
   }
 
   async findSubmissionIntent(teamId: string, submissionId: string): Promise<{ status: string } | null> {

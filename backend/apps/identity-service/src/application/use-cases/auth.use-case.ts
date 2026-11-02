@@ -1,9 +1,15 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { IUserRepository, USER_REPOSITORY } from '../../domain/ports/user.repository.port';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
+import {
+  OrganizationMembershipModel,
+  OrganizationMembershipDocument,
+} from '../../infrastructure/persistence/organization.schema';
 import { User } from '../../domain/user.entity';
 import { Passport } from '../../domain/passport.entity';
 import {
@@ -33,6 +39,9 @@ export class AuthUseCase {
     @Inject(PASSPORT_REPOSITORY) private readonly passportRepo: IPassportRepository,
     private readonly jwtService: JwtService,
     private readonly cryptoService: CryptoService,
+    @Optional()
+    @InjectModel(OrganizationMembershipModel.name)
+    private readonly membershipModel?: Model<OrganizationMembershipDocument>,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -93,6 +102,15 @@ export class AuthUseCase {
     const familyId = crypto.randomUUID();
     const tokens = await this.issueTokenPair(user, familyId);
 
+    // Look up active organization membership if user is an ORGANIZER
+    let organizationId: string | undefined;
+    if (this.membershipModel && user.role === 'ORGANIZER') {
+      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
+      if (activeMem) {
+        organizationId = activeMem.organizationId;
+      }
+    }
+
     return Object.freeze({
       ...tokens,
       user: {
@@ -100,6 +118,7 @@ export class AuthUseCase {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        organizationId,
       },
     });
   }
@@ -139,94 +158,103 @@ export class AuthUseCase {
       );
     }
 
+    // Đánh dấu session cũ đã dùng và xoay vòng Refresh Token mới
     await this.userRepo.markSessionUsed(session.id);
-    return this.issueTokenPair(user, session.familyId);
+    const newTokens = await this.issueTokenPair(user, session.familyId);
+
+    return Object.freeze(newTokens);
   }
 
-  async logout(userId: string, sessionId?: string) {
-    if (sessionId) {
-      await this.userRepo.markSessionUsed(sessionId);
+  async logout(refreshToken: string) {
+    if (!refreshToken) return;
+    try {
+      const tokenHash = this.cryptoService.sha256(refreshToken);
+      const session = await this.userRepo.findSessionByTokenHash(tokenHash);
+      if (session) {
+        await this.userRepo.revokeSessionFamily(session.familyId, 'USER_LOGOUT');
+      }
+    } catch {
+      // Idempotent logout
     }
-    return Object.freeze({ revoked: true, userId });
   }
 
   /**
-   * FR-AUTH-02 & FR-AUTH-03: Sinh mã OTP 6 chữ số bằng CSPRNG, băm SHA-256 trước khi lưu DB.
-   * Áp dụng cooldown 60 giây giữa 2 lần gửi và khóa 15 phút nếu đang trong thời gian bị phạt.
+   * FR-AUTH-02: Gửi mã OTP xác thực email qua Email
    */
   async sendOtp(dto: SendOtpDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const now = new Date();
+    const existing = await this.userRepo.findOtpRecord(normalizedEmail, dto.purpose);
 
-    const existingRecord = await this.userRepo.findOtpRecord(normalizedEmail, dto.purpose);
-    if (existingRecord) {
-      existingRecord.assertCanResend(now);
+    if (existing && existing.lockedUntil && new Date() < existing.lockedUntil) {
+      const waitMinutes = Math.ceil(
+        (existing.lockedUntil.getTime() - Date.now()) / (60 * 1000),
+      );
+      throw new DomainException(
+        ErrorCode.OTP_LOCKED,
+        `Tài khoản đang bị khóa do nhập sai OTP nhiều lần. Vui lòng thử lại sau ${waitMinutes} phút`,
+        429,
+      );
     }
 
-    const rawOtp = String(crypto.randomInt(100000, 1000000));
-    const otpHash = this.cryptoService.sha256(`${normalizedEmail}:${dto.purpose}:${rawOtp}`);
+    // Cooldown 60s
+    if (existing && !existing.isCooldownElapsed(new Date())) {
+      const remainingSeconds = existing.getRemainingCooldownSeconds(new Date());
+      throw new DomainException(
+        ErrorCode.OTP_COOLDOWN,
+        `Vui lòng chờ ${remainingSeconds} giây trước khi yêu cầu gửi lại mã OTP`,
+        429,
+      );
+    }
 
-    const newRecord = OtpRecord.issueNew({
+    // 6 số ngẫu nhiên
+    const rawOtp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = this.cryptoService.sha256(
+      `${normalizedEmail}:${dto.purpose}:${rawOtp}`,
+    );
+
+    const record = OtpRecord.create({
       email: normalizedEmail,
       purpose: dto.purpose,
       otpHash,
-      now,
     });
-    await this.userRepo.saveOtpRecord(newRecord);
+    await this.userRepo.saveOtpRecord(record);
 
-    const isDevOrTest = process.env.NODE_ENV !== 'production';
-    if (isDevOrTest) {
-      this.logger.log(`[OTP-${dto.purpose}] Email=${normalizedEmail} OTP=${rawOtp} (TTL=300s)`);
-    }
+    this.logger.log(`[OTP] Gửi mã tới ${normalizedEmail} [${dto.purpose}]: ${rawOtp}`);
 
     return Object.freeze({
-      sent: true,
       email: normalizedEmail,
       purpose: dto.purpose,
       expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
       cooldownSeconds: Math.floor(OTP_COOLDOWN_MS / 1000),
-      message: 'Mã OTP đã được phát hành và gửi tới email của bạn',
-      devOtpPreview: isDevOrTest ? rawOtp : '',
+      devOtpPreview: process.env.NODE_ENV !== 'production' ? rawOtp : '',
     });
   }
 
   /**
-   * FR-AUTH-02: Xác thực mã OTP (tối đa 5 lần sai -> khóa 15 phút).
-   * Nếu purpose === 'VERIFY_EMAIL', kích hoạt trạng thái tài khoản sang ACTIVE.
+   * FR-AUTH-02: Xác thực mã OTP người dùng gửi lên
    */
   async verifyOtp(dto: VerifyOtpDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     await this.verifyAndConsumeOtp(normalizedEmail, dto.purpose, dto.otpCode);
 
-    let status = 'VERIFIED';
-    if (dto.purpose === 'VERIFY_EMAIL') {
-      const user = await this.userRepo.findByEmail(normalizedEmail);
-      if (user) {
-        const activated = user.activate();
-        await this.userRepo.update(activated);
-        status = activated.status;
-      }
-    }
-
     return Object.freeze({
       verified: true,
       email: normalizedEmail,
       purpose: dto.purpose,
-      status,
     });
   }
 
   /**
-   * FR-AUTH-03: Yêu cầu đặt lại mật khẩu (Chống dò email / Anti-Enumeration).
-   * Nếu email không tồn tại, vẫn trả về thông báo thành công đồng nhất để không lộ danh sách tài khoản.
+   * FR-AUTH-03: Quên mật khẩu - gửi OTP đặt lại mật khẩu
    */
   async forgotPassword(dto: ForgotPasswordDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const user = await this.userRepo.findByEmail(normalizedEmail);
 
-    if (!user || user.status === 'DELETED') {
+    // Chống User Enumeration: Nếu email không tồn tại vẫn trả thông điệp thành công chung chung
+    if (!user) {
+      this.logger.warn(`[ForgotPassword] Yêu cầu từ email không tồn tại: ${normalizedEmail}`);
       return Object.freeze({
-        sent: true,
         email: normalizedEmail,
         purpose: 'RESET_PASSWORD',
         expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
@@ -243,8 +271,7 @@ export class AuthUseCase {
   }
 
   /**
-   * FR-AUTH-03 & FR-AUTH-04: Đặt lại mật khẩu mới bằng mã OTP hợp lệ,
-   * tăng `sessionVersion` và thu hồi toàn bộ các phiên Refresh Token cũ của người dùng.
+   * FR-AUTH-03 & FR-AUTH-04: Đặt lại mật khẩu mới bằng mã OTP hợp lệ
    */
   async resetPassword(dto: ResetPasswordDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
@@ -308,7 +335,17 @@ export class AuthUseCase {
 
   private async issueTokenPair(user: User, familyId: string) {
     const sessionId = crypto.randomUUID();
-    const payload = {
+
+    // Look up active organization membership if user is an ORGANIZER
+    let organizationId: string | undefined;
+    if (this.membershipModel && user.role === 'ORGANIZER') {
+      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
+      if (activeMem) {
+        organizationId = activeMem.organizationId;
+      }
+    }
+
+    const payload: any = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -317,6 +354,9 @@ export class AuthUseCase {
       sessionVersion: user.sessionVersion,
       jti: crypto.randomUUID(),
     };
+    if (organizationId) {
+      payload.organizationId = organizationId;
+    }
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' } as any);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' } as any);

@@ -3,11 +3,13 @@ import {
   CanActivate,
   ExecutionContext,
   SetMetadata,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { DomainException, ErrorCode } from '../../domain/domain.exception';
+import { RedisService } from '../redis/redis.service';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -25,9 +27,10 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
     // Mục 26 & 29 SRS: Xóa mọi header x-user-* do client tự đặt để chống giả mạo danh tính
@@ -77,9 +80,36 @@ export class JwtAuthGuard implements CanActivate {
         throw new Error('Invalid token claims');
       }
 
+      // SCHOL-14: Kiểm tra trạng thái thu hồi phiên hoặc quyền tài khoản từ Redis nếu khả dụng
+      if (this.redisService?.isAvailable) {
+        if (authenticatedUser.sessionId) {
+          const isRevoked = await this.redisService.get(`revoked_session:${authenticatedUser.sessionId}`);
+          if (isRevoked) {
+            throw new DomainException(
+              ErrorCode.UNAUTHENTICATED,
+              'Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại',
+              401,
+            );
+          }
+        }
+        if (authenticatedUser.userId) {
+          const isUserRevoked = await this.redisService.get(`revoked_user:${authenticatedUser.userId}`);
+          if (isUserRevoked) {
+            throw new DomainException(
+              ErrorCode.UNAUTHENTICATED,
+              'Quyền hoặc thành viên của tài khoản đã bị thu hồi, vui lòng đăng nhập lại',
+              401,
+            );
+          }
+        }
+      }
+
       (request as unknown as { user: AuthenticatedUser }).user = authenticatedUser;
       return true;
-    } catch {
+    } catch (err: any) {
+      if (err instanceof DomainException) {
+        throw err;
+      }
       if (isPublic) {
         return true;
       }
