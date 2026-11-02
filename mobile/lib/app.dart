@@ -3,16 +3,18 @@ import 'core/constants/app_colors.dart';
 import 'core/di/service_locator.dart';
 import 'core/storage/secure_storage_helper.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/presentation/viewmodels/login_viewmodel.dart';
-import 'features/auth/presentation/views/login_view.dart';
-import 'features/chat/presentation/viewmodels/chat_viewmodel.dart';
-import 'features/chat/presentation/views/chat_view.dart';
-import 'features/opportunity/presentation/viewmodels/opportunity_viewmodel.dart';
-import 'features/opportunity/presentation/views/opportunity_list_view.dart';
-import 'features/passport/presentation/viewmodels/passport_viewmodel.dart';
-import 'features/passport/presentation/views/passport_view.dart';
-import 'features/team/presentation/viewmodels/team_viewmodel.dart';
-import 'features/team/presentation/views/team_list_view.dart';
+
+// Flat Feature imports for MVVM + Repository Architecture
+import 'features/auth/login_view.dart';
+import 'features/auth/login_viewmodel.dart';
+import 'features/chat/chat_view.dart';
+import 'features/chat/chat_viewmodel.dart';
+import 'features/opportunity/opportunity_list_view.dart';
+import 'features/opportunity/opportunity_viewmodel.dart';
+import 'features/passport/passport_view.dart';
+import 'features/passport/passport_viewmodel.dart';
+import 'features/team/team_list_view.dart';
+import 'features/team/team_viewmodel.dart';
 
 class ScholinkApp extends StatefulWidget {
   final bool initialIsAuthenticated;
