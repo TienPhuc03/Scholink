@@ -30,6 +30,10 @@ import {
   AbortSubmissionIntentDtoSchema,
   SubmitApplicationDto,
   SubmitApplicationDtoSchema,
+  ApplySnapshotRetentionDto,
+  ApplySnapshotRetentionDtoSchema,
+  EvaluateTestResultLogDto,
+  EvaluateTestResultLogDtoSchema,
 } from '@shared';
 import { GATEWAY_OPPORTUNITY_GRPC, OpportunityGrpcClient } from '../grpc-clients.interface';
 
@@ -235,5 +239,37 @@ export class GatewayApplicationController implements OnModuleInit {
         studentId: req.user.userId,
       }),
     );
+  }
+
+  @Post('retention-decision')
+  @Roles('STUDENT', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Thực thi quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi xóa tài khoản (D06 / Mục 29)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả giữ/xóa Snapshot ứng tuyển' })
+  async applySnapshotRetentionDecision(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(ApplySnapshotRetentionDtoSchema)) dto: ApplySnapshotRetentionDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.applySnapshotRetentionDecision({
+        ...dto,
+        studentId: req.user.role === 'ADMIN' ? dto.studentId : req.user.userId,
+      }),
+    );
+  }
+
+  @Post('test-results/evaluate')
+  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Ghi nhận nhật ký kết quả test & chặn claim đủ AC khi còn NOT_RUN (Mục 30 / NFR11)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả đánh giá nhật ký kiểm thử AC' })
+  async evaluateTestResultLog(
+    @Body(new ZodValidationPipe(EvaluateTestResultLogDtoSchema)) dto: EvaluateTestResultLogDto,
+  ) {
+    return firstValueFrom(this.opportunityService.evaluateTestResultLog(dto));
   }
 }

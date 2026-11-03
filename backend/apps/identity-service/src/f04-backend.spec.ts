@@ -1635,4 +1635,518 @@ describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-
       });
     });
   });
+
+  // ============================================================================
+  // 7. F40 Backend — Account Deletion Session Revocation, Personal Data Tracking,
+  //    Snapshot Retention/Purge Decision & AC Test Result Log (FR-AUTH-08, APP-01/05, NFR11)
+  // ============================================================================
+  describe('7. F40 Backend — Account Deletion Session Revocation, Personal Data Tracking, Snapshot Retention/Purge & AC Test Result Log', () => {
+    it('revokes all sessions immediately on account deletion, records trackingId with ledgerPreserved=true, and blocks unverified/deleted users from applying', async () => {
+      const users = new Map<string, User>();
+      const sessions = new Map<string, SessionRecord>();
+      const otpRecords = new Map<string, OtpRecord>();
+      const passports = new Map<string, Passport>();
+      const consents = new Map<string, Consent>();
+      const deletionTrackings = new Map<string, any>();
+      const outboxEvents: any[] = [];
+
+      const userRepo: IUserRepository = {
+        findById: jest.fn(async (id) => users.get(id) ?? null),
+        findByEmail: jest.fn(async (email) => {
+          const norm = email.trim().toLowerCase();
+          for (const u of users.values()) {
+            if (u.normalizedEmail === norm) return u;
+          }
+          return null;
+        }),
+        save: jest.fn(async (u) => {
+          users.set(u.id, u);
+        }),
+        update: jest.fn(async (u) => {
+          users.set(u.id, u);
+        }),
+        saveSession: jest.fn(async (s) => {
+          sessions.set(s.id, s);
+        }),
+        findSessionByTokenHash: jest.fn(async (hash) => {
+          for (const s of sessions.values()) {
+            if (s.tokenHash === hash) return s;
+          }
+          return null;
+        }),
+        markSessionUsed: jest.fn(async (id) => {
+          const s = sessions.get(id);
+          if (s) sessions.set(id, { ...s, isUsed: true });
+        }),
+        revokeSessionFamily: jest.fn(async (familyId) => {
+          for (const [k, s] of sessions.entries()) {
+            if (s.familyId === familyId) sessions.set(k, { ...s, isRevoked: true });
+          }
+        }),
+        revokeAllUserSessions: jest.fn(async (userId) => {
+          for (const [k, s] of sessions.entries()) {
+            if (s.userId === userId) sessions.set(k, { ...s, isRevoked: true });
+          }
+        }),
+        findOtpRecord: jest.fn(async (email, purpose) => otpRecords.get(`${email}:${purpose}`) ?? null),
+        saveOtpRecord: jest.fn(async (rec) => {
+          otpRecords.set(`${rec.normalizedEmail}:${rec.purpose}`, rec);
+        }),
+        deleteOtpRecord: jest.fn(async (email, purpose) => {
+          otpRecords.delete(`${email}:${purpose}`);
+        }),
+        saveDeletionTracking: jest.fn(async (rec) => {
+          deletionTrackings.set(rec.trackingId, rec);
+        }),
+        findDeletionTrackingById: jest.fn(async (id) => deletionTrackings.get(id) ?? null),
+        findDeletionTrackingsByUser: jest.fn(async (uid) =>
+          Array.from(deletionTrackings.values()).filter((t) => t.userId === uid),
+        ),
+        saveOutboxEvent: jest.fn(async (evt) => {
+          outboxEvents.push(evt);
+        }),
+      };
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: jest.fn(async (sid) => passports.get(sid) ?? null),
+        save: jest.fn(async (p) => {
+          passports.set(p.studentId, p);
+        }),
+        update: jest.fn(async (p) => {
+          passports.set(p.studentId, p);
+        }),
+        saveConsent: jest.fn(async (c) => {
+          consents.set(c.id, c);
+        }),
+        findConsentById: jest.fn(async (cid) => consents.get(cid) ?? null),
+        saveMediaAsset: jest.fn(),
+        updateMediaAsset: jest.fn(),
+        findMediaAssetById: jest.fn(async () => null),
+        findMediaAssetsByIds: jest.fn(async () => []),
+      };
+
+      const jwtService = new JwtService({ secret: 'test_secret_f40' });
+      const mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      const passportUseCase = new PassportUseCase(
+        passportRepo,
+        mediaUseCase,
+        cryptoService,
+        userRepo,
+      );
+      const authUseCase = new AuthUseCase(
+        userRepo,
+        passportRepo,
+        jwtService,
+        cryptoService,
+      );
+
+      // 1. Unverified user (PENDING_VERIFICATION) cannot get snapshot or sign consent (FR-AUTH-02)
+      const unverifiedId = 'stu_unverified_f40';
+      users.set(
+        unverifiedId,
+        new User(unverifiedId, {
+          email: 'unverified@scholink.edu.vn',
+          passwordHash: 'hash',
+          role: 'STUDENT',
+          status: 'PENDING_VERIFICATION',
+          fullName: 'Sinh Viên Chưa Xác Minh',
+        }),
+      );
+      passports.set(
+        unverifiedId,
+        new Passport('pass_unverified', {
+          studentId: unverifiedId,
+          profileVersion: 1,
+          fullName: 'Sinh Viên Chưa Xác Minh',
+          isLookingForTeammate: false,
+          isOpenForScholarship: true,
+          isOpenForMentoring: false,
+        }),
+      );
+
+      await expect(passportUseCase.getProfileSnapshot(unverifiedId, [])).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 2. Register & Login active student
+      const reg = await authUseCase.register({
+        email: 'phuc.f40@scholink.edu.vn',
+        password: 'CorrectPassword@2026',
+        fullName: 'Phúc TV1 F40',
+      });
+      const loginRes = await authUseCase.login({
+        email: 'phuc.f40@scholink.edu.vn',
+        password: 'CorrectPassword@2026',
+      });
+      expect(loginRes.refreshToken).toBeDefined();
+
+      // 3. Export personal data (FR-AUTH-08) — must not leak passwordHash
+      const exported = await authUseCase.exportPersonalData(reg.userId);
+      expect(exported.exportId).toMatch(/^exp_/);
+      expect(exported.ledgerPreserved).toBe(true);
+      expect(exported.payloadJson).not.toContain('passwordHash');
+      expect(exported.payload.account.email).toBe('phuc.f40@scholink.edu.vn');
+
+      // 4. Request account deletion with wrong password -> 401 UNAUTHENTICATED
+      await expect(
+        authUseCase.requestAccountDeletion(reg.userId, {
+          currentPassword: 'WrongPassword@123',
+          snapshotDecision: 'RETAIN',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+
+      // 5. Request account deletion with valid password -> revokes sessions & creates trackingId
+      const deletionRes = await authUseCase.requestAccountDeletion(reg.userId, {
+        currentPassword: 'CorrectPassword@2026',
+        snapshotDecision: 'PURGE',
+        reason: 'Người dùng yêu cầu xóa tài khoản cá nhân',
+      });
+      expect(deletionRes.trackingId).toMatch(/^del_/);
+      expect(deletionRes.sessionsRevoked).toBe(true);
+      expect(deletionRes.ledgerPreserved).toBe(true);
+      expect(deletionRes.snapshotDecision).toBe('PURGE');
+      expect(deletionRes.status).toBe('SCHEDULED_PURGE');
+      expect(outboxEvents).toHaveLength(1);
+      expect(outboxEvents[0].type).toBe('user.deleted');
+
+      // 6. Query deletion tracking by owner vs non-owner
+      const trackingCheck = await authUseCase.getDeletionTracking(
+        reg.userId,
+        deletionRes.trackingId,
+      );
+      expect(trackingCheck.trackingId).toBe(deletionRes.trackingId);
+      await expect(
+        authUseCase.getDeletionTracking('other_user_id', deletionRes.trackingId),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 7. Refresh token & Login & Apply snapshot are immediately blocked after account deletion
+      await expect(
+        authUseCase.refresh({ refreshToken: loginRes.refreshToken }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+      await expect(
+        authUseCase.login({
+          email: 'phuc.f40@scholink.edu.vn',
+          password: 'CorrectPassword@2026',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+      await expect(passportUseCase.getProfileSnapshot(reg.userId, [])).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+    });
+
+    it('applies RETAIN vs PURGE snapshot decision while preserving ACCEPTED audit snapshots (D06 / FR-APP-01/05)', async () => {
+      const studentId = 'stu_snapshot_f40';
+      const previews = new Map<string, SubmissionPreviewRecord>();
+      const applications = new Map<string, Application>();
+      const revisions = new Map<string, ApplicationRevisionRecord>();
+
+      previews.set('prv_unsubmitted_1', {
+        previewId: 'prv_unsubmitted_1',
+        actorId: studentId,
+        opportunityId: 'opp_1',
+        submissionId: 'sub_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Sensitive Name' }),
+        manifestJson: '[]',
+        manifestHash: 'h'.repeat(64),
+        payloadHash: 'p'.repeat(64),
+        screening: 'ELIGIBLE',
+        expiresAt: new Date(Date.now() + 600000),
+      });
+
+      // App 1: SUBMITTED (eligible for withdrawal & snapshot purge when decision=PURGE)
+      const submittedApp = new Application('app_submitted_f40', {
+        opportunityId: 'opp_1',
+        studentId,
+        submissionType: 'INDIVIDUAL',
+        status: 'SUBMITTED',
+        screening: 'ELIGIBLE',
+        previewId: 'prv_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        payloadHash: 'p'.repeat(64),
+        consentId: 'con_1',
+        submittedAt: new Date(),
+        revision: 1,
+      });
+      applications.set(submittedApp.id, submittedApp);
+      revisions.set('rev_submitted_1', {
+        id: 'rev_submitted_1',
+        applicationId: submittedApp.id,
+        revision: 1,
+        previewId: 'prv_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Sensitive Name', gpa: 3.8 }),
+        manifestJson: JSON.stringify([{ assetId: 'ast_cv_1' }]),
+        payloadHash: 'p'.repeat(64),
+        consentId: 'con_1',
+        screening: 'ELIGIBLE',
+        retentionStatus: 'ACTIVE',
+        submittedAt: new Date(),
+      });
+
+      // App 2: ACCEPTED (must retain snapshot for audit/compliance per D06 & Mục 29 even if decision=PURGE)
+      const acceptedApp = new Application('app_accepted_f40', {
+        opportunityId: 'opp_2',
+        studentId,
+        submissionType: 'INDIVIDUAL',
+        status: 'ACCEPTED',
+        screening: 'ELIGIBLE',
+        previewId: 'prv_2',
+        snapshotId: 'snap_2',
+        profileVersion: 1,
+        ruleVersion: 1,
+        payloadHash: 'q'.repeat(64),
+        consentId: 'con_2',
+        submittedAt: new Date(),
+        revision: 1,
+      });
+      applications.set(acceptedApp.id, acceptedApp);
+      revisions.set('rev_accepted_2', {
+        id: 'rev_accepted_2',
+        applicationId: acceptedApp.id,
+        revision: 1,
+        previewId: 'prv_2',
+        snapshotId: 'snap_2',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Accepted Winner Name', gpa: 3.9 }),
+        manifestJson: JSON.stringify([{ assetId: 'ast_cv_2' }]),
+        payloadHash: 'q'.repeat(64),
+        consentId: 'con_2',
+        screening: 'ELIGIBLE',
+        retentionStatus: 'ACTIVE',
+        submittedAt: new Date(),
+      });
+
+      const applicationRepo: IApplicationRepository = {
+        findById: jest.fn(async (id) => applications.get(id) ?? null),
+        findByOpportunityAndStudent: jest.fn(async () => null),
+        findManyByStudent: jest.fn(async (sid) =>
+          Array.from(applications.values()).filter((a) => a.studentId === sid),
+        ),
+        findManyByOpportunity: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(async (app) => {
+          applications.set(app.id, app);
+        }),
+        savePreview: jest.fn(),
+        findPreviewById: jest.fn(async (pid) => previews.get(pid) ?? null),
+        saveRevision: jest.fn(),
+        appendEvent: jest.fn(),
+        deletePreviewsByStudent: jest.fn(async (sid) => {
+          let deleted = 0;
+          for (const [k, p] of previews.entries()) {
+            if (p.actorId === sid) {
+              previews.delete(k);
+              deleted += 1;
+            }
+          }
+          return deleted;
+        }),
+        applySnapshotRetentionByStudent: jest.fn(async ({ studentId: sid, decision, trackingId }) => {
+          let purgedPreviewsCount = 0;
+          for (const [k, p] of previews.entries()) {
+            if (p.actorId === sid) {
+              previews.delete(k);
+              purgedPreviewsCount += 1;
+            }
+          }
+          let withdrawnApplicationsCount = 0;
+          let retainedSnapshotsCount = 0;
+          let purgedSnapshotsCount = 0;
+
+          for (const app of Array.from(applications.values()).filter((a) => a.studentId === sid)) {
+            let current = app;
+            if (current.status === 'SUBMITTED') {
+              current = current.withdraw();
+              applications.set(current.id, current);
+              withdrawnApplicationsCount += 1;
+            }
+            const mustRetain = decision === 'RETAIN' || current.status === 'ACCEPTED';
+            for (const [revId, rev] of revisions.entries()) {
+              if (rev.applicationId !== current.id) continue;
+              if (mustRetain) {
+                revisions.set(revId, { ...rev, retentionStatus: 'RETAINED_BY_POLICY' });
+                retainedSnapshotsCount += 1;
+              } else {
+                revisions.set(revId, {
+                  ...rev,
+                  snapshotJson: JSON.stringify({
+                    studentId: sid,
+                    redacted: true,
+                    trackingId: trackingId ?? null,
+                  }),
+                  manifestJson: '[]',
+                  retentionStatus: 'PURGED_ANONYMIZED',
+                });
+                purgedSnapshotsCount += 1;
+              }
+            }
+          }
+          return Object.freeze({
+            studentId: sid,
+            decision,
+            trackingId,
+            purgedPreviewsCount,
+            withdrawnApplicationsCount,
+            retainedSnapshotsCount,
+            purgedSnapshotsCount,
+            processedAt: new Date(),
+          });
+        }),
+      };
+
+      const opportunityRepo: IOpportunityRepository = {
+        findById: jest.fn(async () => null),
+        findMany: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+      };
+
+      const applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+      );
+
+      const summary = await applicationUseCase.applySnapshotRetentionDecision({
+        studentId,
+        decision: 'PURGE',
+        trackingId: 'del_track_001',
+      });
+
+      expect(summary.purgedPreviewsCount).toBe(1);
+      expect(previews.size).toBe(0);
+      expect(summary.withdrawnApplicationsCount).toBe(1);
+      expect(applications.get('app_submitted_f40')?.status).toBe('WITHDRAWN');
+      expect(summary.purgedSnapshotsCount).toBe(1);
+      expect(summary.retainedSnapshotsCount).toBe(1);
+
+      const purgedRev = revisions.get('rev_submitted_1')!;
+      expect(purgedRev.retentionStatus).toBe('PURGED_ANONYMIZED');
+      expect(JSON.parse(purgedRev.snapshotJson).redacted).toBe(true);
+      expect(purgedRev.snapshotJson).not.toContain('Sensitive Name');
+
+      const retainedAcceptedRev = revisions.get('rev_accepted_2')!;
+      expect(retainedAcceptedRev.retentionStatus).toBe('RETAINED_BY_POLICY');
+      expect(retainedAcceptedRev.snapshotJson).toContain('Accepted Winner Name');
+    });
+
+    it('blocks claiming AC completion when any test case is NOT_RUN or FAILED (Mục 30 SRS)', async () => {
+      const opportunityRepo: IOpportunityRepository = {
+        findById: jest.fn(async () => null),
+        findMany: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+      };
+      const applicationRepo: IApplicationRepository = {
+        findById: jest.fn(async () => null),
+        findByOpportunityAndStudent: jest.fn(async () => null),
+        findManyByStudent: jest.fn(async () => []),
+        findManyByOpportunity: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+        savePreview: jest.fn(),
+        findPreviewById: jest.fn(async () => null),
+        saveRevision: jest.fn(),
+        appendEvent: jest.fn(),
+      };
+      const applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+      );
+
+      // 1. Evaluate when 1 test case is still NOT_RUN -> canClaimAllAc MUST be false
+      const partialLog = await applicationUseCase.evaluateTestResultLog({
+        runId: 'trun_week5_partial',
+        strictClaim: false,
+        testCases: [
+          {
+            tcId: 'TC-AUTH-08-01',
+            acId: 'AC-AUTH-08-01',
+            title: 'Xóa tài khoản thu hồi toàn bộ phiên và trả mã trackingId',
+            status: 'PASSED',
+          },
+          {
+            tcId: 'TC-APP-05-02',
+            acId: 'AC-APP-05-01',
+            title: 'Snapshot giữ hoặc xóa theo quyết định D06',
+            status: 'NOT_RUN',
+          },
+        ],
+      });
+
+      expect(partialLog.canClaimAllAc).toBe(false);
+      expect(partialLog.notRunCases).toBe(1);
+      const acAuth = partialLog.acSummaries.find((a) => a.acId === 'AC-AUTH-08-01')!;
+      const acApp = partialLog.acSummaries.find((a) => a.acId === 'AC-APP-05-01')!;
+      expect(acAuth.canClaimAc).toBe(true);
+      expect(acAuth.acStatus).toBe('VERIFIED');
+      expect(acApp.canClaimAc).toBe(false);
+      expect(acApp.acStatus).toBe('INCOMPLETE_NOT_RUN');
+
+      // 2. strictClaim: true MUST throw 409 STATE_CONFLICT when any test case is NOT_RUN
+      await expect(
+        applicationUseCase.evaluateTestResultLog({
+          runId: 'trun_week5_strict_fail',
+          strictClaim: true,
+          testCases: [
+            {
+              tcId: 'TC-AUTH-08-01',
+              acId: 'AC-AUTH-08-01',
+              title: 'Xóa tài khoản thu hồi phiên',
+              status: 'PASSED',
+            },
+            {
+              tcId: 'TC-APP-05-02',
+              acId: 'AC-APP-05-01',
+              title: 'Snapshot giữ/xóa theo quyết định',
+              status: 'NOT_RUN',
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.STATE_CONFLICT,
+      });
+
+      // 3. All test cases PASSED (0 NOT_RUN, 0 FAILED) -> strictClaim: true succeeds with canClaimAllAc = true
+      const fullLog = await applicationUseCase.evaluateTestResultLog({
+        runId: 'trun_week5_complete',
+        strictClaim: true,
+        testCases: [
+          {
+            tcId: 'TC-AUTH-08-01',
+            acId: 'AC-AUTH-08-01',
+            title: 'Xóa tài khoản thu hồi phiên và sinh trackingId',
+            status: 'PASSED',
+          },
+          {
+            tcId: 'TC-APP-05-02',
+            acId: 'AC-APP-05-01',
+            title: 'Snapshot giữ/xóa theo quyết định D06',
+            status: 'PASSED',
+          },
+        ],
+      });
+      expect(fullLog.canClaimAllAc).toBe(true);
+      expect(fullLog.notRunCases).toBe(0);
+      expect(fullLog.failedCases).toBe(0);
+      expect(fullLog.acSummaries.every((a) => a.canClaimAc)).toBe(true);
+    });
+  });
 });

@@ -7,6 +7,7 @@ import {
   VerifyOtpDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestAccountDeletionDto,
   CreateUploadUrlDto,
   CompleteUploadDto,
   UpdatePassportDto,
@@ -16,6 +17,8 @@ import {
   CreatePreviewDto,
   CreateSubmissionIntentDto,
   SubmitApplicationDto,
+  ApplySnapshotRetentionDto,
+  EvaluateTestResultLogDto,
 } from '@shared';
 
 export const GATEWAY_IDENTITY_GRPC = Symbol('GATEWAY_IDENTITY_GRPC');
@@ -30,6 +33,14 @@ export interface IdentityGrpcClient {
   verifyOtp(data: VerifyOtpDto): Observable<Record<string, unknown>>;
   forgotPassword(data: ForgotPasswordDto): Observable<Record<string, unknown>>;
   resetPassword(data: ResetPasswordDto): Observable<Record<string, unknown>>;
+  requestAccountDeletion(
+    data: RequestAccountDeletionDto & { userId: string },
+  ): Observable<Record<string, unknown>>;
+  getDeletionTracking(data: {
+    userId: string;
+    trackingId: string;
+  }): Observable<Record<string, unknown>>;
+  exportPersonalData(data: { userId: string }): Observable<Record<string, unknown>>;
   getMyPassport(data: { studentId: string }): Observable<Record<string, unknown>>;
   updateMyPassport(
     data: UpdatePassportDto & { studentId: string },
@@ -93,4 +104,10 @@ export interface OpportunityGrpcClient {
     studentId: string;
     opportunityId: string;
   }): Observable<Record<string, unknown>>;
+  applySnapshotRetentionDecision(
+    data: ApplySnapshotRetentionDto,
+  ): Observable<Record<string, unknown>>;
+  evaluateTestResultLog(
+    data: EvaluateTestResultLogDto,
+  ): Observable<Record<string, unknown>>;
 }
