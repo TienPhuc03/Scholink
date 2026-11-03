@@ -2,7 +2,11 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { IUserRepository, USER_REPOSITORY } from '../../domain/ports/user.repository.port';
+import {
+  DataDeletionTrackingRecord,
+  IUserRepository,
+  USER_REPOSITORY,
+} from '../../domain/ports/user.repository.port';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
 import { User } from '../../domain/user.entity';
 import { Passport } from '../../domain/passport.entity';
@@ -19,14 +23,17 @@ import {
   VerifyOtpDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestAccountDeletionDto,
 } from '../dtos/auth.dto';
 import { DomainException, ErrorCode, CryptoService } from '@shared';
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DELETION_RETENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthUseCase {
   private readonly logger = new Logger(AuthUseCase.name);
+  private readonly fallbackTrackings = new Map<string, DataDeletionTrackingRecord>();
 
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
@@ -129,7 +136,7 @@ export class AuthUseCase {
       throw new DomainException(ErrorCode.UNAUTHENTICATED, 'Tài khoản không còn hiệu lực', 401);
     }
 
-    // Kiểm tra sessionVersion: nếu user đã đổi/đặt lại mật khẩu thì token cũ lập tức mất hiệu lực
+    // Kiểm tra sessionVersion: nếu user đã đổi/đặt lại mật khẩu hoặc xóa tài khoản thì token cũ lập tức mất hiệu lực
     if (decoded.sessionVersion !== undefined && decoded.sessionVersion !== user.sessionVersion) {
       await this.userRepo.revokeSessionFamily(session.familyId, 'SESSION_VERSION_MISMATCH');
       throw new DomainException(
@@ -202,6 +209,9 @@ export class AuthUseCase {
     if (dto.purpose === 'VERIFY_EMAIL') {
       const user = await this.userRepo.findByEmail(normalizedEmail);
       if (user) {
+        if (user.status === 'DELETED' || user.status === 'BLOCKED') {
+          throw DomainException.forbidden('Tài khoản đã bị xóa hoặc khóa, không thể kích hoạt');
+        }
         const activated = user.activate();
         await this.userRepo.update(activated);
         status = activated.status;
@@ -252,6 +262,9 @@ export class AuthUseCase {
     if (!user) {
       throw DomainException.notFound('Tài khoản người dùng');
     }
+    if (user.status === 'DELETED' || user.status === 'BLOCKED') {
+      throw DomainException.forbidden('Tài khoản đã bị xóa hoặc khóa, không thể đặt lại mật khẩu');
+    }
 
     await this.verifyAndConsumeOtp(normalizedEmail, 'RESET_PASSWORD', dto.otpCode);
 
@@ -265,6 +278,203 @@ export class AuthUseCase {
       passwordReset: true,
       email: updatedUser.email,
       sessionVersion: updatedUser.sessionVersion,
+    });
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-08, Mục 28, Mục 29, D06 & E13 SRS:
+   * Xử lý yêu cầu xóa tài khoản:
+   * 1. Xác thực lại mật khẩu hiện tại của người dùng.
+   * 2. Chuyển trạng thái User sang DELETED và tăng sessionVersion ngay lập tức.
+   * 3. Thu hồi toàn bộ phiên Refresh Token hiện có (revokeAllUserSessions) và dọn OTP tồn đọng.
+   * 4. Tạo bản ghi theo dõi xóa dữ liệu cá nhân (trackingId) với hạn 30 ngày theo Mục 29, cam kết không xóa sổ cái (ledgerPreserved = true).
+   * 5. Phát sự kiện Outbox `user.deleted` để các service hạ nguồn dừng quyền truy cập và xử lý snapshot theo quyết định.
+   */
+  async requestAccountDeletion(userId: string, dto: RequestAccountDeletionDto) {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw DomainException.notFound('Tài khoản người dùng');
+    }
+
+    if (user.status === 'DELETED') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Tài khoản này đã được xác nhận xóa trước đó',
+      );
+    }
+
+    const isPasswordMatched = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isPasswordMatched) {
+      throw new DomainException(
+        ErrorCode.UNAUTHENTICATED,
+        'Mật khẩu xác thực lại không chính xác',
+        401,
+      );
+    }
+
+    const deletedUser = user.markDeleted();
+    await this.userRepo.update(deletedUser);
+    await this.userRepo.revokeAllUserSessions(deletedUser.id, 'ACCOUNT_DELETED');
+    await Promise.all([
+      this.userRepo.deleteOtpRecord(deletedUser.normalizedEmail, 'VERIFY_EMAIL'),
+      this.userRepo.deleteOtpRecord(deletedUser.normalizedEmail, 'RESET_PASSWORD'),
+    ]);
+
+    const now = new Date();
+    const snapshotDecision = dto.snapshotDecision ?? 'RETAIN';
+    const trackingRecord: DataDeletionTrackingRecord = Object.freeze({
+      trackingId: `del_${crypto.randomUUID()}`,
+      userId: deletedUser.id,
+      status: snapshotDecision === 'RETAIN' ? 'RETAINED_BY_POLICY' : 'SCHEDULED_PURGE',
+      snapshotDecision,
+      revokedSessionVersion: deletedUser.sessionVersion,
+      sessionsRevoked: true,
+      ledgerPreserved: true,
+      scheduledPurgeAt: new Date(now.getTime() + DELETION_RETENTION_WINDOW_MS),
+      requestedAt: now,
+      reason: dto.reason,
+    });
+
+    if (this.userRepo.saveDeletionTracking) {
+      await this.userRepo.saveDeletionTracking(trackingRecord);
+    }
+    this.fallbackTrackings.set(trackingRecord.trackingId, trackingRecord);
+
+    if (this.userRepo.saveOutboxEvent) {
+      await this.userRepo.saveOutboxEvent({
+        eventId: `out_${crypto.randomUUID()}`,
+        type: 'user.deleted',
+        occurredAt: now,
+        producer: 'identity-service',
+        aggregateId: deletedUser.id,
+        aggregateVersion: deletedUser.version,
+        correlationId: trackingRecord.trackingId,
+        data: {
+          userId: deletedUser.id,
+          trackingId: trackingRecord.trackingId,
+          snapshotDecision: trackingRecord.snapshotDecision,
+          revokedSessionVersion: deletedUser.sessionVersion,
+          ledgerPreserved: true,
+          scheduledPurgeAt: trackingRecord.scheduledPurgeAt.toISOString(),
+        },
+      });
+    }
+
+    return Object.freeze({
+      trackingId: trackingRecord.trackingId,
+      userId: trackingRecord.userId,
+      status: trackingRecord.status,
+      snapshotDecision: trackingRecord.snapshotDecision,
+      revokedSessionVersion: trackingRecord.revokedSessionVersion,
+      sessionsRevoked: trackingRecord.sessionsRevoked,
+      ledgerPreserved: trackingRecord.ledgerPreserved,
+      scheduledPurgeAt: trackingRecord.scheduledPurgeAt.toISOString(),
+      requestedAt: trackingRecord.requestedAt.toISOString(),
+      reason: trackingRecord.reason ?? '',
+    });
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-08: Tra cứu trạng thái theo dõi xóa dữ liệu cá nhân theo trackingId.
+   */
+  async getDeletionTracking(userId: string, trackingId: string) {
+    const persisted = this.userRepo.findDeletionTrackingById
+      ? await this.userRepo.findDeletionTrackingById(trackingId)
+      : null;
+    const record = persisted ?? this.fallbackTrackings.get(trackingId) ?? null;
+
+    if (!record) {
+      throw DomainException.notFound('Mã theo dõi xóa dữ liệu cá nhân (Deletion Tracking)');
+    }
+
+    if (record.userId !== userId) {
+      throw DomainException.forbidden(
+        'Bạn không có quyền truy cập mã theo dõi xóa dữ liệu của tài khoản khác',
+      );
+    }
+
+    return Object.freeze({
+      trackingId: record.trackingId,
+      userId: record.userId,
+      status: record.status,
+      snapshotDecision: record.snapshotDecision,
+      revokedSessionVersion: record.revokedSessionVersion,
+      sessionsRevoked: record.sessionsRevoked,
+      ledgerPreserved: record.ledgerPreserved,
+      scheduledPurgeAt: record.scheduledPurgeAt.toISOString(),
+      requestedAt: record.requestedAt.toISOString(),
+      reason: record.reason ?? '',
+    });
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-08: Xuất dữ liệu cá nhân (Data Export) an toàn, không lộ passwordHash hoặc secret.
+   */
+  async exportPersonalData(userId: string) {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw DomainException.notFound('Tài khoản người dùng');
+    }
+
+    const [passport, persistedTrackings] = await Promise.all([
+      this.passportRepo.findByStudentId(userId),
+      this.userRepo.findDeletionTrackingsByUser
+        ? this.userRepo.findDeletionTrackingsByUser(userId)
+        : Promise.resolve([]),
+    ]);
+
+    const trackings =
+      persistedTrackings.length > 0
+        ? persistedTrackings
+        : Array.from(this.fallbackTrackings.values()).filter((t) => t.userId === userId);
+
+    const exportedAt = new Date().toISOString();
+    const payload = Object.freeze({
+      account: Object.freeze({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        status: user.status,
+        sessionVersion: user.sessionVersion,
+      }),
+      passport: passport
+        ? Object.freeze({
+            id: passport.id,
+            profileVersion: passport.version,
+            fullName: passport.props.fullName,
+            bio: passport.props.bio ?? '',
+            regionCode: passport.props.regionCode ?? '',
+            education: passport.props.education ?? null,
+            skills: passport.props.skills ?? [],
+            achievements: passport.props.achievements ?? [],
+            certificates: passport.props.certificates ?? [],
+            completionScore: passport.completionScore,
+          })
+        : null,
+      deletionTrackings: trackings.map((t) =>
+        Object.freeze({
+          trackingId: t.trackingId,
+          status: t.status,
+          snapshotDecision: t.snapshotDecision,
+          ledgerPreserved: t.ledgerPreserved,
+          scheduledPurgeAt: t.scheduledPurgeAt.toISOString(),
+          requestedAt: t.requestedAt.toISOString(),
+        }),
+      ),
+      ledgerPolicy: Object.freeze({
+        ledgerPreserved: true,
+        retentionWindowDays: 30,
+      }),
+    });
+
+    return Object.freeze({
+      exportId: `exp_${crypto.randomUUID()}`,
+      userId: user.id,
+      exportedAt,
+      payloadJson: JSON.stringify(payload),
+      payload,
+      ledgerPreserved: true,
     });
   }
 

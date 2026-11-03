@@ -22,6 +22,8 @@ import {
   OrganizationSchema,
   OrganizationMembershipModel,
   OrganizationMembershipSchema,
+  DataDeletionTrackingModel,
+  DataDeletionTrackingSchema,
 } from './infrastructure/persistence/user.schema';
 import {
   PassportModel,
@@ -57,6 +59,7 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
       { name: OtpRecordModel.name, schema: OtpRecordSchema },
       { name: OrganizationModel.name, schema: OrganizationSchema },
       { name: OrganizationMembershipModel.name, schema: OrganizationMembershipSchema },
+      { name: DataDeletionTrackingModel.name, schema: DataDeletionTrackingSchema },
       { name: PassportModel.name, schema: PassportSchema },
       { name: MediaAssetModel.name, schema: MediaAssetSchema },
       { name: ConsentModel.name, schema: ConsentSchema },
