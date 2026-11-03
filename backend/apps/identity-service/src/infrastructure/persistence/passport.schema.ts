@@ -163,6 +163,9 @@ export class ConsentModel {
   @Prop({ required: true })
   payloadHash: string;
 
+  @Prop({ type: [String], default: ['SNAPSHOT', 'ATTACHMENTS'] })
+  scope: string[];
+
   @Prop({ required: true, index: { expires: 0 } })
   expiresAt: Date;
 }

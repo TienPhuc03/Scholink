@@ -27,8 +27,16 @@ import {
   AuthenticatedUser,
   CreatePreviewDto,
   CreatePreviewDtoSchema,
+  CreateSubmissionIntentDto,
+  CreateSubmissionIntentDtoSchema,
+  AbortSubmissionIntentDto,
+  AbortSubmissionIntentDtoSchema,
   SubmitApplicationDto,
   SubmitApplicationDtoSchema,
+  ApplySnapshotRetentionDto,
+  ApplySnapshotRetentionDtoSchema,
+  EvaluateTestResultLogDto,
+  EvaluateTestResultLogDtoSchema,
 } from '@shared';
 import { GATEWAY_OPPORTUNITY_GRPC, OpportunityGrpcClient } from '../grpc-clients.interface';
 
@@ -111,81 +119,77 @@ export class GatewayApplicationController implements OnModuleInit {
     );
   }
 
-  @Post()
+  @Post('intents')
   @Roles('STUDENT')
-  @Idempotent()
-  @ApiHeader({
-    name: 'Idempotency-Key',
-    required: true,
-    description: 'UUID chống gửi trùng lệnh nộp hồ sơ (TTL 24h)',
+  @ApiOperation({
+    summary: 'F31: Tạo Submission Intent (PENDING) cho phiên nộp hồ sơ đội (WF07 / FR-APP-05)',
   })
-  @ApiOperation({ summary: 'Nộp hồ sơ ứng tuyển từ đúng Snapshot trong Preview & Consent hợp lệ' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        opportunityId: { type: 'string', example: 'opp_vinai_scholarship_2026' },
-        submissionId: { type: 'string', example: 'sub_test_001' },
-        submissionType: { type: 'string', enum: ['INDIVIDUAL', 'TEAM'], example: 'INDIVIDUAL' },
-        previewId: { type: 'string', example: 'prv_replace_with_actual_preview_id' },
-        snapshotId: { type: 'string', example: 'snap_replace_with_actual_snapshot_id' },
-        profileVersion: { type: 'number', example: 2 },
-        expectedRuleVersion: { type: 'number', example: 1 },
-        payloadHash: { type: 'string', example: 'hash_replace_with_actual_payload_hash' },
-        consentId: { type: 'string', example: 'consent_replace_with_actual_consent_id' },
-      },
-      required: [
-        'opportunityId',
-        'submissionId',
-        'submissionType',
-        'previewId',
-        'snapshotId',
-        'profileVersion',
-        'expectedRuleVersion',
-        'payloadHash',
-        'consentId',
-      ],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'Nộp hồ sơ thành công' })
-  async submit(
+  @ApiResponse({ status: 201, description: 'Tạo Submission Intent thành công' })
+  async createSubmissionIntent(
     @Req() req: { user: AuthenticatedUser },
-    @Body(new ZodValidationPipe(SubmitApplicationDtoSchema)) dto: SubmitApplicationDto,
+    @Body(new ZodValidationPipe(CreateSubmissionIntentDtoSchema)) dto: CreateSubmissionIntentDto,
   ) {
     return firstValueFrom(
-      this.opportunityService.submitApplication({
+      this.opportunityService.createSubmissionIntent({
         ...dto,
-        studentId: req.user.userId,
+        leaderId: req.user.userId,
       }),
     );
   }
 
-  @Get('me')
-  @Roles('STUDENT')
-  @ApiOperation({ summary: 'Danh sách các hồ sơ ứng tuyển của sinh viên hiện tại' })
-  @ApiResponse({ status: 200, description: 'Danh sách hồ sơ đã nộp' })
-  async getMyApplications(@Req() req: { user: AuthenticatedUser }) {
-    const res = await firstValueFrom(
-      this.opportunityService.getMyApplications({ studentId: req.user.userId }),
-    );
-    return res.items ?? [];
-  }
-
-  @Post(':id/withdraw')
-  @Roles('STUDENT')
+  @Post('intents/:submissionId/abort')
+  @Roles('STUDENT', 'ADMIN')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Rút hồ sơ ứng tuyển trước hạn (có thể nộp lại thành revision mới)' })
-  @ApiResponse({ status: 200, description: 'Rút hồ sơ thành công' })
-  async withdraw(
+  @ApiOperation({
+    summary: 'F31: Hủy nguyên tử Submission Intent (PENDING -> ABORTED, không ghi đè nếu đã COMMITTED)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả xử lý AbortSubmissionIntent' })
+  async abortSubmissionIntent(
     @Req() req: { user: AuthenticatedUser },
-    @Param('id') id: string,
+    @Param('submissionId') submissionId: string,
+    @Body(new ZodValidationPipe(AbortSubmissionIntentDtoSchema)) dto: AbortSubmissionIntentDto,
   ) {
     return firstValueFrom(
-      this.opportunityService.withdrawApplication({
-        applicationId: id,
-        studentId: req.user.userId,
+      this.opportunityService.abortSubmissionIntent({
+        submissionId,
+        actorId: req.user.userId,
+        opportunityId: dto.opportunityId,
+        teamId: dto.teamId,
+        reason: dto.reason,
       }),
     );
+  }
+
+  @Post('retention-decision')
+  @Roles('STUDENT', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Thực thi quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi xóa tài khoản (D06 / Mục 29)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả giữ/xóa Snapshot ứng tuyển' })
+  async applySnapshotRetentionDecision(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(ApplySnapshotRetentionDtoSchema)) dto: ApplySnapshotRetentionDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.applySnapshotRetentionDecision({
+        ...dto,
+        studentId: req.user.role === 'ADMIN' ? dto.studentId : req.user.userId,
+      }),
+    );
+  }
+
+  @Post('test-results/evaluate')
+  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Ghi nhận nhật ký kết quả test & chặn claim đủ AC khi còn NOT_RUN (Mục 30 / NFR11)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả đánh giá nhật ký kiểm thử AC' })
+  async evaluateTestResultLog(
+    @Body(new ZodValidationPipe(EvaluateTestResultLogDtoSchema)) dto: EvaluateTestResultLogDto,
+  ) {
+    return firstValueFrom(this.opportunityService.evaluateTestResultLog(dto));
   }
 
   // =========================================================================
@@ -228,6 +232,111 @@ export class GatewayApplicationController implements OnModuleInit {
     return forwardOpportunity(`/api/v1/applications/organizer/${id}/attachments`, {
       headers: { Authorization: auth },
     });
+  }
+
+  @Post()
+  @Roles('STUDENT')
+  @Idempotent()
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'UUID chống gửi trùng lệnh nộp hồ sơ (TTL 24h)',
+  })
+  @ApiOperation({
+    summary: 'Nộp hồ sơ ứng tuyển (Cá nhân hoặc Đội) từ đúng Snapshot trong Preview & Consent hợp lệ',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        opportunityId: { type: 'string', example: 'opp_vinai_scholarship_2026' },
+        submissionId: { type: 'string', example: 'sub_test_001' },
+        submissionType: { type: 'string', enum: ['INDIVIDUAL', 'TEAM'], example: 'INDIVIDUAL' },
+        teamId: { type: 'string', example: 'team_hackathon_01' },
+        rosterVersion: { type: 'number', example: 1 },
+        reservationId: { type: 'string', example: 'res_001' },
+        fencingToken: { type: 'number', example: 1 },
+        memberConsents: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              studentId: { type: 'string' },
+              previewId: { type: 'string' },
+              snapshotId: { type: 'string' },
+              profileVersion: { type: 'number' },
+              payloadHash: { type: 'string' },
+              consentId: { type: 'string' },
+            },
+          },
+        },
+        previewId: { type: 'string', example: 'prv_replace_with_actual_preview_id' },
+        snapshotId: { type: 'string', example: 'snap_replace_with_actual_snapshot_id' },
+        profileVersion: { type: 'number', example: 2 },
+        expectedRuleVersion: { type: 'number', example: 1 },
+        payloadHash: { type: 'string', example: 'hash_replace_with_actual_payload_hash' },
+        consentId: { type: 'string', example: 'consent_replace_with_actual_consent_id' },
+      },
+      required: ['opportunityId', 'submissionType', 'expectedRuleVersion'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Nộp hồ sơ thành công' })
+  async submit(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(SubmitApplicationDtoSchema)) dto: SubmitApplicationDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.submitApplication({
+        ...dto,
+        studentId: req.user.userId,
+      }),
+    );
+  }
+
+  @Get('me')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Danh sách các hồ sơ ứng tuyển của sinh viên hiện tại' })
+  @ApiResponse({ status: 200, description: 'Danh sách hồ sơ đã nộp' })
+  async getMyApplications(@Req() req: { user: AuthenticatedUser }) {
+    const res = await firstValueFrom(
+      this.opportunityService.getMyApplications({ studentId: req.user.userId }),
+    );
+    return res.items ?? [];
+  }
+
+  @Get(':id')
+  @Roles('STUDENT')
+  @ApiOperation({
+    summary: 'Xem chi tiết hồ sơ ứng tuyển kèm lịch sử Revisions bất biến và Events (FR-APP-03 / FR-APP-08)',
+  })
+  @ApiResponse({ status: 200, description: 'Chi tiết hồ sơ ứng tuyển và lịch sử revisions' })
+  async getApplicationById(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.getApplicationById({
+        applicationId: id,
+        studentId: req.user.userId,
+      }),
+    );
+  }
+
+  @Post(':id/withdraw')
+  @Roles('STUDENT')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rút hồ sơ ứng tuyển trước hạn (có thể nộp lại thành revision mới)' })
+  @ApiResponse({ status: 200, description: 'Rút hồ sơ thành công' })
+  async withdraw(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.withdrawApplication({
+        applicationId: id,
+        studentId: req.user.userId,
+      }),
+    );
   }
 
   @Patch(':id/status')

@@ -6,6 +6,7 @@ export type SessionDocument = SessionModel & Document;
 export type OtpRecordDocument = OtpRecordModel & Document;
 export type OrganizationDocument = OrganizationModel & Document;
 export type OrganizationMembershipDocument = OrganizationMembershipModel & Document;
+export type DataDeletionTrackingDocument = DataDeletionTrackingModel & Document;
 
 /**
  * Mục 27 SRS: Collection users (unique normalizedEmail)
@@ -43,6 +44,9 @@ export class UserModel {
 
   @Prop({ default: 1 })
   sessionVersion: number;
+
+  @Prop()
+  deletedAt?: Date;
 
   @Prop({ default: 1 })
   version: number;
@@ -182,4 +186,51 @@ OrganizationMembershipSchema.index({ organizationId: 1, userId: 1 }, { unique: t
 OrganizationMembershipSchema.index(
   { userId: 1 },
   { unique: true, partialFilterExpression: { status: 'ACTIVE' } },
+);
+
+
+/**
+ * F40 Backend — FR-AUTH-08, Mục 29 & D06 SRS: Collection data_deletion_trackings
+ * Lưu mã theo dõi xóa dữ liệu cá nhân (trackingId), quyết định giữ/xóa snapshot và cam kết không xóa sổ cái.
+ */
+@Schema({ collection: 'data_deletion_trackings', timestamps: true })
+export class DataDeletionTrackingModel {
+  @Prop({ required: true, unique: true, index: true })
+  trackingId: string;
+
+  @Prop({ required: true, index: true })
+  userId: string;
+
+  @Prop({
+    required: true,
+    enum: ['SCHEDULED_PURGE', 'COMPLETED', 'RETAINED_BY_POLICY'],
+    default: 'SCHEDULED_PURGE',
+    index: true,
+  })
+  status: string;
+
+  @Prop({ required: true, enum: ['RETAIN', 'PURGE'], default: 'RETAIN' })
+  snapshotDecision: string;
+
+  @Prop({ required: true, default: 1 })
+  revokedSessionVersion: number;
+
+  @Prop({ required: true, default: true })
+  sessionsRevoked: boolean;
+
+  @Prop({ required: true, default: true })
+  ledgerPreserved: boolean;
+
+  @Prop({ required: true })
+  scheduledPurgeAt: Date;
+
+  @Prop({ required: true, default: () => new Date() })
+  requestedAt: Date;
+
+  @Prop()
+  reason?: string;
+}
+
+export const DataDeletionTrackingSchema = SchemaFactory.createForClass(
+  DataDeletionTrackingModel,
 );

@@ -99,6 +99,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       ruleVersion: consent.ruleVersion,
       manifestHash: consent.manifestHash,
       payloadHash: consent.payloadHash,
+      scope: [...consent.scope],
       expiresAt: consent.expiresAt,
     });
   }
@@ -120,6 +121,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       ruleVersion: doc.ruleVersion,
       manifestHash: doc.manifestHash,
       payloadHash: doc.payloadHash,
+      scope: doc.scope,
       expiresAt: new Date(doc.expiresAt),
     });
   }

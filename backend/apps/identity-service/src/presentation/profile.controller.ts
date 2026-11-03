@@ -68,6 +68,8 @@ export class ProfileController {
     opportunityId: string;
     expectedRuleVersion: number;
     expectedPayloadHash: string;
+    attachmentIds?: string[];
+    requiredScope?: string[];
   }) {
     return this.passportUseCase.validateConsent(data);
   }
