@@ -16,6 +16,8 @@ import {
   ApplicationRevisionDocument,
   ApplicationEventModel,
   ApplicationEventDocument,
+  SubmissionIntentModel,
+  SubmissionIntentDocument,
 } from './application.schema';
 
 @Injectable()
@@ -29,6 +31,8 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     private readonly revisionModel: Model<ApplicationRevisionDocument>,
     @InjectModel(ApplicationEventModel.name)
     private readonly eventModel: Model<ApplicationEventDocument>,
+    @InjectModel(SubmissionIntentModel.name)
+    private readonly intentModel: Model<SubmissionIntentDocument>,
   ) {}
 
   async findById(id: string): Promise<Application | null> {
@@ -68,6 +72,18 @@ export class MongooseApplicationRepository implements IApplicationRepository {
       .lean()
       .exec();
     return docs.map((d) => this.toDomain(d));
+  }
+
+  async findApplicationByTeamId(teamId: string): Promise<Application | null> {
+    const doc = await this.model
+      .findOne({
+        teamId: String(teamId),
+        status: { $in: ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED'] },
+      })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return this.toDomain(doc);
   }
 
   async save(application: Application): Promise<void> {
@@ -150,6 +166,30 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     await this.revisionModel.create({ ...revision });
   }
 
+  async findLatestRevision(applicationId: string): Promise<ApplicationRevisionRecord | null> {
+    const doc = await this.revisionModel
+      .findOne({ applicationId: String(applicationId) })
+      .sort({ revision: -1 })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return Object.freeze({
+      id: doc.id,
+      applicationId: doc.applicationId,
+      revision: doc.revision,
+      previewId: doc.previewId,
+      snapshotId: doc.snapshotId,
+      profileVersion: doc.profileVersion,
+      ruleVersion: doc.ruleVersion,
+      snapshotJson: doc.snapshotJson,
+      manifestJson: doc.manifestJson,
+      payloadHash: doc.payloadHash,
+      consentId: doc.consentId,
+      screening: doc.screening as any,
+      submittedAt: new Date(doc.submittedAt),
+    });
+  }
+
   async appendEvent(event: {
     id: string;
     applicationId: string;
@@ -160,6 +200,61 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     reason?: string;
   }): Promise<void> {
     await this.eventModel.create({ ...event });
+  }
+
+  async findEventsByApplication(applicationId: string): Promise<any[]> {
+    const docs = await this.eventModel
+      .find({ applicationId: String(applicationId) })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({
+      id: d.id,
+      applicationId: d.applicationId,
+      actorId: d.actorId,
+      fromStatus: d.fromStatus,
+      toStatus: d.toStatus,
+      revision: d.revision,
+      reason: d.reason,
+      createdAt: d.createdAt,
+    }));
+  }
+
+  async findSubmissionIntent(teamId: string, submissionId: string): Promise<{ status: string } | null> {
+    const doc = await this.intentModel
+      .findOne({
+        teamId: String(teamId),
+        submissionId: String(submissionId),
+      })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return { status: doc.status };
+  }
+
+  async upsertSubmissionIntent(intent: {
+    submissionId: string;
+    opportunityId: string;
+    teamId: string;
+    leaderId: string;
+    status: string;
+    applicationId?: string;
+  }): Promise<void> {
+    await this.intentModel
+      .findOneAndUpdate(
+        { submissionId: intent.submissionId },
+        {
+          $set: {
+            opportunityId: intent.opportunityId,
+            teamId: intent.teamId,
+            leaderId: intent.leaderId,
+            status: intent.status,
+            applicationId: intent.applicationId,
+          },
+        },
+        { upsert: true, new: true },
+      )
+      .exec();
   }
 
   private toDomain(doc: {

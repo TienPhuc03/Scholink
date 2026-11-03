@@ -87,13 +87,31 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
   const Membership = conn.model('organization_memberships', membershipSchema);
   const Passport = conn.model('passports', passportSchema);
 
-  // 1. Tổ chức VinAI
+  // 1. Tổ chức VinAI (Org A)
   await Org.updateOne(
     { id: orgId },
     {
       $setOnInsert: {
         id: orgId,
         name: 'Viện Nghiên cứu Trí tuệ Nhân tạo VinAI',
+        status: 'ACTIVE',
+        verifiedBy: adminId,
+        verifiedAt: new Date(),
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 1b. Tổ chức HCMUS (Org B - SCHOL-14 Tenant Isolation)
+  const orgBId = 'org_hcmus_002';
+  const organizerBId = 'usr_organizer_002';
+  await Org.updateOne(
+    { id: orgBId },
+    {
+      $setOnInsert: {
+        id: orgBId,
+        name: 'Trường Đại học Khoa học Tự nhiên - ĐHQG TP.HCM',
         status: 'ACTIVE',
         verifiedBy: adminId,
         verifiedAt: new Date(),
@@ -123,7 +141,7 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { upsert: true },
   );
 
-  // 3. Organizer
+  // 3. Organizer A (VinAI)
   const orgHash = await bcrypt.hash(SEED_ORG_PASS, 10);
   await User.updateOne(
     { id: organizerId },
@@ -159,7 +177,42 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
     { upsert: true },
   );
 
-  // 4. Student
+  // 3b. Organizer B (HCMUS)
+  await User.updateOne(
+    { id: organizerBId },
+    {
+      $setOnInsert: {
+        id: organizerBId,
+        email: 'organizer.b@scholink.edu.vn',
+        normalizedEmail: 'organizer.b@scholink.edu.vn',
+        passwordHash: orgHash,
+        fullName: 'Đại Diện Khoa CNTT - ĐH KHTN',
+        role: 'ORGANIZER',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  await Membership.updateOne(
+    { organizationId: orgBId, userId: organizerBId },
+    {
+      $setOnInsert: {
+        id: `mem_${organizerBId}_${orgBId}`,
+        organizationId: orgBId,
+        userId: organizerBId,
+        status: 'ACTIVE',
+        grantedBy: adminId,
+        grantedAt: new Date(),
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 4. Student 1
   const studentHash = await bcrypt.hash(SEED_STUDENT_PASS, 10);
   await User.updateOne(
     { id: studentId },
@@ -218,13 +271,84 @@ async function seedIdentity(studentId: string, organizerId: string, adminId: str
         completionScore: 100,
         scoreVersion: 1,
         version: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 5. Sinh viên 2 (Ứng viên A)
+  await User.updateOne(
+    { id: 'usr_student_002' },
+    {
+      $setOnInsert: {
+        id: 'usr_student_002',
+        email: 'applicant1@scholink.edu.vn',
+        normalizedEmail: 'applicant1@scholink.edu.vn',
+        passwordHash: studentHash,
+        fullName: 'Trần Thị Ứng Viên 1',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+  await Passport.updateOne(
+    { studentId: 'usr_student_002' },
+    {
+      $setOnInsert: {
+        id: 'psp_usr_student_002',
+        studentId: 'usr_student_002',
+        fullName: 'Trần Thị Ứng Viên 1',
+        bio: 'Sinh viên năm 2 ngành Trí tuệ Nhân tạo',
+        skills: ['Python', 'FastAPI', 'PyTorch'],
+        completionScore: 90,
+        scoreVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+
+  // 6. Sinh viên 3 (Ứng viên B)
+  await User.updateOne(
+    { id: 'usr_student_003' },
+    {
+      $setOnInsert: {
+        id: 'usr_student_003',
+        email: 'applicant2@scholink.edu.vn',
+        normalizedEmail: 'applicant2@scholink.edu.vn',
+        passwordHash: studentHash,
+        fullName: 'Lê Văn Ứng Viên 2',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        sessionVersion: 1,
+        version: 1,
+      },
+    },
+    { upsert: true },
+  );
+  await Passport.updateOne(
+    { studentId: 'usr_student_003' },
+    {
+      $setOnInsert: {
+        id: 'psp_usr_student_003',
+        studentId: 'usr_student_003',
+        fullName: 'Lê Văn Ứng Viên 2',
+        bio: 'Sinh viên năm 3 ngành Kỹ thuật Phần mềm',
+        skills: ['Flutter', 'React', 'NodeJS'],
+        completionScore: 85,
+        scoreVersion: 1,
+        version: 1,
       },
     },
     { upsert: true },
   );
 
   await conn.close();
-  console.log('  ✅ Hoàn tất Seed cho Identity Database (Users, Organization, Membership, Passport 100%)');
+  console.log('  ✅ Hoàn tất Seed cho Identity Database (Users, Organizations, Memberships, 3 Students & Passports)');
 }
 
 async function seedOpportunities(organizerId: string, orgId: string) {
@@ -349,6 +473,28 @@ async function seedOpportunities(organizerId: string, orgId: string) {
       ruleVersion: 1,
       tags: ['Khởi nghiệp', 'Startup'],
     },
+    // SCHOL-14: Cơ hội thuộc Org B (ĐH KHTN) để kiểm chứng Tenant Isolation
+    {
+      id: 'opp_hcmus_hackathon_2026',
+      dedupKey: 'competition:hcmus_hackathon:2026',
+      type: 'COMPETITION',
+      title: 'HCMUS IT Hackathon 2026 - Thách Thức Công Nghệ Mới',
+      slug: 'hcmus-it-hackathon-2026',
+      description:
+        'Cuộc thi lập trình giải quyết bài toán dữ liệu lớn và an toàn thông tin do ĐH Khoa học Tự nhiên tổ chức.',
+      organizationId: 'org_hcmus_002',
+      createdBy: 'usr_organizer_002',
+      organizerName: 'Trường Đại học Khoa học Tự nhiên - ĐHQG TP.HCM',
+      applyMode: 'IN_APP',
+      status: 'PUBLISHED',
+      registerDeadline: new Date('2026-12-10T23:59:59+07:00'),
+      submitDeadline: new Date('2026-12-15T23:59:59+07:00'),
+      competitionMode: 'TEAM',
+      minTeamSize: 2,
+      maxTeamSize: 4,
+      ruleVersion: 1,
+      tags: ['Hackathon', 'Big Data', 'Security'],
+    },
   ];
 
   for (const opp of items) {
@@ -356,7 +502,7 @@ async function seedOpportunities(organizerId: string, orgId: string) {
   }
 
   await conn.close();
-  console.log('  ✅ Hoàn tất Seed cho Opportunity Database (4 Cơ hội chuẩn IN_APP & EXTERNAL)');
+  console.log('  ✅ Hoàn tất Seed cho Opportunity Database (5 Cơ hội chuẩn IN_APP & EXTERNAL)');
 }
 
 async function seedBillingAndNotifications(studentId: string) {
@@ -499,11 +645,10 @@ async function seedCollaboration(studentId: string) {
         description: 'Đội thi Đại học Bách Khoa tham gia giải quyết bài toán thị giác máy tính',
         leaderId: studentId,
         minSize: 2,
-        maxSize: 4,
-        status: 'ACTIVE',
+        maxSize: 2,
+        status: 'FORMING',
         members: [
           { studentId, role: 'LEADER', joinedAt: new Date() },
-          { studentId: 'usr_student_002', role: 'MEMBER', joinedAt: new Date() },
         ],
         rosterVersion: 1,
         fencingToken: 0,
@@ -534,7 +679,7 @@ async function seedCollaboration(studentId: string) {
         id: roomId,
         type: 'TEAM',
         refId: teamId,
-        participants: [studentId, 'usr_student_002'],
+        participants: [studentId],
         lastSeq: 2,
         lastMessageSnippet: 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
         lastMessageAt: new Date(),
@@ -576,7 +721,7 @@ async function seedCollaboration(studentId: string) {
   );
 
   await collabConn.close();
-  console.log('  ✅ Hoàn tất Seed cho Collaboration Database (Team, Members, Chat room & Messages Seq #1, #2)');
+  console.log('  ✅ Hoàn tất Seed cho Collaboration Database (Team FORMING 1/2 slot, Chat room & Messages)');
 }
 
 async function seed() {
@@ -594,9 +739,12 @@ async function seed() {
   console.log('\n🎉 Hoàn thành khởi tạo dữ liệu mẫu thành công!');
   console.log('----------------------------------------------------');
   console.log('Tài khoản kiểm thử đã sẵn sàng:');
-  console.log('  1. ADMIN:     admin@scholink.edu.vn     / ScholinkAdmin@2026');
-  console.log('  2. ORGANIZER: organizer@scholink.edu.vn / Organizer@2026');
-  console.log('  3. STUDENT:   student@scholink.edu.vn   / Student@2026');
+  console.log('  1. ADMIN:       admin@scholink.edu.vn        / ScholinkAdmin@2026');
+  console.log('  2. ORGANIZER A: organizer@scholink.edu.vn    / Organizer@2026 (Đơn vị: VinAI)');
+  console.log('  3. ORGANIZER B: organizer.b@scholink.edu.vn  / Organizer@2026 (Đơn vị: ĐH KHTN HCMUS)');
+  console.log('  4. STUDENT 1:   student@scholink.edu.vn      / Student@2026 (Trưởng đội BK AI)');
+  console.log('  5. STUDENT 2:   applicant1@scholink.edu.vn   / Student@2026 (Ứng viên A)');
+  console.log('  6. STUDENT 3:   applicant2@scholink.edu.vn   / Student@2026 (Ứng viên B - Tranh slot)');
   console.log('----------------------------------------------------');
 }
 

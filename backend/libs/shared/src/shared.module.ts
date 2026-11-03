@@ -2,9 +2,11 @@ import { Module, Global } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CryptoService } from './infrastructure/security/crypto.service';
+import { RedisService } from './infrastructure/redis/redis.service';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
 import { RolesGuard } from './infrastructure/guards/roles.guard';
 import { IdempotencyGuard } from './infrastructure/guards/idempotency.guard';
+import { RateLimitGuard } from './infrastructure/guards/rate-limit.guard';
 
 @Global()
 @Module({
@@ -26,7 +28,22 @@ import { IdempotencyGuard } from './infrastructure/guards/idempotency.guard';
       },
     }),
   ],
-  providers: [CryptoService, JwtAuthGuard, RolesGuard, IdempotencyGuard],
-  exports: [JwtModule, CryptoService, JwtAuthGuard, RolesGuard, IdempotencyGuard],
+  providers: [
+    CryptoService,
+    RedisService,
+    JwtAuthGuard,
+    RolesGuard,
+    IdempotencyGuard,
+    RateLimitGuard,
+  ],
+  exports: [
+    JwtModule,
+    CryptoService,
+    RedisService,
+    JwtAuthGuard,
+    RolesGuard,
+    IdempotencyGuard,
+    RateLimitGuard,
+  ],
 })
 export class SharedModule {}

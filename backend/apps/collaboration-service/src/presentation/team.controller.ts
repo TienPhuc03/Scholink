@@ -122,8 +122,19 @@ export class TeamController {
     return this.teamUseCase.transferLeader(teamId, req.user.userId, dto);
   }
 
+  @Post(':id/reopen')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Mở lại đội thi từ hồ sơ đã rút (Reopen from Withdrawal)' })
+  @ApiResponse({ status: 200, description: 'Đã mở lại đội' })
+  async reopenTeam(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') teamId: string,
+  ) {
+    return this.teamUseCase.reopenTeamFromWithdrawal(teamId, req.user.userId);
+  }
+
   // ==========================================
-  // F33: ROSTER FREEZE & SUBMISSION RESERVATIONS
+  // SCHOL-20: ROSTER FREEZE & SUBMISSION RESERVATIONS
   // ==========================================
   @Post(':id/prepare-submission')
   @Roles('STUDENT')
@@ -135,6 +146,18 @@ export class TeamController {
     @Param('id') teamId: string,
   ) {
     return this.teamUseCase.prepareSubmission(teamId, req.user.userId);
+  }
+
+  @Post(':id/consents')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Thành viên gửi Consent xác nhận nộp hồ sơ đội qua teamId' })
+  @ApiResponse({ status: 200, description: 'Đã ghi nhận Consent' })
+  async submitConsentByTeamId(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') teamId: string,
+    @Body(new ZodValidationPipe(SubmitTeamConsentDtoSchema)) dto: SubmitTeamConsentDto,
+  ) {
+    return this.teamUseCase.submitTeamConsentByTeamId(teamId, req.user.userId, dto);
   }
 
   @Post('submissions/:reservationId/consents')

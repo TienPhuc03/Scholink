@@ -52,28 +52,73 @@ export class ApplicationController {
     return this.applicationUseCase.withdraw(data.applicationId, data.studentId);
   }
 
-  // ================= HTTP Handlers (F24: Organizer Kanban) =================
+  // SCHOL-20: Team Submission Intent Abort RPC (Collaboration Worker -> Opportunity Service)
+  @GrpcMethod('OpportunityGrpcService', 'AbortSubmissionIntent')
+  async abortSubmissionIntent(data: {
+    team_id: string;
+    reservation_id: string;
+    fencing_token: number;
+    reason?: string;
+  }) {
+    return this.applicationUseCase.abortSubmissionIntent({
+      teamId: data.team_id,
+      reservationId: data.reservation_id,
+      fencingToken: Number(data.fencing_token),
+      reason: data.reason,
+    });
+  }
+
+  // ================= HTTP Handlers (SCHOL-14: Organizer Kanban, Detail, Attachments, Status) =================
   @Get('organizer/kanban/:opportunityId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ORGANIZER', 'ADMIN')
-  @ApiOperation({ summary: 'Lấy danh sách hồ sơ theo các cột Kanban của cuộc thi / học bổng' })
+  @ApiOperation({ summary: 'Lấy danh sách hồ sơ theo các cột Kanban của cuộc thi / học bổng (SCHOL-14)' })
   @ApiResponse({ status: 200, description: 'Dữ liệu Kanban' })
-  async getOpportunityKanban(@Param('opportunityId') opportunityId: string) {
-    return this.applicationUseCase.getOpportunityKanban(opportunityId);
+  async getOpportunityKanban(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('opportunityId') opportunityId: string,
+  ) {
+    return this.applicationUseCase.getOpportunityKanban(opportunityId, req.user);
+  }
+
+  @Get('organizer/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Xem chi tiết hồ sơ ứng tuyển dành cho Organizer (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Chi tiết hồ sơ' })
+  async getApplicationDetail(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    return this.applicationUseCase.getApplicationDetail(id, req.user);
+  }
+
+  @Get('organizer/:id/attachments')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Lấy danh sách tệp đính kèm của hồ sơ ứng tuyển (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Danh sách tệp đính kèm' })
+  async getApplicationAttachments(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    return this.applicationUseCase.getApplicationAttachments(id, req.user);
   }
 
   @Patch(':id/status')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ORGANIZER', 'ADMIN')
-  @ApiOperation({ summary: 'Organizer cập nhật trạng thái hồ sơ trên Kanban kèm expectedVersion' })
+  @ApiOperation({ summary: 'Organizer cập nhật trạng thái hồ sơ trên Kanban kèm expectedVersion & note (SCHOL-14)' })
   @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })
   async updateStatus(
     @Req() req: { user: AuthenticatedUser },
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateApplicationStatusDtoSchema)) dto: UpdateApplicationStatusDto,
   ) {
-    return this.applicationUseCase.updateStatus(id, req.user.userId, dto);
+    return this.applicationUseCase.updateStatus(id, req.user, dto);
   }
 }

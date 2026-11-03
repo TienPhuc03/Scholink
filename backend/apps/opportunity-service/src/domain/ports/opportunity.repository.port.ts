@@ -4,6 +4,7 @@ export interface OpportunityFilter {
   type?: 'SCHOLARSHIP' | 'COMPETITION';
   keyword?: string;
   status?: string;
+  organizationId?: string;
   applyMode?: 'IN_APP' | 'EXTERNAL';
   limit?: number;
   cursor?: string;

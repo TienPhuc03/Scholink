@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { IChatRepository, CHAT_REPOSITORY } from '../../domain/ports/chat.repository.port';
+import { ITeamRepository, TEAM_REPOSITORY } from '../../domain/ports/team.repository.port';
 import { Message, ChatRoom } from '../../domain/chat.entity';
 import { SendMessageDto, QueryMessagesDto, MarkReadDto } from '../dtos/collaboration.dto';
 import { DomainException, ErrorCode } from '@shared';
@@ -11,6 +12,7 @@ export class ChatUseCase {
 
   constructor(
     @Inject(CHAT_REPOSITORY) private readonly chatRepo: IChatRepository,
+    @Inject(TEAM_REPOSITORY) private readonly teamRepo: ITeamRepository,
   ) {}
 
   async getMyRooms(userId: string) {
@@ -36,9 +38,7 @@ export class ChatUseCase {
       throw DomainException.notFound('Phòng chat');
     }
 
-    if (!room.participants.includes(userId)) {
-      throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Bạn không ở trong phòng chat này', 403);
-    }
+    await this.assertMemberPermission(room, userId);
 
     const messages = await this.chatRepo.findMessagesByRoom(roomId, query.afterSeq, query.limit);
     return {
@@ -55,48 +55,36 @@ export class ChatUseCase {
       throw DomainException.notFound('Phòng chat');
     }
 
-    if (!room.participants.includes(senderId)) {
-      throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Bạn không ở trong phòng chat này (ACL)', 403);
+    // 1. Check user permission (must be active room participant & team member if team room)
+    await this.assertMemberPermission(room, senderId);
+
+    // 2. Validate max text length (SRS FR-CHAT-02: max 4,000 characters)
+    if (dto.content && dto.content.length > 4000) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Nội dung tin nhắn không được vượt quá 4.000 ký tự',
+        400,
+      );
     }
 
-    // Idempotency check with clientMsgId
-    if (dto.clientMsgId) {
-      const existing = await this.chatRepo.findMessageByClientMsgId(roomId, senderId, dto.clientMsgId);
-      if (existing) {
-        this.logger.log(`[ChatDedup] Bỏ qua tin nhắn trùng clientMsgId ${dto.clientMsgId} từ sender ${senderId}`);
-        return {
-          ...existing.props,
-          id: existing.id,
-        };
-      }
-    }
-
-    // Atomic increment sequence per room
-    const nextSeq = await this.chatRepo.atomicNextSeq(roomId, dto.content);
-
-    const message = new Message(`msg_${crypto.randomUUID()}`, {
+    // 3. Atomically persist message + seq + outbox in transaction with idempotency check
+    const { message, isDuplicate } = await this.chatRepo.saveMessageWithOutboxInTransaction(
       roomId,
       senderId,
-      seq: nextSeq,
-      clientMsgId: dto.clientMsgId,
-      content: dto.content,
-      assetId: dto.assetId,
-      readBy: [senderId],
-    });
-
-    // Save message and Outbox event in same transaction boundary
-    await this.chatRepo.saveMessageWithOutbox(message, {
-      type: room.type,
-      refId: room.refId,
-      participants: room.participants,
-    });
-
-    // Automatically mark read for sender
-    await this.chatRepo.updateReadReceipt(roomId, senderId, nextSeq);
+      dto.content,
+      dto.clientMsgId,
+      dto.assetId,
+      {
+        type: room.type,
+        refId: room.refId,
+        participants: room.participants,
+      },
+    );
 
     return {
       ...message.props,
       id: message.id,
+      isDuplicate,
     };
   }
 
@@ -106,10 +94,9 @@ export class ChatUseCase {
       throw DomainException.notFound('Phòng chat');
     }
 
-    if (!room.participants.includes(userId)) {
-      throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Bạn không ở trong phòng chat này', 403);
-    }
+    await this.assertMemberPermission(room, userId);
 
+    // Monotonic non-decreasing read cursor update
     await this.chatRepo.updateReadReceipt(roomId, userId, dto.lastReadSeq);
 
     return {
@@ -138,5 +125,83 @@ export class ChatUseCase {
 
     await this.chatRepo.saveRoom(room);
     return { ...room.props, id: room.id };
+  }
+
+  /**
+   * MQTT Auth & ACL Verification:
+   * Checks whether the user is authorized to connect or subscribe/publish to a specific MQTT topic.
+   * Immediately revokes permission if team membership has ended.
+   */
+  async validateMqttAcl(
+    userId: string,
+    topic: string,
+    action: 'subscribe' | 'publish',
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    // 1. Personal user topics: scholink/users/{userId}/#
+    if (topic.startsWith(`scholink/users/${userId}/`) || topic === `scholink/users/${userId}`) {
+      return { allowed: true };
+    }
+
+    // 2. Chat Room topics: scholink/rooms/{roomId}/# or rooms/{roomId}/#
+    const roomMatch = topic.match(/(?:scholink\/)?rooms\/([^/]+)/);
+    if (roomMatch) {
+      const roomId = roomMatch[1];
+      const room = await this.chatRepo.findRoomById(roomId);
+      if (!room) {
+        return { allowed: false, reason: 'Room not found' };
+      }
+
+      // Check if user is in participants
+      if (!room.participants.includes(userId)) {
+        return { allowed: false, reason: 'User is not a participant in this room' };
+      }
+
+      // If team room, check active membership
+      if (room.type === 'TEAM' && room.refId) {
+        const team = await this.teamRepo.findById(room.refId);
+        if (!team) {
+          return { allowed: false, reason: 'Team not found' };
+        }
+        const isMember = team.members.some((m) => m.studentId === userId);
+        if (!isMember) {
+          return { allowed: false, reason: 'Membership revoked' };
+        }
+      }
+
+      // Action control
+      if (action === 'publish') {
+        // Allow client to publish typing/presence or in-room signals; official messages go via REST
+        return { allowed: true };
+      }
+
+      return { allowed: true };
+    }
+
+    return { allowed: false, reason: 'Topic not permitted' };
+  }
+
+  private async assertMemberPermission(room: ChatRoom, userId: string): Promise<void> {
+    if (!room.participants.includes(userId)) {
+      throw new DomainException(
+        ErrorCode.FORBIDDEN_RESOURCE,
+        'Bạn không ở trong phòng chat này (ACL)',
+        403,
+      );
+    }
+
+    // If it's a team room, verify team membership is still active
+    if (room.type === 'TEAM' && room.refId) {
+      const team = await this.teamRepo.findById(room.refId);
+      if (team) {
+        const isMember = team.members.some((m) => m.studentId === userId);
+        if (!isMember) {
+          throw new DomainException(
+            ErrorCode.FORBIDDEN_RESOURCE,
+            'Tư cách thành viên đội thi của bạn đã bị thu hồi (ACL)',
+            403,
+          );
+        }
+      }
+    }
   }
 }

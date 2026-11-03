@@ -97,8 +97,16 @@ export class Team extends AggregateRoot<string> {
   }
 
   public removeMember(studentId: string): void {
-    if (this._props.status === 'SUBMITTING' || this._props.status === 'SUBMITTED') {
+    if (this._props.status === 'SUBMITTING') {
       throw new DomainException(ErrorCode.STATE_CONFLICT, 'Không thể rời hoặc xóa thành viên khi đội đang nộp hồ sơ (Roster Freeze)', 409);
+    }
+
+    if (this._props.status === 'SUBMITTED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Không thể rời hoặc xóa thành viên sau khi đội đã nộp hồ sơ thành công', 409);
+    }
+
+    if (this._props.status === 'CLOSED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Đội thi đã đóng', 409);
     }
 
     if (studentId === this._props.leaderId) {
@@ -116,6 +124,18 @@ export class Team extends AggregateRoot<string> {
   }
 
   public transferLeader(newLeaderId: string, currentLeaderId: string): void {
+    if (this._props.status === 'SUBMITTING') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Không thể chuyển quyền trưởng đội khi đang nộp hồ sơ (Roster Freeze)', 409);
+    }
+
+    if (this._props.status === 'SUBMITTED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Không thể chuyển quyền trưởng đội sau khi đã nộp hồ sơ', 409);
+    }
+
+    if (this._props.status === 'CLOSED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Đội thi đã đóng', 409);
+    }
+
     if (currentLeaderId !== this._props.leaderId) {
       throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Chỉ trưởng đội mới có quyền chuyển giao vai trò', 403);
     }
@@ -129,10 +149,11 @@ export class Team extends AggregateRoot<string> {
     if (currentMember) currentMember.role = 'MEMBER';
     member.role = 'LEADER';
     this._props.leaderId = newLeaderId;
+    this._props.rosterVersion += 1;
     this.incrementVersion();
   }
 
-  public prepareSubmission(reservationId: string): number {
+  public prepareSubmission(reservationId: string): { fencingToken: number; rosterVersion: number } {
     if (this._props.members.length < this._props.minSize || this._props.members.length > this._props.maxSize) {
       throw new DomainException(
         ErrorCode.STATE_CONFLICT,
@@ -151,9 +172,10 @@ export class Team extends AggregateRoot<string> {
 
     this._props.status = 'SUBMITTING';
     this._props.fencingToken += 1;
+    this._props.rosterVersion += 1;
     this._props.currentReservationId = reservationId;
     this.incrementVersion();
-    return this._props.fencingToken;
+    return { fencingToken: this._props.fencingToken, rosterVersion: this._props.rosterVersion };
   }
 
   public confirmSubmission(reservationId: string): void {
@@ -168,7 +190,18 @@ export class Team extends AggregateRoot<string> {
     if (this._props.status === 'SUBMITTING' && this._props.currentReservationId === reservationId) {
       this._props.status = this._props.members.length >= this._props.minSize ? 'ACTIVE' : 'FORMING';
       this._props.currentReservationId = undefined;
+      this._props.rosterVersion += 1;
       this.incrementVersion();
     }
+  }
+
+  public reopenFromWithdrawal(): void {
+    if (this._props.status !== 'SUBMITTED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Chỉ có thể mở lại đội từ hồ sơ đã nộp thành công', 409);
+    }
+    this._props.status = this._props.members.length >= this._props.minSize ? 'ACTIVE' : 'FORMING';
+    this._props.currentReservationId = undefined;
+    this._props.rosterVersion += 1;
+    this.incrementVersion();
   }
 }

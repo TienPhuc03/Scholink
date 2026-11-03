@@ -6,9 +6,12 @@ import {
   Param,
   Query,
   Req,
+  Headers,
   Inject,
   OnModuleInit,
   UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
@@ -26,6 +29,27 @@ import {
   QueryOpportunityDtoSchema,
 } from '@shared';
 import { GATEWAY_OPPORTUNITY_GRPC, OpportunityGrpcClient } from '../grpc-clients.interface';
+
+const OPPORTUNITY_URL = () => process.env.OPPORTUNITY_SERVICE_URL || 'http://localhost:3002';
+
+async function forwardOpportunity(path: string, options: RequestInit = {}) {
+  const url = `${OPPORTUNITY_URL()}${path}`;
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const errorMsg = data?.message || data?.error || 'Opportunity Service Error';
+      throw new HttpException(data || { message: errorMsg }, res.status);
+    }
+    return data;
+  } catch (err: any) {
+    if (err instanceof HttpException) throw err;
+    throw new HttpException(
+      { message: `Không thể kết nối Opportunity Service: ${err.message}` },
+      HttpStatus.BAD_GATEWAY,
+    );
+  }
+}
 
 @ApiTags('Opportunity Catalog (Opportunity Service)')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -53,6 +77,17 @@ export class GatewayOpportunityController implements OnModuleInit {
       nextCursor: res.nextCursor ?? null,
       hasMore: Boolean(res.hasMore),
     };
+  }
+
+  @Get('organizer/my-opportunities')
+  @ApiBearerAuth()
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Organizer lấy danh sách cơ hội thuộc tổ chức của mình (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Danh sách cơ hội của đơn vị' })
+  async listMyOpportunities(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/opportunities/organizer/my-opportunities', {
+      headers: { Authorization: auth },
+    });
   }
 
   @Public()
