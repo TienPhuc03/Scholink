@@ -203,3 +203,33 @@ export const CreateConsentDtoSchema = z.object({
 });
 
 export type CreateConsentDto = z.infer<typeof CreateConsentDtoSchema>;
+
+/**
+ * F40 Backend — FR-AUTH-08, Mục 28, Mục 29, D06 & E13 SRS:
+ * Yêu cầu xóa tài khoản (bắt buộc xác thực lại mật khẩu hiện tại),
+ * lựa chọn quyết định giữ/xóa Snapshot ứng tuyển (RETAIN | PURGE) và tra cứu mã theo dõi (trackingId).
+ */
+export const SnapshotRetentionDecisionSchema = z.enum(['RETAIN', 'PURGE']);
+export type SnapshotRetentionDecision = z.infer<typeof SnapshotRetentionDecisionSchema>;
+
+export const RequestAccountDeletionDtoSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, 'Bắt buộc nhập mật khẩu hiện tại để xác thực lại trước khi xóa tài khoản')
+    .max(128),
+  snapshotDecision: SnapshotRetentionDecisionSchema.default('RETAIN'),
+  reason: z
+    .string()
+    .transform(sanitizePlainText)
+    .pipe(z.string().max(500))
+    .optional(),
+});
+
+export type RequestAccountDeletionDto = z.infer<typeof RequestAccountDeletionDtoSchema>;
+
+export const GetDeletionTrackingDtoSchema = z.object({
+  trackingId: z.string().trim().min(1, 'trackingId không được để trống').max(120),
+});
+
+export type GetDeletionTrackingDto = z.infer<typeof GetDeletionTrackingDtoSchema>;
+

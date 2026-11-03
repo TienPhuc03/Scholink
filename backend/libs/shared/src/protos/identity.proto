@@ -12,6 +12,9 @@ service IdentityGrpcService {
   rpc VerifyOtp (VerifyOtpRequest) returns (VerifyOtpResponse);
   rpc ForgotPassword (ForgotPasswordRequest) returns (SendOtpResponse);
   rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (AccountDeletionTrackingResponse);
+  rpc GetDeletionTracking (GetDeletionTrackingRequest) returns (AccountDeletionTrackingResponse);
+  rpc ExportPersonalData (ExportPersonalDataRequest) returns (ExportPersonalDataResponse);
 
   // Profile, MediaAsset & Passport RPCs (API Gateway -> Identity Service)
   rpc GetMyPassport (GetMyPassportRequest) returns (PassportResponse);
@@ -297,4 +300,42 @@ message ValidateConsentRequest {
 message ValidateConsentResponse {
   bool valid = 1;
   int32 profileVersion = 2;
+}
+
+
+message RequestAccountDeletionRequest {
+  string userId = 1;
+  string currentPassword = 2;
+  string snapshotDecision = 3;
+  string reason = 4;
+}
+
+message GetDeletionTrackingRequest {
+  string userId = 1;
+  string trackingId = 2;
+}
+
+message AccountDeletionTrackingResponse {
+  string trackingId = 1;
+  string userId = 2;
+  string status = 3;
+  string snapshotDecision = 4;
+  int32 revokedSessionVersion = 5;
+  bool sessionsRevoked = 6;
+  bool ledgerPreserved = 7;
+  string scheduledPurgeAt = 8;
+  string requestedAt = 9;
+  string reason = 10;
+}
+
+message ExportPersonalDataRequest {
+  string userId = 1;
+}
+
+message ExportPersonalDataResponse {
+  string exportId = 1;
+  string userId = 2;
+  string exportedAt = 3;
+  string payloadJson = 4;
+  bool ledgerPreserved = 5;
 }

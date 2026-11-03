@@ -19,6 +19,8 @@ service OpportunityGrpcService {
   rpc GetApplicationById (GetApplicationByIdRequest) returns (ApplicationDetailResponse);
   rpc WithdrawApplication (WithdrawApplicationRequest) returns (WithdrawApplicationResponse);
   rpc CheckReadiness (CheckReadinessRequest) returns (CheckReadinessResponse);
+  rpc ApplySnapshotRetentionDecision (ApplySnapshotRetentionRequest) returns (ApplySnapshotRetentionResponse);
+  rpc EvaluateTestResultLog (EvaluateTestResultLogRequest) returns (EvaluateTestResultLogResponse);
 }
 
 message ListOpportunitiesRequest {
@@ -333,3 +335,56 @@ message CheckReadinessResponse {
   repeated string missingFields = 9;
   repeated ScreeningReasonMessage screeningReasons = 10;
 }
+
+message ApplySnapshotRetentionRequest {
+  string studentId = 1;
+  string decision = 2;
+  string trackingId = 3;
+}
+
+message ApplySnapshotRetentionResponse {
+  string studentId = 1;
+  string decision = 2;
+  string trackingId = 3;
+  int32 purgedPreviewsCount = 4;
+  int32 withdrawnApplicationsCount = 5;
+  int32 retainedSnapshotsCount = 6;
+  int32 purgedSnapshotsCount = 7;
+  string processedAt = 8;
+}
+
+message TestCaseLogItemMessage {
+  string tcId = 1;
+  string acId = 2;
+  string title = 3;
+  string status = 4;
+  string note = 5;
+}
+
+message AcTestSummaryMessage {
+  string acId = 1;
+  int32 totalCases = 2;
+  int32 passedCases = 3;
+  int32 failedCases = 4;
+  int32 notRunCases = 5;
+  bool canClaimAc = 6;
+  string acStatus = 7;
+}
+
+message EvaluateTestResultLogRequest {
+  string runId = 1;
+  bool strictClaim = 2;
+  repeated TestCaseLogItemMessage testCases = 3;
+}
+
+message EvaluateTestResultLogResponse {
+  string runId = 1;
+  string evaluatedAt = 2;
+  int32 totalCases = 3;
+  int32 passedCases = 4;
+  int32 failedCases = 5;
+  int32 notRunCases = 6;
+  bool canClaimAllAc = 7;
+  repeated AcTestSummaryMessage acSummaries = 8;
+}
+

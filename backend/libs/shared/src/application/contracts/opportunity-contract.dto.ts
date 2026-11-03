@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sanitizePlainText } from './identity-contract.dto';
+import { sanitizePlainText, SnapshotRetentionDecisionSchema } from './identity-contract.dto';
 
 /**
  * Mục 10 SRS: Mô hình điều kiện sàng lọc (Eligibility Rule)
@@ -271,3 +271,49 @@ export const SubmitApplicationDtoSchema = z
   });
 
 export type SubmitApplicationDto = z.infer<typeof SubmitApplicationDtoSchema>;
+
+/**
+ * F40 Backend — FR-APP-01/05, Mục 29, D06:
+ * Áp dụng quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi tài khoản bị xóa.
+ */
+export const ApplySnapshotRetentionDtoSchema = z.object({
+  studentId: z.string().trim().min(1, 'studentId không được để trống'),
+  decision: SnapshotRetentionDecisionSchema.default('RETAIN'),
+  trackingId: z.string().trim().max(120).optional(),
+});
+
+export type ApplySnapshotRetentionDto = z.infer<typeof ApplySnapshotRetentionDtoSchema>;
+
+/**
+ * F40 Backend — Mục 30 SRS & NFR11:
+ * Nhật ký kết quả kiểm thử (Test Result Log) & đánh giá hoàn thành AC.
+ * Bất biến nghiệm thu: Không được phép claim đủ AC khi còn bất kỳ test case nào ở trạng thái NOT_RUN hoặc FAILED.
+ */
+export const TestCaseExecutionStatusSchema = z.enum(['PASSED', 'FAILED', 'NOT_RUN']);
+export type TestCaseExecutionStatus = z.infer<typeof TestCaseExecutionStatusSchema>;
+
+export const TestCaseLogItemDtoSchema = z.object({
+  tcId: z.string().trim().min(1, 'tcId không được để trống').max(80),
+  acId: z.string().trim().min(1, 'acId không được để trống').max(80),
+  title: z
+    .string()
+    .transform(sanitizePlainText)
+    .pipe(z.string().min(1, 'Tên ca kiểm thử không được để trống').max(300)),
+  status: TestCaseExecutionStatusSchema,
+  note: z
+    .string()
+    .transform(sanitizePlainText)
+    .pipe(z.string().max(500))
+    .optional(),
+});
+
+export type TestCaseLogItemDto = z.infer<typeof TestCaseLogItemDtoSchema>;
+
+export const EvaluateTestResultLogDtoSchema = z.object({
+  runId: z.string().trim().max(120).optional(),
+  strictClaim: z.boolean().optional().default(false),
+  testCases: z.array(TestCaseLogItemDtoSchema).min(1, 'Danh sách ca kiểm thử không được rỗng'),
+});
+
+export type EvaluateTestResultLogDto = z.infer<typeof EvaluateTestResultLogDtoSchema>;
+
