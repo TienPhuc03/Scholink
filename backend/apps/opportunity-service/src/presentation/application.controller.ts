@@ -6,6 +6,8 @@ import {
   CreatePreviewDto,
   CreateSubmissionIntentDto,
   SubmitApplicationDto,
+  ApplySnapshotRetentionDto,
+  EvaluateTestResultLogDto,
   UpdateApplicationStatusDto,
   UpdateApplicationStatusDtoSchema,
 } from '../application/dtos/opportunity.dto';
@@ -83,6 +85,16 @@ export class ApplicationController {
   @GrpcMethod('OpportunityGrpcService', 'CheckReadiness')
   async checkReadiness(data: { studentId: string; opportunityId: string }) {
     return this.applicationUseCase.checkReadiness(data.studentId, data.opportunityId);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'ApplySnapshotRetentionDecision')
+  async applySnapshotRetentionDecision(data: ApplySnapshotRetentionDto) {
+    return this.applicationUseCase.applySnapshotRetentionDecision(data);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'EvaluateTestResultLog')
+  async evaluateTestResultLog(data: EvaluateTestResultLogDto) {
+    return this.applicationUseCase.evaluateTestResultLog(data);
   }
 
   // ================= HTTP Handlers (F24: Organizer Kanban) =================

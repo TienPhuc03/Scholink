@@ -195,6 +195,12 @@ export class ApplicationRevisionModel {
   @Prop({ type: [Object], default: [] })
   consentRefs: Record<string, unknown>[];
 
+  @Prop({
+    enum: ['ACTIVE', 'RETAINED_BY_POLICY', 'PURGED_ANONYMIZED'],
+    default: 'ACTIVE',
+  })
+  retentionStatus?: string;
+
   @Prop({ required: true })
   submittedAt: Date;
 }

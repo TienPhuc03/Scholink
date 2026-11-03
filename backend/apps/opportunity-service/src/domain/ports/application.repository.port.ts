@@ -42,6 +42,8 @@ export interface TeamMemberSnapshotRecord {
   readonly screeningReasons?: readonly ScreeningReason[];
 }
 
+export type SnapshotRetentionStatus = 'ACTIVE' | 'RETAINED_BY_POLICY' | 'PURGED_ANONYMIZED';
+
 export interface ApplicationRevisionRecord {
   readonly id: string;
   readonly applicationId: string;
@@ -59,7 +61,19 @@ export interface ApplicationRevisionRecord {
   readonly rosterVersion?: number;
   readonly memberSnapshots?: readonly TeamMemberSnapshotRecord[];
   readonly consentRefs?: readonly TeamMemberConsentRefRecord[];
+  readonly retentionStatus?: SnapshotRetentionStatus;
   readonly submittedAt: Date;
+}
+
+export interface SnapshotRetentionSummaryRecord {
+  readonly studentId: string;
+  readonly decision: 'RETAIN' | 'PURGE';
+  readonly trackingId?: string;
+  readonly purgedPreviewsCount: number;
+  readonly withdrawnApplicationsCount: number;
+  readonly retainedSnapshotsCount: number;
+  readonly purgedSnapshotsCount: number;
+  readonly processedAt: Date;
 }
 
 export interface ApplicationEventRecord {
@@ -155,4 +169,10 @@ export interface IApplicationRepository {
     event: ApplicationEventRecord;
     outbox: OutboxEventRecord;
   }): Promise<void>;
+  deletePreviewsByStudent?(studentId: string): Promise<number>;
+  applySnapshotRetentionByStudent?(params: {
+    studentId: string;
+    decision: 'RETAIN' | 'PURGE';
+    trackingId?: string;
+  }): Promise<SnapshotRetentionSummaryRecord>;
 }

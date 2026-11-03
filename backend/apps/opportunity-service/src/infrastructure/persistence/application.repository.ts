@@ -18,6 +18,8 @@ import {
   SubmissionIntentStatus,
   TeamMemberSnapshotRecord,
   TeamMemberConsentRefRecord,
+  SnapshotRetentionStatus,
+  SnapshotRetentionSummaryRecord,
   OutboxEventRecord,
 } from '../../domain/ports/application.repository.port';
 import { Application, ApplicationStatus, ScreeningStatus } from '../../domain/application.entity';
@@ -271,6 +273,7 @@ export class MongooseApplicationRepository implements IApplicationRepository {
           screeningReasons: [...(revision.screeningReasons ?? [])],
           memberSnapshots: [...(revision.memberSnapshots ?? [])],
           consentRefs: [...(revision.consentRefs ?? [])],
+          retentionStatus: revision.retentionStatus ?? 'ACTIVE',
         },
       ],
       session ? { session } : undefined,
@@ -323,6 +326,7 @@ export class MongooseApplicationRepository implements IApplicationRepository {
             Object.freeze({ ...cr }),
           ),
         ),
+        retentionStatus: (doc.retentionStatus as SnapshotRetentionStatus) ?? 'ACTIVE',
         submittedAt: new Date(doc.submittedAt),
       }),
     );
@@ -594,6 +598,136 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     };
 
     await this.runInTransactionWithFallback(writeOperations);
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-08 & Mục 29 SRS:
+   * Dọn ngay toàn bộ bản xem trước (submission_previews) chưa nộp của sinh viên vừa xóa tài khoản.
+   */
+  async deletePreviewsByStudent(studentId: string): Promise<number> {
+    const safeStudentId = String(studentId);
+    const res = await this.previewModel
+      .deleteMany({ actorId: { $eq: safeStudentId } })
+      .exec();
+    return res.deletedCount ?? 0;
+  }
+
+  /**
+   * F40 Backend — FR-APP-01/05, Mục 29 & D06 SRS:
+   * Thực thi chính sách giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi tài khoản bị xóa:
+   * 1. Luôn xóa ngay các bản submission_previews chưa nộp của sinh viên.
+   * 2. Với các hồ sơ ứng tuyển do sinh viên này đứng tên mà đang chờ xử lý (SUBMITTED, REVIEWING, SHORTLISTED, INTERVIEW, INELIGIBLE),
+   *    chuyển sang WITHDRAWN (lý do ACCOUNT_DELETED) và giải phóng application_members.
+   * 3. Với các bản application_revisions (Snapshot đã nộp):
+   *    - Nếu decision === 'RETAIN' HOẶC đơn ở trạng thái ACCEPTED (nghĩa vụ lưu trữ/đối soát bắt buộc theo D06):
+   *      giữ nguyên Snapshot bất biến và đánh dấu retentionStatus = 'RETAINED_BY_POLICY'.
+   *    - Nếu decision === 'PURGE' và đơn không thuộc diện ACCEPTED:
+   *      ẩn danh dữ liệu cá nhân trong snapshotJson, manifestJson và memberSnapshots của sinh viên đó,
+   *      đánh dấu retentionStatus = 'PURGED_ANONYMIZED'.
+   */
+  async applySnapshotRetentionByStudent(params: {
+    studentId: string;
+    decision: 'RETAIN' | 'PURGE';
+    trackingId?: string;
+  }): Promise<SnapshotRetentionSummaryRecord> {
+    const safeStudentId = String(params.studentId);
+    const purgedPreviewsCount = await this.deletePreviewsByStudent(safeStudentId);
+    const applications = await this.findManyByStudent(safeStudentId);
+
+    let withdrawnApplicationsCount = 0;
+    let retainedSnapshotsCount = 0;
+    let purgedSnapshotsCount = 0;
+
+    for (const app of applications) {
+      let currentApp = app;
+      const isPendingStatus = [
+        'SUBMITTED',
+        'REVIEWING',
+        'SHORTLISTED',
+        'INTERVIEW',
+        'INELIGIBLE',
+      ].includes(currentApp.status);
+
+      if (currentApp.studentId === safeStudentId && isPendingStatus) {
+        currentApp = currentApp.withdraw();
+        await this.update(currentApp);
+        await this.releaseApplicationMembers(currentApp.id);
+        await this.appendEvent({
+          id: `evt_${crypto.randomUUID()}`,
+          applicationId: currentApp.id,
+          actorId: safeStudentId,
+          fromStatus: app.status,
+          toStatus: currentApp.status,
+          revision: currentApp.revision,
+          reason: params.trackingId
+            ? `ACCOUNT_DELETED:${params.trackingId}`
+            : 'ACCOUNT_DELETED',
+        });
+        withdrawnApplicationsCount += 1;
+      }
+
+      const mustRetainForAudit =
+        params.decision === 'RETAIN' || currentApp.status === 'ACCEPTED';
+      const revisions = await this.findRevisionsByApplicationId(currentApp.id);
+
+      for (const rev of revisions) {
+        if (mustRetainForAudit) {
+          await this.revisionModel
+            .updateOne(
+              { id: { $eq: String(rev.id) } },
+              { $set: { retentionStatus: 'RETAINED_BY_POLICY' } },
+            )
+            .exec();
+          retainedSnapshotsCount += 1;
+        } else {
+          const anonymizedSnapshotJson = JSON.stringify({
+            studentId: safeStudentId,
+            redacted: true,
+            retentionPolicy: 'PURGED_BY_USER_DELETION_DECISION',
+            trackingId: params.trackingId ?? null,
+          });
+          const updatedMemberSnapshots = (rev.memberSnapshots ?? []).map((ms) =>
+            ms.studentId === safeStudentId
+              ? {
+                  ...ms,
+                  snapshotJson: anonymizedSnapshotJson,
+                  manifestJson: '[]',
+                }
+              : ms,
+          );
+
+          await this.revisionModel
+            .updateOne(
+              { id: { $eq: String(rev.id) } },
+              {
+                $set: {
+                  ...(currentApp.studentId === safeStudentId
+                    ? {
+                        snapshotJson: anonymizedSnapshotJson,
+                        manifestJson: '[]',
+                      }
+                    : {}),
+                  memberSnapshots: updatedMemberSnapshots,
+                  retentionStatus: 'PURGED_ANONYMIZED',
+                },
+              },
+            )
+            .exec();
+          purgedSnapshotsCount += 1;
+        }
+      }
+    }
+
+    return Object.freeze({
+      studentId: safeStudentId,
+      decision: params.decision,
+      trackingId: params.trackingId,
+      purgedPreviewsCount,
+      withdrawnApplicationsCount,
+      retainedSnapshotsCount,
+      purgedSnapshotsCount,
+      processedAt: new Date(),
+    });
   }
 
   private async claimSubmissionIntentForCommit(

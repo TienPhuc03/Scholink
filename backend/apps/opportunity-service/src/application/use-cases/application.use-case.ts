@@ -20,6 +20,8 @@ import {
   CreatePreviewDto,
   CreateSubmissionIntentDto,
   SubmitApplicationDto,
+  ApplySnapshotRetentionDto,
+  EvaluateTestResultLogDto,
 } from '../dtos/opportunity.dto';
 import { DomainException, ErrorCode, CryptoService } from '@shared';
 
@@ -1350,5 +1352,121 @@ export class ApplicationUseCase implements OnModuleInit {
       version: updated.version,
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * F40 Backend — FR-APP-01/05, Mục 29 & D06 SRS:
+   * Giữ hoặc xóa/ẩn danh Snapshot ứng tuyển theo quyết định khi tài khoản bị xóa.
+   */
+  async applySnapshotRetentionDecision(dto: ApplySnapshotRetentionDto) {
+    if (this.applicationRepo.applySnapshotRetentionByStudent) {
+      const summary = await this.applicationRepo.applySnapshotRetentionByStudent({
+        studentId: dto.studentId,
+        decision: dto.decision,
+        trackingId: dto.trackingId,
+      });
+      return Object.freeze({
+        ...summary,
+        trackingId: summary.trackingId ?? '',
+        processedAt: summary.processedAt.toISOString(),
+      });
+    }
+
+    const purgedPreviewsCount = this.applicationRepo.deletePreviewsByStudent
+      ? await this.applicationRepo.deletePreviewsByStudent(dto.studentId)
+      : 0;
+
+    return Object.freeze({
+      studentId: dto.studentId,
+      decision: dto.decision,
+      trackingId: dto.trackingId ?? '',
+      purgedPreviewsCount,
+      withdrawnApplicationsCount: 0,
+      retainedSnapshotsCount: 0,
+      purgedSnapshotsCount: 0,
+      processedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * F40 Backend — Mục 30 SRS & NFR11:
+   * Ghi nhận nhật ký kết quả kiểm thử (Test Result Log) và kiểm tra điều kiện hoàn thành AC.
+   * Bất biến nghiệm thu: Không bao giờ được claim đủ AC (`canClaimAc = false`, `canClaimAllAc = false`)
+   * khi vẫn còn bất kỳ ca kiểm thử nào ở trạng thái `NOT_RUN` hoặc `FAILED`.
+   */
+  async evaluateTestResultLog(dto: EvaluateTestResultLogDto) {
+    const runId = dto.runId?.trim() || `trun_${crypto.randomUUID()}`;
+    const groupedByAc = new Map<
+      string,
+      Array<{
+        tcId: string;
+        acId: string;
+        title: string;
+        status: 'PASSED' | 'FAILED' | 'NOT_RUN';
+        note?: string;
+      }>
+    >();
+
+    for (const rawTc of dto.testCases ?? []) {
+      const normalizedTc = {
+        tcId: String(rawTc.tcId ?? ''),
+        acId: String(rawTc.acId ?? ''),
+        title: String(rawTc.title ?? ''),
+        status: (rawTc.status ?? 'NOT_RUN') as 'PASSED' | 'FAILED' | 'NOT_RUN',
+        note: rawTc.note,
+      };
+      const existing = groupedByAc.get(normalizedTc.acId) ?? [];
+      existing.push(normalizedTc);
+      groupedByAc.set(normalizedTc.acId, existing);
+    }
+
+    const acSummaries = Array.from(groupedByAc.entries()).map(([acId, cases]) => {
+      const totalCases = cases.length;
+      const passedCases = cases.filter((c) => c.status === 'PASSED').length;
+      const failedCases = cases.filter((c) => c.status === 'FAILED').length;
+      const notRunCases = cases.filter((c) => c.status === 'NOT_RUN').length;
+      const canClaimAc = totalCases > 0 && notRunCases === 0 && failedCases === 0;
+      const acStatus =
+        failedCases > 0
+          ? 'FAILED'
+          : notRunCases > 0
+            ? 'INCOMPLETE_NOT_RUN'
+            : 'VERIFIED';
+
+      return Object.freeze({
+        acId,
+        totalCases,
+        passedCases,
+        failedCases,
+        notRunCases,
+        canClaimAc,
+        acStatus,
+      });
+    });
+
+    const totalCases = dto.testCases.length;
+    const passedCases = dto.testCases.filter((c) => c.status === 'PASSED').length;
+    const failedCases = dto.testCases.filter((c) => c.status === 'FAILED').length;
+    const notRunCases = dto.testCases.filter((c) => c.status === 'NOT_RUN').length;
+    const canClaimAllAc =
+      acSummaries.length > 0 && acSummaries.every((summary) => summary.canClaimAc);
+
+    if (dto.strictClaim && !canClaimAllAc) {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Không được phép claim đủ AC khi vẫn còn ca kiểm thử ở trạng thái NOT_RUN hoặc FAILED',
+      );
+    }
+
+    return Object.freeze({
+      runId,
+      evaluatedAt: new Date().toISOString(),
+      totalCases,
+      passedCases,
+      failedCases,
+      notRunCases,
+      canClaimAllAc,
+      acSummaries: Object.freeze(acSummaries),
+    });
   }
 }
