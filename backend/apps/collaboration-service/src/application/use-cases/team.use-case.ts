@@ -1,7 +1,11 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { ITeamRepository, TEAM_REPOSITORY } from '../../domain/ports/team.repository.port';
 import { IChatRepository, CHAT_REPOSITORY } from '../../domain/ports/chat.repository.port';
+import {
+  IIdentityClientPort,
+  IDENTITY_CLIENT,
+} from '../../domain/ports/identity-client.port';
 import { Team } from '../../domain/team.entity';
 import { JoinRequest } from '../../domain/join-request.entity';
 import { SubmissionReservation } from '../../domain/reservation.entity';
@@ -22,6 +26,9 @@ export class TeamUseCase {
   constructor(
     @Inject(TEAM_REPOSITORY) private readonly teamRepo: ITeamRepository,
     @Inject(CHAT_REPOSITORY) private readonly chatRepo: IChatRepository,
+    @Optional()
+    @Inject(IDENTITY_CLIENT)
+    private readonly identityClient?: IIdentityClientPort,
   ) {}
 
   async createTeam(studentId: string, dto: CreateTeamDto) {
@@ -172,7 +179,6 @@ export class TeamUseCase {
     }
 
     if (dto.decision === 'ACCEPT') {
-      // Atomic verification: check if slot is still available and applicant is not in another team
       if (team.members.length >= team.props.maxSize) {
         throw new DomainException(ErrorCode.SLOT_FULL, 'Đội thi đã đủ số lượng thành viên', 409);
       }
@@ -188,7 +194,6 @@ export class TeamUseCase {
         );
       }
 
-      // Add to team & active membership
       team.addMember(joinRequest.applicantId);
       await this.teamRepo.update(team);
 
@@ -244,10 +249,18 @@ export class TeamUseCase {
     }
 
     team.removeMember(studentId);
+
+    // Invalidate any pending reservation if present
+    const pendingRes = await this.teamRepo.findActiveReservationByTeam(team.id);
+    if (pendingRes) {
+      pendingRes.abort();
+      await this.teamRepo.updateReservation(pendingRes);
+    }
+
     await this.teamRepo.update(team);
     await this.teamRepo.deleteActiveMembership(team.competitionId, studentId);
 
-    // Remove from Team Chat Room
+    // Revoke from Team Chat Room immediately
     const room = await this.chatRepo.findRoomByRefId(team.id);
     if (room) {
       room.removeParticipant(studentId);
@@ -268,6 +281,14 @@ export class TeamUseCase {
     }
 
     team.transferLeader(dto.newLeaderId, currentLeaderId);
+
+    // Invalidate any pending reservation if present
+    const pendingRes = await this.teamRepo.findActiveReservationByTeam(team.id);
+    if (pendingRes) {
+      pendingRes.abort();
+      await this.teamRepo.updateReservation(pendingRes);
+    }
+
     await this.teamRepo.update(team);
 
     return {
@@ -277,13 +298,33 @@ export class TeamUseCase {
     };
   }
 
+  async reopenTeamFromWithdrawal(teamId: string, leaderId: string) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+
+    if (team.leaderId !== leaderId) {
+      throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Chỉ trưởng đội mới có quyền mở lại hồ sơ đội', 403);
+    }
+
+    team.reopenFromWithdrawal();
+    await this.teamRepo.update(team);
+
+    return {
+      teamId: team.id,
+      status: team.status,
+      rosterVersion: team.rosterVersion,
+    };
+  }
+
   async getCompetitionTeams(competitionId: string) {
     const teams = await this.teamRepo.findManyByCompetition(competitionId);
     return teams.map((t) => ({ ...t.props, id: t.id }));
   }
 
   // ==========================================
-  // F33: SUBMISSION RESERVATION & ROSTER FREEZE
+  // SCHOL-20: SUBMISSION RESERVATION & ROSTER FREEZE
   // ==========================================
   async prepareSubmission(teamId: string, leaderId: string) {
     const team = await this.teamRepo.findById(teamId);
@@ -295,19 +336,79 @@ export class TeamUseCase {
       throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Chỉ trưởng đội mới có quyền bắt đầu nộp hồ sơ đội', 403);
     }
 
+    if (team.members.length < team.props.minSize || team.members.length > team.props.maxSize) {
+      throw new DomainException(
+        ErrorCode.STATE_CONFLICT,
+        `Số lượng thành viên (${team.members.length}) không đạt yêu cầu [${team.props.minSize} - ${team.props.maxSize}]`,
+        422,
+      );
+    }
+
+    if (team.status === 'SUBMITTING') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Đội đã có phiên chuẩn bị nộp hồ sơ đang diễn ra', 409);
+    }
+
+    if (team.status === 'SUBMITTED') {
+      throw new DomainException(ErrorCode.ALREADY_APPLIED, 'Đội thi đã nộp hồ sơ thành công cho cuộc thi này', 409);
+    }
+
+    // SCHOL-20 requirement 1: Verify all members have active memberships & valid profiles
+    for (const member of team.members) {
+      const memRecord = await this.teamRepo.findActiveMembership(team.competitionId, member.studentId);
+      if (!memRecord || memRecord.teamId !== team.id) {
+        throw new DomainException(
+          ErrorCode.STATE_CONFLICT,
+          `Thành viên ${member.studentId} không còn tư cách thành viên hợp lệ trong đội`,
+          409,
+        );
+      }
+
+      if (this.identityClient) {
+        const profileCheck = await this.identityClient.validateMemberProfile(member.studentId);
+        if (!profileCheck.isValid) {
+          throw new DomainException(
+            ErrorCode.PROFILE_INCOMPLETE,
+            `Hồ sơ của thành viên ${member.studentId} chưa hoàn thiện hoặc không còn hiệu lực (${profileCheck.message || 'Thiếu thông tin bắt buộc'})`,
+            422,
+          );
+        }
+      }
+    }
+
     const reservationId = `res_${crypto.randomUUID()}`;
-    const fencingToken = team.prepareSubmission(reservationId);
-    await this.teamRepo.update(team);
+    const nextFencingToken = team.fencingToken + 1;
+    const nextRosterVersion = team.rosterVersion + 1;
+
+    // SCHOL-20 requirement 3: Conditional transition to SUBMITTING with optimistic concurrency lock
+    const updatedTeam = await this.teamRepo.conditionalPrepareSubmission(
+      team.id,
+      leaderId,
+      reservationId,
+      team.version,
+      nextFencingToken,
+      nextRosterVersion,
+    );
+
+    if (!updatedTeam) {
+      const latest = await this.teamRepo.findById(teamId);
+      if (latest?.status === 'SUBMITTING') {
+        throw new DomainException(ErrorCode.STATE_CONFLICT, 'Đội đã có phiên chuẩn bị nộp hồ sơ đang diễn ra', 409);
+      }
+      if (latest?.status === 'SUBMITTED') {
+        throw new DomainException(ErrorCode.ALREADY_APPLIED, 'Đội thi đã nộp hồ sơ thành công cho cuộc thi này', 409);
+      }
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Xung đột khi chuẩn bị nộp hồ sơ, vui lòng thử lại', 409);
+    }
 
     // 10 minutes lease for roster freeze
     const leaseExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const memberIds = team.members.map((m) => m.studentId);
+    const memberIds = updatedTeam.members.map((m) => m.studentId);
 
     const reservation = new SubmissionReservation(reservationId, {
-      teamId: team.id,
-      competitionId: team.competitionId,
-      fencingToken,
-      rosterVersion: team.rosterVersion,
+      teamId: updatedTeam.id,
+      competitionId: updatedTeam.competitionId,
+      fencingToken: nextFencingToken,
+      rosterVersion: nextRosterVersion,
       members: memberIds,
       leaseExpiresAt,
       status: 'PENDING',
@@ -315,12 +416,12 @@ export class TeamUseCase {
     });
 
     await this.teamRepo.saveReservation(reservation);
-    this.logger.log(`[RosterFreeze] Đội ${team.id} khóa nộp hồ sơ. Reservation: ${reservationId}, fencingToken: ${fencingToken}`);
+    this.logger.log(`[RosterFreeze] Đội ${updatedTeam.id} khóa nộp hồ sơ. Reservation: ${reservationId}, fencingToken: ${nextFencingToken}, rosterVersion: ${nextRosterVersion}`);
 
     return {
       reservationId: reservation.id,
-      teamId: team.id,
-      competitionId: team.competitionId,
+      teamId: updatedTeam.id,
+      competitionId: updatedTeam.competitionId,
       fencingToken: reservation.fencingToken,
       rosterVersion: reservation.rosterVersion,
       members: reservation.members,
@@ -329,7 +430,8 @@ export class TeamUseCase {
     };
   }
 
-  async validateReservation(teamId: string, fencingToken: number) {
+  // SCHOL-20 requirement 4: Validate reservation with token and rosterVersion validation
+  async validateReservation(teamId: string, fencingToken: number, expectedRosterVersion?: number) {
     const reservation = await this.teamRepo.findActiveReservationByTeam(teamId);
     if (!reservation) {
       return { isValid: false, status: 'NOT_FOUND', errorCode: 'RESERVATION_NOT_FOUND' };
@@ -337,16 +439,52 @@ export class TeamUseCase {
     if (reservation.fencingToken !== fencingToken) {
       return { isValid: false, status: 'STALE_FENCING_TOKEN', errorCode: 'FENCING_TOKEN_MISMATCH' };
     }
-    if (new Date() > reservation.leaseExpiresAt) {
+    if (reservation.isExpired()) {
       return { isValid: false, status: 'EXPIRED', errorCode: 'LEASE_EXPIRED' };
     }
+    if (expectedRosterVersion !== undefined && reservation.rosterVersion !== expectedRosterVersion) {
+      return { isValid: false, status: 'ROSTER_MISMATCH', errorCode: 'ROSTER_VERSION_MISMATCH' };
+    }
+
+    const team = await this.teamRepo.findById(teamId);
+    if (!team || team.status !== 'SUBMITTING' || team.fencingToken !== fencingToken) {
+      return { isValid: false, status: 'TEAM_STATE_INVALID', errorCode: 'TEAM_NOT_SUBMITTING' };
+    }
+
+    if (!reservation.hasAllConsents()) {
+      return { isValid: false, status: 'MISSING_CONSENTS', errorCode: 'MISSING_MEMBER_CONSENTS' };
+    }
+
     return { isValid: true, status: 'VALID', errorCode: '' };
   }
 
+  // SCHOL-20 requirement 2: Consent collection bound to profileVersion and rosterVersion
   async submitTeamConsent(reservationId: string, studentId: string, dto: SubmitTeamConsentDto) {
     const reservation = await this.teamRepo.findReservationById(reservationId);
     if (!reservation) {
       throw DomainException.notFound('Phiên giữ chỗ nộp hồ sơ (Submission Reservation)');
+    }
+
+    if (reservation.status !== 'PENDING') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Phiên giữ chỗ không ở trạng thái chờ xác nhận', 409);
+    }
+
+    if (reservation.isExpired()) {
+      throw new DomainException(ErrorCode.HOLD_EXPIRED, 'Thời hạn phiên giữ chỗ đã hết hạn (Lease Expired)', 409);
+    }
+
+    const team = await this.teamRepo.findById(reservation.teamId);
+    if (!team || team.status !== 'SUBMITTING' || team.currentReservationId !== reservation.id) {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Đội thi không ở trạng thái chờ nộp hồ sơ cho phiên này', 409);
+    }
+
+    // Invalidate consent if team roster version has changed
+    if (dto.rosterVersion !== reservation.rosterVersion || team.rosterVersion !== dto.rosterVersion) {
+      throw new DomainException(
+        ErrorCode.VERSION_MISMATCH,
+        'Roster đã thay đổi, vui lòng xác nhận lại theo đội hình mới',
+        409,
+      );
     }
 
     reservation.addMemberConsent({
@@ -354,6 +492,8 @@ export class TeamUseCase {
       consentId: `cst_${crypto.randomUUID()}`,
       snapshotId: dto.snapshotId,
       payloadHash: dto.payloadHash,
+      profileVersion: dto.profileVersion,
+      rosterVersion: dto.rosterVersion,
       confirmedAt: new Date(),
     });
 
@@ -368,10 +508,36 @@ export class TeamUseCase {
     };
   }
 
-  async confirmSubmission(reservationId: string) {
+  async submitTeamConsentByTeamId(teamId: string, studentId: string, dto: SubmitTeamConsentDto) {
+    const reservation = await this.teamRepo.findActiveReservationByTeam(teamId);
+    if (!reservation) {
+      throw DomainException.notFound('Không tìm thấy phiên giữ chỗ nộp hồ sơ đang hoạt động cho đội');
+    }
+    return this.submitTeamConsent(reservation.id, studentId, dto);
+  }
+
+  // SCHOL-20 requirement 4: Confirm without holding DB transaction across network
+  async confirmSubmission(reservationId: string, fencingToken?: number) {
     const reservation = await this.teamRepo.findReservationById(reservationId);
     if (!reservation) {
       throw DomainException.notFound('Phiên giữ chỗ nộp hồ sơ');
+    }
+
+    if (reservation.status === 'CONFIRMED') {
+      const team = await this.teamRepo.findById(reservation.teamId);
+      return {
+        reservationId: reservation.id,
+        status: reservation.status,
+        teamStatus: team ? team.status : 'SUBMITTED',
+      };
+    }
+
+    if (reservation.status === 'ABORTED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Phiên giữ chỗ đã bị hủy trước đó', 409);
+    }
+
+    if (fencingToken !== undefined && reservation.fencingToken !== fencingToken) {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Fencing token không khớp với phiên hiện tại', 409);
     }
 
     reservation.confirm();
@@ -392,10 +558,27 @@ export class TeamUseCase {
     };
   }
 
-  async abortSubmission(reservationId: string) {
+  async abortSubmission(reservationId: string, fencingToken?: number, reason?: string) {
     const reservation = await this.teamRepo.findReservationById(reservationId);
     if (!reservation) {
       throw DomainException.notFound('Phiên giữ chỗ nộp hồ sơ');
+    }
+
+    if (reservation.status === 'ABORTED') {
+      const team = await this.teamRepo.findById(reservation.teamId);
+      return {
+        reservationId: reservation.id,
+        status: reservation.status,
+        teamStatus: team ? team.status : 'ACTIVE',
+      };
+    }
+
+    if (reservation.status === 'CONFIRMED') {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Phiên nộp đã được xác nhận, không thể hủy', 409);
+    }
+
+    if (fencingToken !== undefined && reservation.fencingToken !== fencingToken) {
+      throw new DomainException(ErrorCode.STATE_CONFLICT, 'Fencing token không khớp với phiên hiện tại', 409);
     }
 
     reservation.abort();
@@ -407,7 +590,7 @@ export class TeamUseCase {
       await this.teamRepo.update(team);
     }
 
-    this.logger.log(`[SubmissionAborted] Reservation ${reservationId} đã bị hủy, giải phóng Roster Freeze cho đội ${reservation.teamId}`);
+    this.logger.log(`[SubmissionAborted] Reservation ${reservationId} đã bị hủy (${reason || 'Manual abort'}), giải phóng Roster Freeze cho đội ${reservation.teamId}`);
 
     return {
       reservationId: reservation.id,

@@ -19,6 +19,7 @@
     "seed": "ts-node scripts/seed.ts",
     "backup": "ts-node scripts/backup.ts",
     "restore": "ts-node scripts/restore.ts",
+    "test:smoke": "ts-node scripts/smoke-test-schol14.ts",
     "test:e2e": "ts-node scripts/test-e2e.ts",
     "test:unit": "jest apps/ libs/",
     "test:security": "ts-node scripts/security-test.ts",

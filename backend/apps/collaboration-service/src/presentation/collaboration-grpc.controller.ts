@@ -18,6 +18,7 @@ export class CollaborationGrpcController {
         success: true,
         reservation_id: result.reservationId,
         fencing_token: result.fencingToken,
+        roster_version: result.rosterVersion,
         lease_expires_at: new Date(result.leaseExpiresAt).getTime(),
         message: 'Roster freeze activated successfully',
       };
@@ -26,6 +27,7 @@ export class CollaborationGrpcController {
         success: false,
         reservation_id: '',
         fencing_token: 0,
+        roster_version: 0,
         lease_expires_at: 0,
         message: err.message || 'Prepare submission failed',
       };
@@ -33,8 +35,12 @@ export class CollaborationGrpcController {
   }
 
   @GrpcMethod('CollaborationGrpcService', 'ValidateReservation')
-  async validateReservation(data: { team_id: string; fencing_token: number }) {
-    const result = await this.teamUseCase.validateReservation(data.team_id, Number(data.fencing_token));
+  async validateReservation(data: { team_id: string; fencing_token: number; roster_version?: number }) {
+    const result = await this.teamUseCase.validateReservation(
+      data.team_id,
+      Number(data.fencing_token),
+      data.roster_version ? Number(data.roster_version) : undefined,
+    );
     return {
       is_valid: result.isValid,
       status: result.status,
@@ -45,7 +51,7 @@ export class CollaborationGrpcController {
   @GrpcMethod('CollaborationGrpcService', 'ConfirmSubmission')
   async confirmSubmission(data: { team_id: string; reservation_id: string; fencing_token: number }) {
     try {
-      const result = await this.teamUseCase.confirmSubmission(data.reservation_id);
+      const result = await this.teamUseCase.confirmSubmission(data.reservation_id, Number(data.fencing_token));
       return {
         success: true,
         status: result.status,
@@ -63,7 +69,7 @@ export class CollaborationGrpcController {
   @GrpcMethod('CollaborationGrpcService', 'AbortSubmission')
   async abortSubmission(data: { team_id: string; reservation_id: string; fencing_token: number; reason: string }) {
     try {
-      const result = await this.teamUseCase.abortSubmission(data.reservation_id);
+      const result = await this.teamUseCase.abortSubmission(data.reservation_id, Number(data.fencing_token), data.reason);
       return {
         success: true,
         message: `Submission aborted. Reason: ${data.reason}`,
@@ -101,7 +107,7 @@ export class CollaborationGrpcController {
       client_msg_id: result.clientMsgId || '',
       content: result.content,
       created_at: result.createdAt ? new Date(result.createdAt).getTime() : Date.now(),
-      is_duplicate: false,
+      is_duplicate: result.isDuplicate || false,
     };
   }
 

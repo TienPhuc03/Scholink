@@ -9,7 +9,7 @@ import {
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@shared';
+import { JwtAuthGuard, Public } from '@shared';
 
 const COLLAB_URL = () => process.env.COLLABORATION_SERVICE_URL || 'http://localhost:3003';
 
@@ -102,6 +102,28 @@ export class GatewayChatController {
         'Content-Type': 'application/json',
         Authorization: auth,
       },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Public()
+  @Post('mqtt/auth')
+  @ApiOperation({ summary: 'EMQX Webhook xác thực MQTT client' })
+  async mqttAuth(@Body() body: any) {
+    return forwardCollab('/api/v1/chats/mqtt/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Public()
+  @Post('mqtt/acl')
+  @ApiOperation({ summary: 'EMQX Webhook kiểm tra quyền truy cập Topic (MQTT ACL)' })
+  async mqttAcl(@Body() body: any) {
+    return forwardCollab('/api/v1/chats/mqtt/acl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   }

@@ -18,6 +18,16 @@ export interface ITeamRepository {
   save(team: Team): Promise<void>;
   update(team: Team): Promise<void>;
 
+  // Conditional state transition (Optimistic Locking for Roster Freeze)
+  conditionalPrepareSubmission(
+    teamId: string,
+    leaderId: string,
+    reservationId: string,
+    currentVersion: number,
+    nextFencingToken: number,
+    nextRosterVersion: number,
+  ): Promise<Team | null>;
+
   // Atomic Active Memberships
   saveActiveMembership(record: ActiveMembershipRecord): Promise<void>;
   findActiveMembership(competitionId: string, studentId: string): Promise<ActiveMembershipRecord | null>;
@@ -30,7 +40,7 @@ export interface ITeamRepository {
   findJoinRequestsByTeam(teamId: string): Promise<JoinRequest[]>;
   updateJoinRequest(request: JoinRequest): Promise<void>;
 
-  // Submission Reservations (WF07)
+  // Submission Reservations (WF07 & SCHOL-20)
   saveReservation(reservation: SubmissionReservation): Promise<void>;
   findReservationById(id: string): Promise<SubmissionReservation | null>;
   findActiveReservationByTeam(teamId: string): Promise<SubmissionReservation | null>;

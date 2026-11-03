@@ -1,39 +1,36 @@
 import 'package:get_it/get_it.dart';
-import '../../features/auth/data/datasources/auth_remote_data_source.dart';
-import '../../features/auth/data/repositories/auth_repository_impl.dart';
-import '../../features/auth/domain/repositories/auth_repository.dart';
-import '../../features/auth/domain/usecases/login_usecase.dart';
-import '../../features/auth/presentation/viewmodels/login_viewmodel.dart';
-import '../../features/chat/data/datasources/chat_remote_data_source.dart';
-import '../../features/chat/data/repositories/chat_repository_impl.dart';
-import '../../features/chat/domain/repositories/chat_repository.dart';
-import '../../features/chat/domain/usecases/chat_usecases.dart';
-import '../../features/chat/presentation/viewmodels/chat_viewmodel.dart';
-import '../../features/opportunity/data/datasources/opportunity_local_data_source.dart';
-import '../../features/opportunity/data/datasources/opportunity_remote_data_source.dart';
-import '../../features/opportunity/data/repositories/opportunity_repository_impl.dart';
-import '../../features/opportunity/domain/repositories/opportunity_repository.dart';
-import '../../features/opportunity/domain/usecases/get_opportunities_usecase.dart';
-import '../../features/opportunity/presentation/viewmodels/opportunity_viewmodel.dart';
-import '../../features/passport/data/datasources/passport_remote_data_source.dart';
-import '../../features/passport/data/repositories/passport_repository_impl.dart';
-import '../../features/passport/domain/repositories/passport_repository.dart';
-import '../../features/passport/domain/usecases/get_passport_usecase.dart';
-import '../../features/passport/presentation/viewmodels/passport_viewmodel.dart';
-import '../../features/team/data/datasources/team_remote_data_source.dart';
-import '../../features/team/data/repositories/team_repository_impl.dart';
-import '../../features/team/domain/repositories/team_repository.dart';
-import '../../features/team/domain/usecases/team_usecases.dart';
-import '../../features/team/presentation/viewmodels/team_viewmodel.dart';
+
+// Core Infrastructure
 import '../database/local_cache_manager.dart';
 import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
 import '../storage/secure_storage_helper.dart';
 
+// Feature 1: Auth
+import '../../features/auth/auth_repository.dart';
+import '../../features/auth/login_viewmodel.dart';
+
+// Feature 2: Opportunity
+import '../../features/opportunity/opportunity_repository.dart';
+import '../../features/opportunity/opportunity_viewmodel.dart';
+
+// Feature 3: Team
+import '../../features/team/team_repository.dart';
+import '../../features/team/team_viewmodel.dart';
+
+// Feature 4: Chat
+import '../../features/chat/chat_repository.dart';
+import '../../features/chat/chat_viewmodel.dart';
+
+// Feature 5: Passport
+import '../../features/passport/passport_repository.dart';
+import '../../features/passport/passport_viewmodel.dart';
+
 final GetIt sl = GetIt.instance;
 
+/// Simple Dependency Injection setup for MVVM + Repository pattern.
 Future<void> setupServiceLocator() async {
-  // Core Infrastructure
+  // 1. Core Infrastructure Singletons
   final SecureStorageHelper secureStorage = SecureStorageHelperImpl();
   sl.registerSingleton<SecureStorageHelper>(secureStorage);
 
@@ -46,103 +43,58 @@ Future<void> setupServiceLocator() async {
   final MqttManager mqttManager = MqttManagerImpl();
   sl.registerSingleton<MqttManager>(mqttManager);
 
-  // Feature 1: Auth
-  sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(sl<ApiClient>()),
-  );
+  // 2. Feature Repositories (Lazy Singletons)
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(
-      remoteDataSource: sl<AuthRemoteDataSource>(),
+    () => AuthRepository(
+      apiClient: sl<ApiClient>(),
       secureStorage: sl<SecureStorageHelper>(),
     ),
   );
-  sl.registerLazySingleton<LoginUseCase>(() => LoginUseCase(sl<AuthRepository>()));
-  sl.registerFactory<LoginViewModel>(() => LoginViewModel(sl<LoginUseCase>()));
 
-  // Feature 2: Passport
-  sl.registerLazySingleton<PassportRemoteDataSource>(
-    () => PassportRemoteDataSourceImpl(sl<ApiClient>()),
-  );
-  sl.registerLazySingleton<PassportRepository>(
-    () => PassportRepositoryImpl(sl<PassportRemoteDataSource>()),
-  );
-  sl.registerLazySingleton<GetPassportUseCase>(
-    () => GetPassportUseCase(sl<PassportRepository>()),
-  );
-  sl.registerFactory<PassportViewModel>(() => PassportViewModel(sl<GetPassportUseCase>()));
-
-  // Feature 3: Opportunity
-  sl.registerLazySingleton<OpportunityRemoteDataSource>(
-    () => OpportunityRemoteDataSourceImpl(sl<ApiClient>()),
-  );
-  sl.registerLazySingleton<OpportunityLocalDataSource>(
-    () => OpportunityLocalDataSourceImpl(sl<LocalCacheManager>()),
-  );
   sl.registerLazySingleton<OpportunityRepository>(
-    () => OpportunityRepositoryImpl(
-      remoteDataSource: sl<OpportunityRemoteDataSource>(),
-      localDataSource: sl<OpportunityLocalDataSource>(),
+    () => OpportunityRepository(
+      apiClient: sl<ApiClient>(),
+      localCache: sl<LocalCacheManager>(),
     ),
   );
-  sl.registerLazySingleton<GetOpportunitiesUseCase>(
-    () => GetOpportunitiesUseCase(sl<OpportunityRepository>()),
-  );
-  sl.registerFactory<OpportunityViewModel>(
-    () => OpportunityViewModel(sl<GetOpportunitiesUseCase>()),
+
+  sl.registerLazySingleton<TeamRepository>(
+    () => TeamRepository(sl<ApiClient>()),
   );
 
-  // Feature 4: Team
-  sl.registerLazySingleton<TeamRemoteDataSource>(
-    () => TeamRemoteDataSourceImpl(sl<ApiClient>()),
+  sl.registerLazySingleton<ChatRepository>(
+    () => ChatRepository(sl<ApiClient>()),
   );
-  sl.registerLazySingleton<TeamRepository>(
-    () => TeamRepositoryImpl(sl<TeamRemoteDataSource>()),
+
+  sl.registerLazySingleton<PassportRepository>(
+    () => PassportRepository(sl<ApiClient>()),
   );
-  sl.registerLazySingleton<GetTeamsByCompetitionUseCase>(
-    () => GetTeamsByCompetitionUseCase(sl<TeamRepository>()),
+
+  // 3. Feature ViewModels (Factory instances for Views)
+  sl.registerFactory<LoginViewModel>(
+    () => LoginViewModel(sl<AuthRepository>()),
   );
-  sl.registerLazySingleton<CreateTeamUseCase>(
-    () => CreateTeamUseCase(sl<TeamRepository>()),
+
+  sl.registerFactory<OpportunityViewModel>(
+    () => OpportunityViewModel(sl<OpportunityRepository>()),
   );
-  sl.registerLazySingleton<JoinTeamUseCase>(
-    () => JoinTeamUseCase(sl<TeamRepository>()),
-  );
-  sl.registerLazySingleton<LeaveTeamUseCase>(
-    () => LeaveTeamUseCase(sl<TeamRepository>()),
-  );
+
   sl.registerFactory<TeamViewModel>(
     () => TeamViewModel(
-      getTeamsUseCase: sl<GetTeamsByCompetitionUseCase>(),
-      createTeamUseCase: sl<CreateTeamUseCase>(),
-      joinTeamUseCase: sl<JoinTeamUseCase>(),
-      leaveTeamUseCase: sl<LeaveTeamUseCase>(),
+      repository: sl<TeamRepository>(),
       secureStorage: sl<SecureStorageHelper>(),
     ),
   );
 
-  // Feature 5: Chat
-  sl.registerLazySingleton<ChatRemoteDataSource>(
-    () => ChatRemoteDataSourceImpl(sl<ApiClient>()),
-  );
-  sl.registerLazySingleton<ChatRepository>(
-    () => ChatRepositoryImpl(sl<ChatRemoteDataSource>()),
-  );
-  sl.registerLazySingleton<GetChatRoomsUseCase>(
-    () => GetChatRoomsUseCase(sl<ChatRepository>()),
-  );
-  sl.registerLazySingleton<GetMessagesUseCase>(
-    () => GetMessagesUseCase(sl<ChatRepository>()),
-  );
-  sl.registerLazySingleton<SendMessageUseCase>(
-    () => SendMessageUseCase(sl<ChatRepository>()),
-  );
   sl.registerFactory<ChatViewModel>(
     () => ChatViewModel(
-      getRoomsUseCase: sl<GetChatRoomsUseCase>(),
-      getMessagesUseCase: sl<GetMessagesUseCase>(),
-      sendMessageUseCase: sl<SendMessageUseCase>(),
+      repository: sl<ChatRepository>(),
       mqttManager: sl<MqttManager>(),
       secureStorage: sl<SecureStorageHelper>(),
     ),
+  );
+
+  sl.registerFactory<PassportViewModel>(
+    () => PassportViewModel(sl<PassportRepository>()),
   );
 }

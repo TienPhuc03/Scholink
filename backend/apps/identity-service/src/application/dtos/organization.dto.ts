@@ -16,3 +16,17 @@ export const AssignOrganizerDtoSchema = z.object({
 });
 
 export type AssignOrganizerDto = z.infer<typeof AssignOrganizerDtoSchema>;
+
+export const RevokeOrganizerDtoSchema = z.object({
+  userId: z.string().min(1, 'User ID không được để trống'),
+  reason: z.string().max(200).optional(),
+});
+
+export type RevokeOrganizerDto = z.infer<typeof RevokeOrganizerDtoSchema>;
+
+export const UpdateOrganizationStatusDtoSchema = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED']),
+  reason: z.string().max(200).optional(),
+});
+
+export type UpdateOrganizationStatusDto = z.infer<typeof UpdateOrganizationStatusDtoSchema>;

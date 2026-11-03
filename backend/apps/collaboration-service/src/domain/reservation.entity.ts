@@ -7,6 +7,8 @@ export interface TeamMemberConsent {
   consentId: string;
   snapshotId: string;
   payloadHash: string;
+  profileVersion: number;
+  rosterVersion: number;
   confirmedAt: Date;
 }
 
@@ -85,6 +87,10 @@ export class SubmissionReservation extends Entity<string> {
 
     if (!this._props.members.includes(consent.studentId)) {
       throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Thành viên không thuộc danh sách đăng ký của đội', 403);
+    }
+
+    if (consent.rosterVersion !== this._props.rosterVersion) {
+      throw new DomainException(ErrorCode.VERSION_MISMATCH, 'Roster đã thay đổi, vui lòng xác nhận lại theo đội hình mới', 409);
     }
 
     const existingIndex = this._props.consents.findIndex((c) => c.studentId === consent.studentId);

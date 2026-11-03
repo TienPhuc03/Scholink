@@ -11,6 +11,7 @@ export * from './infrastructure/grpc/grpc-exception.filter';
 export * from './infrastructure/guards/jwt-auth.guard';
 export * from './infrastructure/guards/roles.guard';
 export * from './infrastructure/guards/idempotency.guard';
+export * from './infrastructure/guards/rate-limit.guard';
 export * from './infrastructure/interceptors/correlation-id.interceptor';
 export * from './infrastructure/redis/redis.service';
 export * from './infrastructure/security/crypto.service';

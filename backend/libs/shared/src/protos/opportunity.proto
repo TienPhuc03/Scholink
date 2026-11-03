@@ -159,6 +159,11 @@ message AbortSubmissionIntentRequest {
   string opportunityId = 3;
   string teamId = 4;
   string reason = 5;
+  string reservationId = 6;
+  int64 fencingToken = 7;
+  string team_id = 8;
+  string reservation_id = 9;
+  int64 fencing_token = 10;
 }
 
 message GetSubmissionByIdRequest {
@@ -178,6 +183,8 @@ message SubmissionIntentResponse {
   repeated string memberIds = 10;
   bool aborted = 11;
   string reason = 12;
+  string outcome = 13;
+  string message = 14;
 }
 
 message SubmitApplicationRequest {
@@ -387,4 +394,3 @@ message EvaluateTestResultLogResponse {
   bool canClaimAllAc = 7;
   repeated AcTestSummaryMessage acSummaries = 8;
 }
-

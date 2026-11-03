@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import {
   IOpportunityRepository,
   OPPORTUNITY_REPOSITORY,
+  OpportunityFilter,
 } from '../../domain/ports/opportunity.repository.port';
 import { Opportunity } from '../../domain/opportunity.entity';
 import {
@@ -10,7 +11,7 @@ import {
   QueryOpportunityDto,
   OpportunityDetailResponseDto,
 } from '../dtos/opportunity.dto';
-import { DomainException, PaginationHelper, PaginatedResult } from '@shared';
+import { DomainException, PaginationHelper, PaginatedResult, AuthenticatedUser } from '@shared';
 
 @Injectable()
 export class OpportunityUseCase {
@@ -84,6 +85,20 @@ export class OpportunityUseCase {
       limit,
       (item) => ({ id: item.id as string, createdAt: item.createdAt as string }),
     );
+  }
+
+  async listMyOpportunities(caller: AuthenticatedUser): Promise<OpportunityDetailResponseDto[]> {
+    if (caller.role !== 'ADMIN' && !caller.organizationId) {
+      throw DomainException.forbidden('Tài khoản chưa được gán vào đơn vị tổ chức');
+    }
+
+    const filter: OpportunityFilter =
+      caller.role === 'ADMIN'
+        ? { limit: 100 }
+        : { organizationId: caller.organizationId, limit: 100 };
+
+    const opportunities = await this.opportunityRepo.findMany(filter);
+    return opportunities.map((o) => this.toResponse(o));
   }
 
   async getById(id: string): Promise<OpportunityDetailResponseDto> {

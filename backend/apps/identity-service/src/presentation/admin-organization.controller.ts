@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrganizationUseCase } from '../application/use-cases/organization.use-case';
 import {
@@ -6,6 +15,10 @@ import {
   CreateOrganizationDtoSchema,
   AssignOrganizerDto,
   AssignOrganizerDtoSchema,
+  RevokeOrganizerDto,
+  RevokeOrganizerDtoSchema,
+  UpdateOrganizationStatusDto,
+  UpdateOrganizationStatusDtoSchema,
 } from '../application/dtos/organization.dto';
 import { ZodValidationPipe, JwtAuthGuard, RolesGuard, Roles, AuthenticatedUser } from '@shared';
 
@@ -42,6 +55,18 @@ export class AdminOrganizationController {
     return this.orgUseCase.getOrganizationById(id);
   }
 
+  @Post(':id/status')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Cập nhật trạng thái đơn vị tổ chức (ACTIVE / SUSPENDED) (Admin)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })
+  async updateStatus(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateOrganizationStatusDtoSchema)) dto: UpdateOrganizationStatusDto,
+  ) {
+    return this.orgUseCase.updateOrganizationStatus(id, req.user.userId, dto);
+  }
+
   @Post(':id/assign-organizer')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Cấp quyền Organizer và gán vào đơn vị tổ chức (Admin)' })
@@ -52,5 +77,30 @@ export class AdminOrganizationController {
     @Body(new ZodValidationPipe(AssignOrganizerDtoSchema)) dto: AssignOrganizerDto,
   ) {
     return this.orgUseCase.assignOrganizer(id, req.user.userId, dto);
+  }
+
+  // SCHOL-14: API thu hồi quyền membership chỉ Admin được thực hiện
+  @Post(':id/revoke-organizer')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Thu hồi quyền thành viên của Organizer tại đơn vị tổ chức (Admin)' })
+  @ApiResponse({ status: 200, description: 'Thu hồi quyền thành viên thành công' })
+  async revokeOrganizer(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(RevokeOrganizerDtoSchema)) dto: RevokeOrganizerDto,
+  ) {
+    return this.orgUseCase.revokeOrganizerMembership(id, req.user.userId, dto);
+  }
+
+  @Delete(':id/members/:userId')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Xóa quyền thành viên của Organizer tại đơn vị tổ chức (Admin)' })
+  @ApiResponse({ status: 200, description: 'Xóa quyền thành viên thành công' })
+  async deleteMember(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.orgUseCase.revokeOrganizerMembership(id, req.user.userId, { userId });
   }
 }

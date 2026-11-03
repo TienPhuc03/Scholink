@@ -1,5 +1,5 @@
 name: scholink_mobile
-description: "Scholink Mobile Platform - Flutter MVVM Clean Architecture with Defensive Null-Safety"
+description: "Scholink Mobile Platform - Flutter MVVM + Repository Architecture with Sound Null-Safety"
 publish_to: 'none'
 version: 1.0.0+1
 

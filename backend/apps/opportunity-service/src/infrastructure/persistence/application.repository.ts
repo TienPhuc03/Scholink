@@ -142,6 +142,18 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     return docs.map((d) => this.toDomain(d));
   }
 
+  async findApplicationByTeamId(teamId: string): Promise<Application | null> {
+    const doc = await this.model
+      .findOne({
+        teamId: { $eq: String(teamId) },
+        status: { $in: ['SUBMITTED', 'UNDER_REVIEW', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW', 'ACCEPTED', 'REJECTED'] },
+      })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return this.toDomain(doc);
+  }
+
   async save(application: Application, session?: ClientSession): Promise<void> {
     const subjectType = application.props.submissionType === 'TEAM' ? 'TEAM' : 'STUDENT';
     const subjectId =
@@ -278,6 +290,47 @@ export class MongooseApplicationRepository implements IApplicationRepository {
       ],
       session ? { session } : undefined,
     );
+  }
+
+  async findLatestRevision(applicationId: string): Promise<ApplicationRevisionRecord | null> {
+    const doc = await this.revisionModel
+      .findOne({ applicationId: { $eq: String(applicationId) } })
+      .sort({ revision: -1 })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return Object.freeze({
+      id: doc.id,
+      applicationId: doc.applicationId,
+      revision: doc.revision,
+      previewId: doc.previewId,
+      snapshotId: doc.snapshotId,
+      profileVersion: doc.profileVersion,
+      ruleVersion: doc.ruleVersion,
+      snapshotJson: doc.snapshotJson,
+      manifestJson: doc.manifestJson,
+      payloadHash: doc.payloadHash,
+      consentId: doc.consentId,
+      screening: doc.screening as ScreeningStatus,
+      screeningReasons: Object.freeze(
+        ((doc.screeningReasons ?? []) as unknown as ScreeningReason[]).map((r) =>
+          Object.freeze({ ...r }),
+        ),
+      ),
+      rosterVersion: doc.rosterVersion,
+      memberSnapshots: Object.freeze(
+        ((doc.memberSnapshots ?? []) as unknown as TeamMemberSnapshotRecord[]).map((ms) =>
+          Object.freeze({ ...ms }),
+        ),
+      ),
+      consentRefs: Object.freeze(
+        ((doc.consentRefs ?? []) as unknown as TeamMemberConsentRefRecord[]).map((cr) =>
+          Object.freeze({ ...cr }),
+        ),
+      ),
+      retentionStatus: (doc.retentionStatus as SnapshotRetentionStatus) ?? 'ACTIVE',
+      submittedAt: new Date(doc.submittedAt),
+    });
   }
 
   async appendEvent(
@@ -910,6 +963,61 @@ export class MongooseApplicationRepository implements IApplicationRepository {
       memberIds: Object.freeze([...(doc.memberIds ?? [])]),
       reason: doc.reason,
     });
+  }
+
+  async findEventsByApplication(applicationId: string): Promise<any[]> {
+    const docs = await this.eventModel
+      .find({ applicationId: { $eq: String(applicationId) } })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({
+      id: d.id,
+      applicationId: d.applicationId,
+      actorId: d.actorId,
+      fromStatus: d.fromStatus,
+      toStatus: d.toStatus,
+      revision: d.revision,
+      reason: d.reason,
+      createdAt: d.createdAt,
+    }));
+  }
+
+  async findSubmissionIntent(teamId: string, submissionId: string): Promise<{ status: string } | null> {
+    const doc = await this.intentModel
+      .findOne({
+        teamId: { $eq: String(teamId) },
+        submissionId: { $eq: String(submissionId) },
+      })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return { status: doc.status };
+  }
+
+  async upsertSubmissionIntent(intent: {
+    submissionId: string;
+    opportunityId: string;
+    teamId: string;
+    leaderId: string;
+    status: string;
+    applicationId?: string;
+  }): Promise<void> {
+    await this.intentModel
+      .findOneAndUpdate(
+        { submissionId: { $eq: String(intent.submissionId) } },
+        {
+          $set: {
+            opportunityId: intent.opportunityId,
+            teamId: intent.teamId,
+            leaderId: intent.leaderId,
+            status: intent.status,
+            applicationId: intent.applicationId,
+          },
+        },
+        { upsert: true, new: true },
+      )
+      .exec();
   }
 
   private toDomain(doc: {

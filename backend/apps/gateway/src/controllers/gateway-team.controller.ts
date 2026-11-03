@@ -111,6 +111,23 @@ export class GatewayTeamController {
     });
   }
 
+  @Post(':id/leave')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Rời đội thi' })
+  @ApiResponse({ status: 200, description: 'Rời đội thành công' })
+  async leaveTeam(
+    @Param('id') teamId: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/${teamId}/leave`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+    });
+  }
+
   @Post(':id/transfer-leader')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Chuyển giao quyền đội trưởng cho thành viên khác' })
@@ -130,9 +147,49 @@ export class GatewayTeamController {
     });
   }
 
+  @Post(':id/reopen')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Mở lại đội thi từ hồ sơ đã rút (Reopen from Withdrawal)' })
+  @ApiResponse({ status: 200, description: 'Đã mở lại đội' })
+  async reopenTeam(
+    @Param('id') teamId: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/${teamId}/reopen`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+    });
+  }
+
+  // ==========================================
+  // SCHOL-20: ROSTER FREEZE & SUBMISSIONS
+  // ==========================================
+  @Post(':id/prepare-submission')
+  @Roles('STUDENT')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Bắt đầu quy trình nộp hồ sơ đội (Roster Freeze 10 phút & cấp Lease)' })
+  @ApiResponse({ status: 201, description: 'Khóa đội và tạo Reservation thành công' })
+  async prepareSubmission(
+    @Param('id') teamId: string,
+    @Headers('authorization') auth: string,
+    @Headers('idempotency-key') idem: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/${teamId}/prepare-submission`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+        'Idempotency-Key': idem,
+      },
+    });
+  }
+
   @Post(':id/consents')
   @Roles('STUDENT')
-  @ApiOperation({ summary: 'Thành viên ký Consent đồng thuận nộp hồ sơ đội' })
+  @ApiOperation({ summary: 'Thành viên ký Consent đồng thuận nộp hồ sơ đội qua teamId' })
   @ApiResponse({ status: 200, description: 'Ghi nhận Consent thành công' })
   async submitTeamConsent(
     @Param('id') teamId: string,
@@ -146,6 +203,59 @@ export class GatewayTeamController {
         Authorization: auth,
       },
       body: JSON.stringify(body),
+    });
+  }
+
+  @Post('submissions/:reservationId/consents')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Thành viên ký Consent đồng thuận nộp hồ sơ đội qua reservationId' })
+  @ApiResponse({ status: 200, description: 'Ghi nhận Consent thành công' })
+  async submitTeamConsentByReservation(
+    @Param('reservationId') reservationId: string,
+    @Headers('authorization') auth: string,
+    @Body() body: any,
+  ) {
+    return forwardCollab(`/api/v1/teams/submissions/${reservationId}/consents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Post('submissions/:reservationId/confirm')
+  @Roles('STUDENT', 'ADMIN')
+  @ApiOperation({ summary: 'Xác nhận nộp hồ sơ đội hoàn tất' })
+  @ApiResponse({ status: 200, description: 'Hoàn tất nộp hồ sơ đội' })
+  async confirmSubmission(
+    @Param('reservationId') reservationId: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/submissions/${reservationId}/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+    });
+  }
+
+  @Post('submissions/:reservationId/abort')
+  @Roles('STUDENT', 'ADMIN')
+  @ApiOperation({ summary: 'Hủy phiên nộp hồ sơ đội và giải phóng khóa Roster Freeze' })
+  @ApiResponse({ status: 200, description: 'Đã hủy phiên nộp và mở khóa đội' })
+  async abortSubmission(
+    @Param('reservationId') reservationId: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/submissions/${reservationId}/abort`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
     });
   }
 }

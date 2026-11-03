@@ -5,6 +5,7 @@ import {
   OtpPurpose,
   OutboxDocument,
   OutboxModel,
+  RedisService,
   SnapshotRetentionDecision,
 } from '@shared';
 import {
@@ -36,6 +37,8 @@ export class MongooseUserRepository implements IUserRepository {
     private readonly sessionModel: Model<SessionDocument>,
     @InjectModel(OtpRecordModel.name)
     private readonly otpRecordModel: Model<OtpRecordDocument>,
+    @Optional()
+    private readonly redisService?: RedisService,
     @Optional()
     @InjectModel(DataDeletionTrackingModel.name)
     private readonly deletionTrackingModel?: Model<DataDeletionTrackingDocument>,
@@ -150,6 +153,11 @@ export class MongooseUserRepository implements IUserRepository {
         { $set: { isRevoked: true, revokedReason: String(reason) } },
       )
       .exec();
+
+    // SCHOL-14: Invalidate token instantly in Redis cache if available (7 days TTL)
+    if (this.redisService?.isAvailable) {
+      await this.redisService.set(`revoked_user:${userId}`, String(reason), 7 * 24 * 3600);
+    }
   }
 
   async findOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<OtpRecord | null> {

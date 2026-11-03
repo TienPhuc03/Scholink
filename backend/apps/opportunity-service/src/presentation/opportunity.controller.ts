@@ -77,6 +77,16 @@ export class OpportunityController {
     return this.opportunityUseCase.list(query);
   }
 
+  @Get('organizer/my-opportunities')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Lấy danh sách các cuộc thi / học bổng thuộc đơn vị tổ chức của mình (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Danh sách cơ hội của đơn vị' })
+  async listMyOpportunities(@Req() req: { user: AuthenticatedUser }) {
+    return this.opportunityUseCase.listMyOpportunities(req.user);
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết học bổng / cuộc thi' })

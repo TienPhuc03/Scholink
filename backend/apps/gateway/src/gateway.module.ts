@@ -1,8 +1,9 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
-import { SharedModule } from '@shared';
+import { SharedModule, RateLimitGuard } from '@shared';
 import { HealthController } from './health.controller';
 import { PortalController } from './portal.controller';
 import { GrpcGatewayController } from './grpc-gateway.controller';
@@ -99,7 +100,13 @@ import { GatewayAdminOrgController } from './controllers/gateway-admin-org.contr
     GatewayNotificationController,
     GatewayAdminOrgController,
   ],
-  providers: [ReverseProxyMiddleware],
+  providers: [
+    ReverseProxyMiddleware,
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+  ],
 })
 export class GatewayModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

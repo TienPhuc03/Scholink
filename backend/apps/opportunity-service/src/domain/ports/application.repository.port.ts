@@ -133,14 +133,17 @@ export interface IApplicationRepository {
   ): Promise<Application | null>;
   findManyByStudent(studentId: string): Promise<Application[]>;
   findManyByOpportunity(opportunityId: string): Promise<Application[]>;
+  findApplicationByTeamId?(teamId: string): Promise<Application | null>;
   save(application: Application): Promise<void>;
   update(application: Application): Promise<void>;
   savePreview(preview: SubmissionPreviewRecord): Promise<void>;
   findPreviewById(previewId: string): Promise<SubmissionPreviewRecord | null>;
   saveRevision(revision: ApplicationRevisionRecord): Promise<void>;
+  findLatestRevision?(applicationId: string): Promise<ApplicationRevisionRecord | null>;
   appendEvent(event: ApplicationEventRecord): Promise<void>;
   findRevisionsByApplicationId?(applicationId: string): Promise<ApplicationRevisionRecord[]>;
   findEventsByApplicationId?(applicationId: string): Promise<ApplicationEventRecord[]>;
+  findEventsByApplication?(applicationId: string): Promise<any[]>;
   findActiveMembersByOpportunityAndStudents?(
     opportunityId: string,
     studentIds: readonly string[],
@@ -175,4 +178,15 @@ export interface IApplicationRepository {
     decision: 'RETAIN' | 'PURGE';
     trackingId?: string;
   }): Promise<SnapshotRetentionSummaryRecord>;
+
+  // Submission Intent tracking (SCHOL-20 & WF07 race resolution)
+  findSubmissionIntent?(teamId: string, submissionId: string): Promise<{ status: string } | null>;
+  upsertSubmissionIntent?(intent: {
+    submissionId: string;
+    opportunityId: string;
+    teamId: string;
+    leaderId: string;
+    status: string;
+    applicationId?: string;
+  }): Promise<void>;
 }

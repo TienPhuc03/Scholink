@@ -94,12 +94,24 @@ export class OutboxModel {
   @Prop({ required: true, default: 'PENDING', index: true })
   status: string;
 
+  @Prop({ default: 0 })
+  retryCount: number;
+
+  @Prop()
+  nextRetryAt?: Date;
+
+  @Prop()
+  error?: string;
+
+  @Prop()
+  sentAt?: Date;
+
   @Prop({ default: Date.now })
   createdAt: Date;
 }
 
 export const OutboxSchema = SchemaFactory.createForClass(OutboxModel);
-OutboxSchema.index({ status: 1, createdAt: 1 });
+OutboxSchema.index({ status: 1, nextRetryAt: 1, createdAt: 1 });
 
 @Schema({ collection: 'read_receipts', timestamps: true })
 export class ReadReceiptModel {

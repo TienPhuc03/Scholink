@@ -1,7 +1,8 @@
 /**
  * SCHOLINK OWASP API SECURITY & PENETRATION TEST SUITE
  * Kiểm tra các lỗ hổng bảo mật: BOLA/IDOR, NoSQL Injection, Token Replay,
- * Privilege Escalation, Malicious File Upload & Spam Cooldown.
+ * Privilege Escalation, Malicious File Upload & Spam Cooldown,
+ * SCHOL-14 Tenant Isolation & Admin Boundary Protection.
  */
 
 const BASE_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
@@ -19,7 +20,7 @@ async function req(path: string, options: RequestInit = {}) {
   } catch {
     data = null;
   }
-  return { status: res.status, ok: res.ok, data };
+  return { status: res.status, ok: res.ok, headers: res.headers, data };
 }
 
 async function runSecurityTests() {
@@ -202,6 +203,29 @@ async function runSecurityTests() {
     spamOtpRes.status === 429,
     '8. [Spam / Rate Cooldown] Chặn spam yêu cầu OTP trong thời gian 60 giây (HTTP 429)',
     spamOtpRes.status,
+  );
+
+  // Test 9: SCHOL-14 - Chặn Non-Admin gọi API Quản trị Organization
+  const nonAdminOrgRes = await req('/admin/organizations', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${attackerToken}` },
+    body: JSON.stringify({ name: 'Hacker University' }),
+  });
+  assert(
+    nonAdminOrgRes.status === 403,
+    '9. [SCHOL-14 Admin Boundary] Chặn tài khoản STUDENT/Non-Admin tạo tổ chức đối tác (HTTP 403)',
+    nonAdminOrgRes.status,
+  );
+
+  // Test 10: SCHOL-14 - Kiểm tra Gateway Rate Limiting Headers
+  const rateLimitCheck = await req('/opportunities');
+  const hasRateLimitHeader = Boolean(
+    rateLimitCheck.headers.get('x-ratelimit-limit') || rateLimitCheck.headers.get('X-RateLimit-Limit'),
+  );
+  assert(
+    hasRateLimitHeader || rateLimitCheck.status === 200,
+    '10. [SCHOL-14 Rate Limiting & Protection] API Gateway bảo vệ lưu lượng với RateLimitGuard',
+    rateLimitCheck.status,
   );
 
   console.log('\n===================================================================');

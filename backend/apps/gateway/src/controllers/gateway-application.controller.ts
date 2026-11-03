@@ -2,11 +2,14 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Req,
+  Headers,
   HttpCode,
   HttpStatus,
+  HttpException,
   Inject,
   OnModuleInit,
   UseGuards,
@@ -36,6 +39,27 @@ import {
   EvaluateTestResultLogDtoSchema,
 } from '@shared';
 import { GATEWAY_OPPORTUNITY_GRPC, OpportunityGrpcClient } from '../grpc-clients.interface';
+
+const OPPORTUNITY_URL = () => process.env.OPPORTUNITY_SERVICE_URL || 'http://localhost:3002';
+
+async function forwardOpportunity(path: string, options: RequestInit = {}) {
+  const url = `${OPPORTUNITY_URL()}${path}`;
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const errorMsg = data?.message || data?.error || 'Opportunity Service Error';
+      throw new HttpException(data || { message: errorMsg }, res.status);
+    }
+    return data;
+  } catch (err: any) {
+    if (err instanceof HttpException) throw err;
+    throw new HttpException(
+      { message: `Không thể kết nối Opportunity Service: ${err.message}` },
+      HttpStatus.BAD_GATEWAY,
+    );
+  }
+}
 
 @ApiTags('Application (Opportunity Service)')
 @ApiBearerAuth()
@@ -134,6 +158,80 @@ export class GatewayApplicationController implements OnModuleInit {
         reason: dto.reason,
       }),
     );
+  }
+
+  @Post('retention-decision')
+  @Roles('STUDENT', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Thực thi quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi xóa tài khoản (D06 / Mục 29)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả giữ/xóa Snapshot ứng tuyển' })
+  async applySnapshotRetentionDecision(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(ApplySnapshotRetentionDtoSchema)) dto: ApplySnapshotRetentionDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.applySnapshotRetentionDecision({
+        ...dto,
+        studentId: req.user.role === 'ADMIN' ? dto.studentId : req.user.userId,
+      }),
+    );
+  }
+
+  @Post('test-results/evaluate')
+  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F40: Ghi nhận nhật ký kết quả test & chặn claim đủ AC khi còn NOT_RUN (Mục 30 / NFR11)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả đánh giá nhật ký kiểm thử AC' })
+  async evaluateTestResultLog(
+    @Body(new ZodValidationPipe(EvaluateTestResultLogDtoSchema)) dto: EvaluateTestResultLogDto,
+  ) {
+    return firstValueFrom(this.opportunityService.evaluateTestResultLog(dto));
+  }
+
+  // =========================================================================
+  // SCHOL-14: ORGANIZER KANBAN, DETAIL, ATTACHMENTS & STATUS MANAGEMENT
+  // =========================================================================
+  @Get('organizer/kanban/:opportunityId')
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Organizer xem danh sách hồ sơ theo cột Kanban (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Dữ liệu Kanban' })
+  async getOpportunityKanban(
+    @Headers('authorization') auth: string,
+    @Param('opportunityId') opportunityId: string,
+  ) {
+    return forwardOpportunity(`/api/v1/applications/organizer/kanban/${opportunityId}`, {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Get('organizer/:id')
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Organizer xem chi tiết hồ sơ ứng tuyển (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Chi tiết hồ sơ' })
+  async getApplicationDetail(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+  ) {
+    return forwardOpportunity(`/api/v1/applications/organizer/${id}`, {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Get('organizer/:id/attachments')
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Organizer xem danh sách tệp đính kèm của hồ sơ (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Danh sách tệp đính kèm' })
+  async getApplicationAttachments(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+  ) {
+    return forwardOpportunity(`/api/v1/applications/organizer/${id}/attachments`, {
+      headers: { Authorization: auth },
+    });
   }
 
   @Post()
@@ -241,35 +339,22 @@ export class GatewayApplicationController implements OnModuleInit {
     );
   }
 
-  @Post('retention-decision')
-  @Roles('STUDENT', 'ADMIN')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'F40: Thực thi quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi xóa tài khoản (D06 / Mục 29)',
-  })
-  @ApiResponse({ status: 200, description: 'Kết quả giữ/xóa Snapshot ứng tuyển' })
-  async applySnapshotRetentionDecision(
-    @Req() req: { user: AuthenticatedUser },
-    @Body(new ZodValidationPipe(ApplySnapshotRetentionDtoSchema)) dto: ApplySnapshotRetentionDto,
+  @Patch(':id/status')
+  @Roles('ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Organizer chuyển trạng thái hồ sơ kèm expectedVersion & lý do khi từ chối (SCHOL-14)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })
+  async updateStatus(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() body: any,
   ) {
-    return firstValueFrom(
-      this.opportunityService.applySnapshotRetentionDecision({
-        ...dto,
-        studentId: req.user.role === 'ADMIN' ? dto.studentId : req.user.userId,
-      }),
-    );
-  }
-
-  @Post('test-results/evaluate')
-  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'F40: Ghi nhận nhật ký kết quả test & chặn claim đủ AC khi còn NOT_RUN (Mục 30 / NFR11)',
-  })
-  @ApiResponse({ status: 200, description: 'Kết quả đánh giá nhật ký kiểm thử AC' })
-  async evaluateTestResultLog(
-    @Body(new ZodValidationPipe(EvaluateTestResultLogDtoSchema)) dto: EvaluateTestResultLogDto,
-  ) {
-    return firstValueFrom(this.opportunityService.evaluateTestResultLog(dto));
+    return forwardOpportunity(`/api/v1/applications/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
   }
 }

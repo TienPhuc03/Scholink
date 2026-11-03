@@ -1,4 +1,6 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -8,6 +10,10 @@ import {
   USER_REPOSITORY,
 } from '../../domain/ports/user.repository.port';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
+import {
+  OrganizationMembershipModel,
+  OrganizationMembershipDocument,
+} from '../../infrastructure/persistence/organization.schema';
 import { User } from '../../domain/user.entity';
 import { Passport } from '../../domain/passport.entity';
 import {
@@ -40,6 +46,9 @@ export class AuthUseCase {
     @Inject(PASSPORT_REPOSITORY) private readonly passportRepo: IPassportRepository,
     private readonly jwtService: JwtService,
     private readonly cryptoService: CryptoService,
+    @Optional()
+    @InjectModel(OrganizationMembershipModel.name)
+    private readonly membershipModel?: Model<OrganizationMembershipDocument>,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -100,6 +109,15 @@ export class AuthUseCase {
     const familyId = crypto.randomUUID();
     const tokens = await this.issueTokenPair(user, familyId);
 
+    // Look up active organization membership if user is an ORGANIZER (SCHOL-14)
+    let organizationId: string | undefined;
+    if (this.membershipModel && user.role === 'ORGANIZER') {
+      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
+      if (activeMem) {
+        organizationId = activeMem.organizationId;
+      }
+    }
+
     return Object.freeze({
       ...tokens,
       user: {
@@ -107,6 +125,7 @@ export class AuthUseCase {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        ...(organizationId ? { organizationId } : {}),
       },
     });
   }
@@ -146,15 +165,32 @@ export class AuthUseCase {
       );
     }
 
+    // Đánh dấu session cũ đã dùng và xoay vòng Refresh Token mới
     await this.userRepo.markSessionUsed(session.id);
-    return this.issueTokenPair(user, session.familyId);
+    const newTokens = await this.issueTokenPair(user, session.familyId);
+
+    return Object.freeze(newTokens);
   }
 
-  async logout(userId: string, sessionId?: string) {
+  async logout(userIdOrRefreshToken: string, sessionId?: string) {
     if (sessionId) {
       await this.userRepo.markSessionUsed(sessionId);
+      return Object.freeze({ revoked: true, userId: userIdOrRefreshToken });
     }
-    return Object.freeze({ revoked: true, userId });
+
+    if (userIdOrRefreshToken) {
+      try {
+        const tokenHash = this.cryptoService.sha256(userIdOrRefreshToken);
+        const session = await this.userRepo.findSessionByTokenHash(tokenHash);
+        if (session) {
+          await this.userRepo.revokeSessionFamily(session.familyId, 'USER_LOGOUT');
+        }
+      } catch {
+        // Idempotent logout
+      }
+    }
+
+    return Object.freeze({ revoked: true, userId: userIdOrRefreshToken });
   }
 
   /**
@@ -235,6 +271,7 @@ export class AuthUseCase {
     const user = await this.userRepo.findByEmail(normalizedEmail);
 
     if (!user || user.status === 'DELETED') {
+      this.logger.warn(`[ForgotPassword] Yêu cầu từ email không tồn tại hoặc đã xóa: ${normalizedEmail}`);
       return Object.freeze({
         sent: true,
         email: normalizedEmail,
@@ -518,7 +555,17 @@ export class AuthUseCase {
 
   private async issueTokenPair(user: User, familyId: string) {
     const sessionId = crypto.randomUUID();
-    const payload = {
+
+    // Look up active organization membership if user is an ORGANIZER (SCHOL-14)
+    let organizationId: string | undefined;
+    if (this.membershipModel && user.role === 'ORGANIZER') {
+      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
+      if (activeMem) {
+        organizationId = activeMem.organizationId;
+      }
+    }
+
+    const payload: Record<string, unknown> = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -527,6 +574,9 @@ export class AuthUseCase {
       sessionVersion: user.sessionVersion,
       jti: crypto.randomUUID(),
     };
+    if (organizationId) {
+      payload.organizationId = organizationId;
+    }
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' } as any);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' } as any);

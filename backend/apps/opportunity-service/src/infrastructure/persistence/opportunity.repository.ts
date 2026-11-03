@@ -36,6 +36,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     if (filter.type) query.type = { $eq: String(filter.type) };
     if (filter.status) query.status = { $eq: String(filter.status) };
     if (filter.applyMode) query.applyMode = { $eq: String(filter.applyMode) };
+    if (filter.organizationId) query.organizationId = { $eq: String(filter.organizationId) };
     if (filter.keyword && filter.keyword.trim()) {
       query.title = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
     }
