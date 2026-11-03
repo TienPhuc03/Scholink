@@ -83,6 +83,21 @@ export class ApplicationModel {
   @Prop({ index: true })
   teamId?: string;
 
+  @Prop()
+  submissionId?: string;
+
+  @Prop()
+  rosterVersion?: number;
+
+  @Prop()
+  reservationId?: string;
+
+  @Prop()
+  fencingToken?: number;
+
+  @Prop({ type: [String], default: [] })
+  memberIds: string[];
+
   @Prop({ required: true, enum: ['INDIVIDUAL', 'TEAM'], default: 'INDIVIDUAL' })
   submissionType: string;
 
@@ -128,7 +143,7 @@ ApplicationSchema.index({ opportunityId: 1, subjectType: 1, subjectId: 1 }, { un
 
 /**
  * Mục 26 & 27 SRS: Collection application_revisions
- * Lưu vĩnh viễn bản sao bất biến của snapshot và consent refs theo từng lần nộp (KHÔNG đặt TTL)
+ * Lưu vĩnh viễn bản sao bất biến của snapshot, memberSnapshots và consentRefs theo từng lần nộp (KHÔNG đặt TTL)
  */
 @Schema({ collection: 'application_revisions', timestamps: true })
 export class ApplicationRevisionModel {
@@ -170,6 +185,15 @@ export class ApplicationRevisionModel {
 
   @Prop({ type: [Object], default: [] })
   screeningReasons: Record<string, unknown>[];
+
+  @Prop()
+  rosterVersion?: number;
+
+  @Prop({ type: [Object], default: [] })
+  memberSnapshots: Record<string, unknown>[];
+
+  @Prop({ type: [Object], default: [] })
+  consentRefs: Record<string, unknown>[];
 
   @Prop({ required: true })
   submittedAt: Date;
@@ -237,7 +261,7 @@ ApplicationMemberSchema.index(
 );
 
 /**
- * Mục 7 WF07 & 27 SRS: Collection submission_intents
+ * Mục 7 WF07 & 27, 28 SRS: Collection submission_intents
  * Tranh quyền nguyên tử giữa Commit (COMMITTED) và Timeout Worker (ABORTED)
  */
 @Schema({ collection: 'submission_intents', timestamps: true })
@@ -259,6 +283,21 @@ export class SubmissionIntentModel {
 
   @Prop()
   applicationId?: string;
+
+  @Prop()
+  reservationId?: string;
+
+  @Prop()
+  fencingToken?: number;
+
+  @Prop()
+  rosterVersion?: number;
+
+  @Prop({ type: [String], default: [] })
+  memberIds: string[];
+
+  @Prop()
+  reason?: string;
 }
 
 export const SubmissionIntentSchema = SchemaFactory.createForClass(SubmissionIntentModel);

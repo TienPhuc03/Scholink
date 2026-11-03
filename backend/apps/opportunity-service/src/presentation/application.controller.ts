@@ -4,6 +4,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ApplicationUseCase } from '../application/use-cases/application.use-case';
 import {
   CreatePreviewDto,
+  CreateSubmissionIntentDto,
   SubmitApplicationDto,
   UpdateApplicationStatusDto,
   UpdateApplicationStatusDtoSchema,
@@ -23,7 +24,7 @@ import {
 export class ApplicationController {
   constructor(private readonly applicationUseCase: ApplicationUseCase) {}
 
-  // ================= gRPC Handlers (API Gateway Dispatch — F04, F13, F22) =================
+  // ================= gRPC Handlers (API Gateway / Collaboration Dispatch — F04, F13, F22, F31) =================
   @GrpcMethod('OpportunityGrpcService', 'CreateApplicationPreview')
   async createPreview(data: CreatePreviewDto & { studentId: string }) {
     const { studentId, ...dto } = data;
@@ -33,6 +34,28 @@ export class ApplicationController {
   @GrpcMethod('OpportunityGrpcService', 'GetApplicationPreview')
   async getPreview(data: { studentId: string; previewId: string }) {
     return this.applicationUseCase.getPreview(data.studentId, data.previewId);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'CreateSubmissionIntent')
+  async createSubmissionIntent(data: CreateSubmissionIntentDto & { leaderId: string }) {
+    const { leaderId, ...dto } = data;
+    return this.applicationUseCase.createSubmissionIntent(leaderId, dto);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'AbortSubmissionIntent')
+  async abortSubmissionIntent(data: {
+    submissionId: string;
+    actorId?: string;
+    opportunityId?: string;
+    teamId?: string;
+    reason?: string;
+  }) {
+    return this.applicationUseCase.abortSubmissionIntent(data);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'GetSubmissionById')
+  async getSubmissionById(data: { submissionId: string }) {
+    return this.applicationUseCase.getSubmissionById(data.submissionId);
   }
 
   @GrpcMethod('OpportunityGrpcService', 'SubmitApplication')

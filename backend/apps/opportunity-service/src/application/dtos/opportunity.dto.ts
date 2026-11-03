@@ -10,6 +10,12 @@ export {
   QueryOpportunityDto,
   CreatePreviewDtoSchema,
   CreatePreviewDto,
+  TeamMemberConsentDtoSchema,
+  TeamMemberConsentDto,
+  CreateSubmissionIntentDtoSchema,
+  CreateSubmissionIntentDto,
+  AbortSubmissionIntentDtoSchema,
+  AbortSubmissionIntentDto,
   SubmitApplicationDtoSchema,
   SubmitApplicationDto,
 } from '@shared';

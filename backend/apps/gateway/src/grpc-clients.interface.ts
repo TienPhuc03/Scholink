@@ -14,6 +14,7 @@ import {
   CreateOpportunityDto,
   QueryOpportunityDto,
   CreatePreviewDto,
+  CreateSubmissionIntentDto,
   SubmitApplicationDto,
 } from '@shared';
 
@@ -65,6 +66,17 @@ export interface OpportunityGrpcClient {
     studentId: string;
     previewId: string;
   }): Observable<Record<string, unknown>>;
+  createSubmissionIntent(
+    data: CreateSubmissionIntentDto & { leaderId: string },
+  ): Observable<Record<string, unknown>>;
+  abortSubmissionIntent(data: {
+    submissionId: string;
+    actorId?: string;
+    opportunityId?: string;
+    teamId?: string;
+    reason?: string;
+  }): Observable<Record<string, unknown>>;
+  getSubmissionById(data: { submissionId: string }): Observable<Record<string, unknown>>;
   submitApplication(
     data: SubmitApplicationDto & { studentId: string },
   ): Observable<Record<string, unknown>>;

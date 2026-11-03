@@ -8,9 +8,12 @@ service OpportunityGrpcService {
   rpc GetOpportunityById (GetOpportunityByIdRequest) returns (OpportunityMessage);
   rpc CreateOpportunity (CreateOpportunityRequest) returns (OpportunityMessage);
 
-  // Application & Immutable Preview RPCs (API Gateway -> Opportunity Service)
+  // Application & Immutable Preview RPCs (API Gateway / Collaboration -> Opportunity Service)
   rpc CreateApplicationPreview (CreatePreviewRequest) returns (PreviewResponse);
   rpc GetApplicationPreview (GetPreviewRequest) returns (PreviewResponse);
+  rpc CreateSubmissionIntent (CreateSubmissionIntentRequest) returns (SubmissionIntentResponse);
+  rpc AbortSubmissionIntent (AbortSubmissionIntentRequest) returns (SubmissionIntentResponse);
+  rpc GetSubmissionById (GetSubmissionByIdRequest) returns (SubmissionIntentResponse);
   rpc SubmitApplication (SubmitApplicationRequest) returns (SubmitApplicationResponse);
   rpc GetMyApplications (GetMyApplicationsRequest) returns (GetMyApplicationsResponse);
   rpc GetApplicationById (GetApplicationByIdRequest) returns (ApplicationDetailResponse);
@@ -115,6 +118,66 @@ message PreviewResponse {
   repeated ScreeningReasonMessage screeningReasons = 13;
 }
 
+message TeamMemberConsentMessage {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  int32 profileVersion = 4;
+  string payloadHash = 5;
+  string consentId = 6;
+}
+
+message TeamMemberSnapshotMessage {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  int32 profileVersion = 4;
+  string snapshotJson = 5;
+  string manifestJson = 6;
+  string payloadHash = 7;
+  string consentId = 8;
+  string screening = 9;
+  repeated ScreeningReasonMessage screeningReasons = 10;
+}
+
+message CreateSubmissionIntentRequest {
+  string leaderId = 1;
+  string opportunityId = 2;
+  string teamId = 3;
+  string submissionId = 4;
+  string reservationId = 5;
+  int64 fencingToken = 6;
+  int32 rosterVersion = 7;
+  repeated string memberIds = 8;
+}
+
+message AbortSubmissionIntentRequest {
+  string submissionId = 1;
+  string actorId = 2;
+  string opportunityId = 3;
+  string teamId = 4;
+  string reason = 5;
+}
+
+message GetSubmissionByIdRequest {
+  string submissionId = 1;
+}
+
+message SubmissionIntentResponse {
+  string submissionId = 1;
+  string opportunityId = 2;
+  string teamId = 3;
+  string leaderId = 4;
+  string status = 5;
+  string applicationId = 6;
+  string reservationId = 7;
+  int64 fencingToken = 8;
+  int32 rosterVersion = 9;
+  repeated string memberIds = 10;
+  bool aborted = 11;
+  string reason = 12;
+}
+
 message SubmitApplicationRequest {
   string studentId = 1;
   string opportunityId = 2;
@@ -127,6 +190,10 @@ message SubmitApplicationRequest {
   int32 profileVersion = 9;
   string payloadHash = 10;
   string consentId = 11;
+  int32 rosterVersion = 12;
+  string reservationId = 13;
+  int64 fencingToken = 14;
+  repeated TeamMemberConsentMessage memberConsents = 15;
 }
 
 message SubmitApplicationResponse {
@@ -142,6 +209,11 @@ message SubmitApplicationResponse {
   string payloadHash = 10;
   string consentId = 11;
   repeated ScreeningReasonMessage screeningReasons = 12;
+  string submissionType = 13;
+  string teamId = 14;
+  string submissionId = 15;
+  int32 rosterVersion = 16;
+  repeated TeamMemberConsentMessage consentRefs = 17;
 }
 
 message GetMyApplicationsRequest {
@@ -165,6 +237,8 @@ message ApplicationSummaryMessage {
   int32 revision = 14;
   int32 version = 15;
   repeated ScreeningReasonMessage screeningReasons = 16;
+  int32 rosterVersion = 17;
+  repeated string memberIds = 18;
 }
 
 message GetMyApplicationsResponse {
@@ -191,6 +265,9 @@ message ApplicationRevisionMessage {
   string screening = 12;
   string submittedAt = 13;
   repeated ScreeningReasonMessage screeningReasons = 14;
+  int32 rosterVersion = 15;
+  repeated TeamMemberSnapshotMessage memberSnapshots = 16;
+  repeated TeamMemberConsentMessage consentRefs = 17;
 }
 
 message ApplicationEventMessage {
@@ -223,6 +300,8 @@ message ApplicationDetailResponse {
   repeated ScreeningReasonMessage screeningReasons = 17;
   repeated ApplicationRevisionMessage revisions = 18;
   repeated ApplicationEventMessage events = 19;
+  int32 rosterVersion = 20;
+  repeated string memberIds = 21;
 }
 
 message WithdrawApplicationRequest {

@@ -143,17 +143,131 @@ export const CreatePreviewDtoSchema = z.object({
 
 export type CreatePreviewDto = z.infer<typeof CreatePreviewDtoSchema>;
 
-export const SubmitApplicationDtoSchema = z.object({
-  opportunityId: z.string().trim().min(1),
-  submissionId: z.string().trim().optional(),
-  submissionType: z.enum(['INDIVIDUAL', 'TEAM']).default('INDIVIDUAL'),
-  teamId: z.string().trim().optional(),
-  expectedRuleVersion: z.number().int().min(1).default(1),
-  previewId: z.string().trim().min(1),
-  snapshotId: z.string().trim().min(1),
+export const TeamMemberConsentDtoSchema = z.object({
+  studentId: z.string().trim().min(1, 'studentId không được để trống'),
+  previewId: z.string().trim().min(1, 'previewId không được để trống'),
+  snapshotId: z.string().trim().min(1, 'snapshotId không được để trống'),
   profileVersion: z.number().int().min(1),
   payloadHash: z.string().trim().length(64, 'payloadHash phải là chuỗi SHA-256 64 ký tự hex'),
-  consentId: z.string().trim().min(1),
+  consentId: z.string().trim().min(1, 'consentId không được để trống'),
 });
+
+export type TeamMemberConsentDto = z.infer<typeof TeamMemberConsentDtoSchema>;
+
+export const CreateSubmissionIntentDtoSchema = z.object({
+  opportunityId: z.string().trim().min(1, 'opportunityId không được để trống'),
+  teamId: z.string().trim().min(1, 'teamId không được để trống'),
+  submissionId: z.string().trim().min(1, 'submissionId không được để trống'),
+  reservationId: z.string().trim().min(1).optional(),
+  fencingToken: z.number().int().nonnegative().optional(),
+  rosterVersion: z.number().int().min(1).optional(),
+  memberIds: z.array(z.string().trim().min(1)).min(1).max(20).optional(),
+});
+
+export type CreateSubmissionIntentDto = z.infer<typeof CreateSubmissionIntentDtoSchema>;
+
+export const AbortSubmissionIntentDtoSchema = z.object({
+  opportunityId: z.string().trim().min(1).optional(),
+  teamId: z.string().trim().min(1).optional(),
+  reason: z
+    .string()
+    .transform(sanitizePlainText)
+    .pipe(z.string().max(500))
+    .optional(),
+});
+
+export type AbortSubmissionIntentDto = z.infer<typeof AbortSubmissionIntentDtoSchema>;
+
+export const SubmitApplicationDtoSchema = z
+  .object({
+    opportunityId: z.string().trim().min(1),
+    submissionId: z.string().trim().optional(),
+    submissionType: z.enum(['INDIVIDUAL', 'TEAM']).default('INDIVIDUAL'),
+    teamId: z.string().trim().optional(),
+    rosterVersion: z.number().int().min(1).optional(),
+    reservationId: z.string().trim().optional(),
+    fencingToken: z.number().int().nonnegative().optional(),
+    memberConsents: z.array(TeamMemberConsentDtoSchema).min(1).max(20).optional(),
+    expectedRuleVersion: z.number().int().min(1).default(1),
+    previewId: z.string().trim().min(1).optional(),
+    snapshotId: z.string().trim().min(1).optional(),
+    profileVersion: z.number().int().min(1).optional(),
+    payloadHash: z
+      .string()
+      .trim()
+      .length(64, 'payloadHash phải là chuỗi SHA-256 64 ký tự hex')
+      .optional(),
+    consentId: z.string().trim().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.submissionType === 'TEAM') {
+      if (!data.teamId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teamId'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có teamId',
+        });
+      }
+      if (!data.submissionId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['submissionId'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có submissionId',
+        });
+      }
+      if (!data.memberConsents || data.memberConsents.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['memberConsents'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có danh sách memberConsents của từng thành viên',
+        });
+      } else {
+        const uniqueStudents = new Set(data.memberConsents.map((m) => m.studentId));
+        if (uniqueStudents.size !== data.memberConsents.length) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['memberConsents'],
+            message: 'Danh sách thành viên trong memberConsents không được trùng studentId',
+          });
+        }
+      }
+    } else {
+      if (!data.previewId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['previewId'],
+          message: 'previewId không được để trống',
+        });
+      }
+      if (!data.snapshotId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['snapshotId'],
+          message: 'snapshotId không được để trống',
+        });
+      }
+      if (data.profileVersion === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['profileVersion'],
+          message: 'profileVersion không được để trống',
+        });
+      }
+      if (!data.payloadHash) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['payloadHash'],
+          message: 'payloadHash không được để trống',
+        });
+      }
+      if (!data.consentId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['consentId'],
+          message: 'consentId không được để trống',
+        });
+      }
+    }
+  });
 
 export type SubmitApplicationDto = z.infer<typeof SubmitApplicationDtoSchema>;

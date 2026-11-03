@@ -24,6 +24,10 @@ import {
   AuthenticatedUser,
   CreatePreviewDto,
   CreatePreviewDtoSchema,
+  CreateSubmissionIntentDto,
+  CreateSubmissionIntentDtoSchema,
+  AbortSubmissionIntentDto,
+  AbortSubmissionIntentDtoSchema,
   SubmitApplicationDto,
   SubmitApplicationDtoSchema,
 } from '@shared';
@@ -87,6 +91,47 @@ export class GatewayApplicationController implements OnModuleInit {
     );
   }
 
+  @Post('intents')
+  @Roles('STUDENT')
+  @ApiOperation({
+    summary: 'F31: Tạo Submission Intent (PENDING) cho phiên nộp hồ sơ đội (WF07 / FR-APP-05)',
+  })
+  @ApiResponse({ status: 201, description: 'Tạo Submission Intent thành công' })
+  async createSubmissionIntent(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(CreateSubmissionIntentDtoSchema)) dto: CreateSubmissionIntentDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.createSubmissionIntent({
+        ...dto,
+        leaderId: req.user.userId,
+      }),
+    );
+  }
+
+  @Post('intents/:submissionId/abort')
+  @Roles('STUDENT', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'F31: Hủy nguyên tử Submission Intent (PENDING -> ABORTED, không ghi đè nếu đã COMMITTED)',
+  })
+  @ApiResponse({ status: 200, description: 'Kết quả xử lý AbortSubmissionIntent' })
+  async abortSubmissionIntent(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('submissionId') submissionId: string,
+    @Body(new ZodValidationPipe(AbortSubmissionIntentDtoSchema)) dto: AbortSubmissionIntentDto,
+  ) {
+    return firstValueFrom(
+      this.opportunityService.abortSubmissionIntent({
+        submissionId,
+        actorId: req.user.userId,
+        opportunityId: dto.opportunityId,
+        teamId: dto.teamId,
+        reason: dto.reason,
+      }),
+    );
+  }
+
   @Post()
   @Roles('STUDENT')
   @Idempotent()
@@ -95,7 +140,9 @@ export class GatewayApplicationController implements OnModuleInit {
     required: true,
     description: 'UUID chống gửi trùng lệnh nộp hồ sơ (TTL 24h)',
   })
-  @ApiOperation({ summary: 'Nộp hồ sơ ứng tuyển từ đúng Snapshot trong Preview & Consent hợp lệ' })
+  @ApiOperation({
+    summary: 'Nộp hồ sơ ứng tuyển (Cá nhân hoặc Đội) từ đúng Snapshot trong Preview & Consent hợp lệ',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -103,6 +150,24 @@ export class GatewayApplicationController implements OnModuleInit {
         opportunityId: { type: 'string', example: 'opp_vinai_scholarship_2026' },
         submissionId: { type: 'string', example: 'sub_test_001' },
         submissionType: { type: 'string', enum: ['INDIVIDUAL', 'TEAM'], example: 'INDIVIDUAL' },
+        teamId: { type: 'string', example: 'team_hackathon_01' },
+        rosterVersion: { type: 'number', example: 1 },
+        reservationId: { type: 'string', example: 'res_001' },
+        fencingToken: { type: 'number', example: 1 },
+        memberConsents: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              studentId: { type: 'string' },
+              previewId: { type: 'string' },
+              snapshotId: { type: 'string' },
+              profileVersion: { type: 'number' },
+              payloadHash: { type: 'string' },
+              consentId: { type: 'string' },
+            },
+          },
+        },
         previewId: { type: 'string', example: 'prv_replace_with_actual_preview_id' },
         snapshotId: { type: 'string', example: 'snap_replace_with_actual_snapshot_id' },
         profileVersion: { type: 'number', example: 2 },
@@ -110,17 +175,7 @@ export class GatewayApplicationController implements OnModuleInit {
         payloadHash: { type: 'string', example: 'hash_replace_with_actual_payload_hash' },
         consentId: { type: 'string', example: 'consent_replace_with_actual_consent_id' },
       },
-      required: [
-        'opportunityId',
-        'submissionId',
-        'submissionType',
-        'previewId',
-        'snapshotId',
-        'profileVersion',
-        'expectedRuleVersion',
-        'payloadHash',
-        'consentId',
-      ],
+      required: ['opportunityId', 'submissionType', 'expectedRuleVersion'],
     },
   })
   @ApiResponse({ status: 201, description: 'Nộp hồ sơ thành công' })

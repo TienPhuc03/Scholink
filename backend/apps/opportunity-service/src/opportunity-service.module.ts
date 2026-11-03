@@ -45,6 +45,7 @@ import { OpportunityUseCase } from './application/use-cases/opportunity.use-case
 import {
   ApplicationUseCase,
   IDENTITY_GRPC_CLIENT,
+  COLLABORATION_GRPC_CLIENT,
 } from './application/use-cases/application.use-case';
 import { OpportunityController } from './presentation/opportunity.controller';
 import { ApplicationController } from './presentation/application.controller';
@@ -68,6 +69,19 @@ import { ApplicationController } from './presentation/application.controller';
             package: 'scholink.identity',
             protoPath: join(process.cwd(), 'libs/shared/src/protos/identity.proto'),
             url: config.get<string>('IDENTITY_GRPC_URL', 'localhost:50051'),
+          },
+        }),
+      },
+      {
+        name: COLLABORATION_GRPC_CLIENT,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'collaboration',
+            protoPath: join(process.cwd(), 'proto/collaboration.proto'),
+            url: config.get<string>('COLLABORATION_GRPC_URL', 'localhost:50053'),
           },
         }),
       },

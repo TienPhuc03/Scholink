@@ -25,6 +25,9 @@ import { Application } from '../../opportunity-service/src/domain/application.en
 import {
   IApplicationRepository,
   SubmissionPreviewRecord,
+  ApplicationRevisionRecord,
+  ApplicationMemberRecord,
+  SubmissionIntentRecord,
 } from '../../opportunity-service/src/domain/ports/application.repository.port';
 import { IOpportunityRepository } from '../../opportunity-service/src/domain/ports/opportunity.repository.port';
 
@@ -1074,6 +1077,562 @@ describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-
       expect(resubmittedIneligible.status).toBe('INELIGIBLE');
       expect(outboxEvents).toHaveLength(3);
       expect(outboxEvents[2].type).toBe('application.resubmitted');
+    });
+  });
+
+  describe('6. F31 Backend — Team Submission Intent, Commit/Abort Mutual Exclusion, Unique Active Application Members & Per-Member Snapshots', () => {
+    const competitionId = 'opp_team_hackathon_2026';
+    const leader1 = 'stu_leader_1';
+    const leader2 = 'stu_leader_2';
+    const sharedMember = 'stu_shared_member';
+    const member3 = 'stu_member_3';
+
+    let passports: Map<string, Passport>;
+    let consents: Map<string, Consent>;
+    let mediaAssets: Map<string, MediaAsset>;
+    let previews: Map<string, SubmissionPreviewRecord>;
+    let applications: Map<string, Application>;
+    let revisions: ApplicationRevisionRecord[];
+    let appMembers: ApplicationMemberRecord[];
+    let intents: Map<string, SubmissionIntentRecord>;
+    let outboxEvents: Array<Record<string, unknown>>;
+    let passportUseCase: PassportUseCase;
+    let applicationUseCase: ApplicationUseCase;
+    let currentCompetition: Opportunity;
+
+    const createReadyPassport = (studentId: string, fullName: string, gpa = 3.7) =>
+      new Passport(`pass_${studentId}`, {
+        studentId,
+        profileVersion: 1,
+        fullName,
+        education: {
+          institution: 'UIT - VNUHCM',
+          major: 'Computer Science',
+          startYear: 2023,
+          gpa,
+          gpaScale: 4,
+        },
+        skills: ['TypeScript', 'NestJS'],
+        isLookingForTeammate: true,
+        isOpenForScholarship: false,
+        isOpenForMentoring: false,
+      });
+
+    beforeEach(() => {
+      passports = new Map();
+      consents = new Map();
+      mediaAssets = new Map();
+      previews = new Map();
+      applications = new Map();
+      revisions = [];
+      appMembers = [];
+      intents = new Map();
+      outboxEvents = [];
+
+      passports.set(leader1, createReadyPassport(leader1, 'Leader One'));
+      passports.set(leader2, createReadyPassport(leader2, 'Leader Two'));
+      passports.set(sharedMember, createReadyPassport(sharedMember, 'Shared Member'));
+      passports.set(member3, createReadyPassport(member3, 'Member Three'));
+
+      currentCompetition = new Opportunity(competitionId, {
+        type: 'COMPETITION',
+        title: 'Scholink AI Hackathon 2026',
+        description: 'National AI Team Competition for University Students',
+        organizationId: 'org_hackathon',
+        createdBy: 'usr_org_1',
+        organizerName: 'Scholink Tech Org',
+        applyMode: 'IN_APP',
+        status: 'PUBLISHED',
+        competitionMode: 'TEAM',
+        minTeamSize: 2,
+        maxTeamSize: 4,
+        registerDeadline: new Date(Date.now() + 5 * 86400000),
+        timezone: 'Asia/Ho_Chi_Minh',
+        requiredFields: ['fullName', 'education.gpa', 'skills'],
+        eligibilityRules: [
+          {
+            fieldKey: 'education.gpa',
+            operator: 'GTE',
+            value: 3.2,
+            scale: 4,
+            type: 'HARD',
+          },
+        ],
+        ruleVersion: 1,
+      });
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: async (id) => passports.get(id) ?? null,
+        save: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        update: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        saveConsent: async (c) => {
+          consents.set(c.id, c);
+        },
+        findConsentById: async (id) => consents.get(id) ?? null,
+        saveMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        updateMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        findMediaAssetById: async (id) => mediaAssets.get(id) ?? null,
+        findMediaAssetsByIds: async (ids) =>
+          ids.map((id) => mediaAssets.get(id)).filter((a): a is MediaAsset => Boolean(a)),
+      };
+
+      const opportunityRepo: IOpportunityRepository = {
+        findById: async (id) => (id === competitionId ? currentCompetition : null),
+        findMany: async () => [currentCompetition],
+        save: async () => undefined,
+        update: async () => undefined,
+      };
+
+      const applicationRepo: IApplicationRepository = {
+        findById: async (id) => applications.get(id) ?? null,
+        findByOpportunityAndStudent: async (oppId, stuId) =>
+          Array.from(applications.values()).find(
+            (a) =>
+              a.opportunityId === oppId &&
+              a.props.submissionType === 'INDIVIDUAL' &&
+              a.studentId === stuId,
+          ) ?? null,
+        findByOpportunityAndTeam: async (oppId, teamId) =>
+          Array.from(applications.values()).find(
+            (a) =>
+              a.opportunityId === oppId &&
+              a.props.submissionType === 'TEAM' &&
+              a.teamId === teamId,
+          ) ?? null,
+        findManyByStudent: async (stuId) =>
+          Array.from(applications.values()).filter(
+            (a) => a.studentId === stuId || a.memberIds.includes(stuId),
+          ),
+        findManyByOpportunity: async (oppId) =>
+          Array.from(applications.values()).filter((a) => a.opportunityId === oppId),
+        save: async (app) => {
+          applications.set(app.id, app);
+        },
+        update: async (app) => {
+          applications.set(app.id, app);
+        },
+        savePreview: async (prv) => {
+          previews.set(prv.previewId, prv);
+        },
+        findPreviewById: async (prvId) => previews.get(prvId) ?? null,
+        saveRevision: async (rev) => {
+          revisions.push(rev);
+        },
+        appendEvent: async () => undefined,
+        findRevisionsByApplicationId: async (appId) =>
+          revisions.filter((r) => r.applicationId === appId),
+        findEventsByApplicationId: async () => [],
+        findActiveMembersByOpportunityAndStudents: async (oppId, studentIds) =>
+          appMembers.filter(
+            (m) =>
+              m.opportunityId === oppId &&
+              m.isActive &&
+              studentIds.includes(m.studentId),
+          ),
+        releaseApplicationMembers: async (appId) => {
+          appMembers = appMembers.map((m) =>
+            m.applicationId === appId ? { ...m, isActive: false } : m,
+          );
+        },
+        findSubmissionIntentById: async (subId) => intents.get(subId) ?? null,
+        createOrGetSubmissionIntent: async (intent) => {
+          const existing = intents.get(intent.submissionId);
+          if (existing) {
+            if (existing.status === 'ABORTED') {
+              throw DomainException.conflict(
+                ErrorCode.HOLD_EXPIRED,
+                'Submission Intent đã bị hủy (ABORTED)',
+              );
+            }
+            return existing;
+          }
+          const created: SubmissionIntentRecord = Object.freeze({
+            ...intent,
+            status: 'PENDING',
+          });
+          intents.set(intent.submissionId, created);
+          return created;
+        },
+        abortSubmissionIntent: async ({ submissionId, opportunityId, teamId, leaderId, reason }) => {
+          const existing = intents.get(submissionId);
+          if (existing) {
+            if (existing.status === 'COMMITTED') {
+              return Object.freeze({
+                ...existing,
+                aborted: false,
+              });
+            }
+            const abortedIntent: SubmissionIntentRecord = Object.freeze({
+              ...existing,
+              status: 'ABORTED',
+              reason: reason ?? existing.reason,
+            });
+            intents.set(submissionId, abortedIntent);
+            return Object.freeze({
+              ...abortedIntent,
+              aborted: true,
+            });
+          }
+          const tombstone: SubmissionIntentRecord = Object.freeze({
+            submissionId,
+            opportunityId: opportunityId ?? competitionId,
+            teamId: teamId ?? 'UNKNOWN',
+            leaderId: leaderId ?? 'SYSTEM',
+            status: 'ABORTED',
+            reason: reason ?? 'LEASE_EXPIRED',
+          });
+          intents.set(submissionId, tombstone);
+          return Object.freeze({
+            ...tombstone,
+            aborted: true,
+          });
+        },
+        commitSubmissionWithOutbox: async ({
+          application,
+          isResubmission,
+          revision,
+          outbox,
+          submissionIntent,
+          activeMemberIds,
+        }) => {
+          if (submissionIntent) {
+            const currentIntent = intents.get(submissionIntent.submissionId);
+            if (currentIntent?.status === 'ABORTED') {
+              throw DomainException.conflict(
+                ErrorCode.HOLD_EXPIRED,
+                'Submission Intent đã bị ABORTED trước khi commit',
+              );
+            }
+            if (currentIntent?.status === 'COMMITTED') {
+              throw DomainException.conflict(
+                ErrorCode.ALREADY_APPLIED,
+                'Submission Intent đã được COMMITTED',
+              );
+            }
+            intents.set(
+              submissionIntent.submissionId,
+              Object.freeze({
+                ...submissionIntent,
+                status: 'COMMITTED',
+                applicationId: application.id,
+              }),
+            );
+          }
+
+          if (activeMemberIds && activeMemberIds.length > 0) {
+            if (isResubmission) {
+              appMembers = appMembers.map((m) =>
+                m.applicationId === application.id ? { ...m, isActive: false } : m,
+              );
+            }
+            const conflict = appMembers.find(
+              (m) =>
+                m.opportunityId === application.opportunityId &&
+                m.isActive &&
+                m.applicationId !== application.id &&
+                activeMemberIds.includes(m.studentId),
+            );
+            if (conflict) {
+              throw DomainException.conflict(
+                ErrorCode.ALREADY_APPLIED,
+                `Thành viên ${conflict.studentId} đang thuộc hồ sơ đội khác còn hiệu lực`,
+              );
+            }
+            for (const stuId of activeMemberIds) {
+              appMembers.push({
+                id: `am_${stuId}_${application.revision}`,
+                opportunityId: application.opportunityId,
+                applicationId: application.id,
+                studentId: stuId,
+                isActive: true,
+              });
+            }
+          }
+
+          applications.set(application.id, application);
+          revisions.push(revision);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+        commitWithdrawalWithOutbox: async ({ application, outbox }) => {
+          applications.set(application.id, application);
+          appMembers = appMembers.map((m) =>
+            m.applicationId === application.id ? { ...m, isActive: false } : m,
+          );
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+      };
+
+      const mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      passportUseCase = new PassportUseCase(passportRepo, mediaUseCase, cryptoService);
+
+      const grpcClient = {
+        getService: () => ({
+          getProfileSnapshot: (req: { studentId: string; attachmentIds: string[] }) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .getProfileSnapshot(req.studentId, req.attachmentIds)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+          validateConsent: (req: any) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .validateConsent(req)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+        }),
+      };
+
+      applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+        grpcClient as any,
+      );
+      applicationUseCase.onModuleInit();
+    });
+
+    const prepareMemberConsent = async (studentId: string, submissionId: string) => {
+      const preview = await applicationUseCase.createPreview(studentId, {
+        opportunityId: competitionId,
+        submissionId,
+        attachmentIds: [],
+        expectedRuleVersion: currentCompetition.ruleVersion,
+      });
+      const consent = await passportUseCase.createConsent(studentId, {
+        opportunityId: competitionId,
+        submissionId,
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+      return {
+        studentId,
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        payloadHash: preview.payloadHash,
+        consentId: consent.consentId,
+      };
+    };
+
+    it('ensures Commit and Abort never both win on the same submission_intents document', async () => {
+      // Case A: Abort wins first (e.g., Reservation lease timeout worker fires before leader commits)
+      const intentA = await applicationUseCase.createSubmissionIntent(leader1, {
+        opportunityId: competitionId,
+        teamId: 'team_alpha',
+        submissionId: 'sub_race_abort_wins',
+        rosterVersion: 1,
+        memberIds: [leader1, sharedMember],
+      });
+      expect(intentA.status).toBe('PENDING');
+
+      const c1 = await prepareMemberConsent(leader1, 'sub_race_abort_wins');
+      const c2 = await prepareMemberConsent(sharedMember, 'sub_race_abort_wins');
+
+      // Worker aborts the pending submission intent
+      const abortResA = await applicationUseCase.abortSubmissionIntent({
+        submissionId: 'sub_race_abort_wins',
+        reason: 'LEASE_TIMEOUT',
+      });
+      expect(abortResA.status).toBe('ABORTED');
+      expect(abortResA.aborted).toBe(true);
+
+      // Late commit attempt for 'sub_race_abort_wins' MUST fail with HOLD_EXPIRED
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_race_abort_wins',
+          submissionType: 'TEAM',
+          teamId: 'team_alpha',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [c1, c2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.HOLD_EXPIRED,
+      });
+      expect(applications.size).toBe(0);
+
+      // Case B: Commit wins first -> subsequent AbortSubmissionIntent cannot overwrite COMMITTED!
+      await applicationUseCase.createSubmissionIntent(leader1, {
+        opportunityId: competitionId,
+        teamId: 'team_alpha',
+        submissionId: 'sub_race_commit_wins',
+        rosterVersion: 1,
+        memberIds: [leader1, sharedMember],
+      });
+
+      const c1Commit = await prepareMemberConsent(leader1, 'sub_race_commit_wins');
+      const c2Commit = await prepareMemberConsent(sharedMember, 'sub_race_commit_wins');
+
+      const committedTeamApp = await applicationUseCase.submit(leader1, {
+        opportunityId: competitionId,
+        submissionId: 'sub_race_commit_wins',
+        submissionType: 'TEAM',
+        teamId: 'team_alpha',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [c1Commit, c2Commit],
+      });
+      expect(committedTeamApp.status).toBe('SUBMITTED');
+      expect(committedTeamApp.submissionType).toBe('TEAM');
+
+      // Late AbortSubmissionIntent from timeout worker sees COMMITTED and returns aborted: false
+      const lateAbort = await applicationUseCase.abortSubmissionIntent({
+        submissionId: 'sub_race_commit_wins',
+        reason: 'LATE_WORKER_TICK',
+      });
+      expect(lateAbort.status).toBe('COMMITTED');
+      expect(lateAbort.aborted).toBe(false);
+      expect(lateAbort.applicationId).toBe(committedTeamApp.applicationId);
+
+      // Verify per-member snapshots & consentRefs are immutably stored in ApplicationRevision
+      const detail = await applicationUseCase.getApplicationById(
+        committedTeamApp.applicationId,
+        sharedMember, // team member can also view their team's application
+      );
+      expect(detail.revisions).toHaveLength(1);
+      expect(detail.revisions[0].memberSnapshots).toHaveLength(2);
+      expect(detail.revisions[0].consentRefs).toHaveLength(2);
+    });
+
+    it('blocks two teams from sharing an active member (application_members unique) until the first team withdraws', async () => {
+      // Team 1 (leader1 + sharedMember) submits
+      const t1c1 = await prepareMemberConsent(leader1, 'sub_team_1');
+      const t1c2 = await prepareMemberConsent(sharedMember, 'sub_team_1');
+
+      const team1App = await applicationUseCase.submit(leader1, {
+        opportunityId: competitionId,
+        submissionId: 'sub_team_1',
+        submissionType: 'TEAM',
+        teamId: 'team_1',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [t1c1, t1c2],
+      });
+      expect(team1App.status).toBe('SUBMITTED');
+
+      // Team 2 (leader2 + sharedMember) attempts to submit for the same competition -> blocked by active application_members!
+      const t2c1 = await prepareMemberConsent(leader2, 'sub_team_2');
+      const t2c2 = await prepareMemberConsent(sharedMember, 'sub_team_2');
+
+      await expect(
+        applicationUseCase.submit(leader2, {
+          opportunityId: competitionId,
+          submissionId: 'sub_team_2',
+          submissionType: 'TEAM',
+          teamId: 'team_2',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [t2c1, t2c2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.ALREADY_APPLIED,
+      });
+
+      // Non-leader member cannot withdraw Team 1's application -> 403 FORBIDDEN_RESOURCE
+      await expect(
+        applicationUseCase.withdraw(team1App.applicationId, sharedMember),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // Leader 1 withdraws Team 1's application before deadline -> releases application_members (isActive: false)
+      const withdrawn = await applicationUseCase.withdraw(team1App.applicationId, leader1);
+      expect(withdrawn.status).toBe('WITHDRAWN');
+
+      // Now Team 2 (leader2 + sharedMember) can commit cleanly!
+      const team2App = await applicationUseCase.submit(leader2, {
+        opportunityId: competitionId,
+        submissionId: 'sub_team_2',
+        submissionType: 'TEAM',
+        teamId: 'team_2',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [t2c1, t2c2],
+      });
+      expect(team2App.status).toBe('SUBMITTED');
+      expect(team2App.teamId).toBe('team_2');
+    });
+
+    it('validates deadline, ruleVersion, and per-member Consent freshness (SNAPSHOT_STALE)', async () => {
+      const m1 = await prepareMemberConsent(leader1, 'sub_stale_member');
+      const m2 = await prepareMemberConsent(member3, 'sub_stale_member');
+
+      // Member 3 updates their Passport after signing Consent -> profileVersion becomes 2
+      await passportUseCase.updateMyPassport(member3, {
+        bio: 'Member 3 edited passport after signing team consent',
+      });
+
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_stale_member',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [m1, m2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.SNAPSHOT_STALE,
+      });
+
+      // RuleVersion mismatch -> 409 VERSION_MISMATCH
+      const m2Fresh = await prepareMemberConsent(member3, 'sub_rule_mismatch');
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_rule_mismatch',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 99,
+          memberConsents: [m1, m2Fresh],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.VERSION_MISMATCH,
+      });
+
+      // Expired registerDeadline -> 409 DEADLINE_PASSED
+      currentCompetition = new Opportunity(competitionId, {
+        ...currentCompetition.props,
+        registerDeadline: new Date(Date.now() - 60000),
+      });
+
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_deadline_passed',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [m1, m2Fresh],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.DEADLINE_PASSED,
+      });
     });
   });
 });
