@@ -10,6 +10,7 @@ import {
   OpportunityType,
   OpportunityStatus,
   ApplyMode,
+  FundingLevel,
 } from '../../domain/opportunity.entity';
 import { OpportunityModel, OpportunityDocument } from './opportunity.schema';
 
@@ -25,17 +26,17 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
   ) {}
 
   async findById(id: string): Promise<Opportunity | null> {
-    const doc = await this.model.findOne({ id: String(id) }).lean().exec();
+    const doc = await this.model.findOne({ id: { $eq: String(id) } }).lean().exec();
     if (!doc) return null;
     return this.toDomain(doc);
   }
 
   async findMany(filter: OpportunityFilter): Promise<Opportunity[]> {
     const query: Record<string, unknown> = {};
-    if (filter.type) query.type = String(filter.type);
-    if (filter.status) query.status = String(filter.status);
-    if (filter.applyMode) query.applyMode = String(filter.applyMode);
-    if (filter.organizationId) query.organizationId = String(filter.organizationId);
+    if (filter.type) query.type = { $eq: String(filter.type) };
+    if (filter.status) query.status = { $eq: String(filter.status) };
+    if (filter.applyMode) query.applyMode = { $eq: String(filter.applyMode) };
+    if (filter.organizationId) query.organizationId = { $eq: String(filter.organizationId) };
     if (filter.keyword && filter.keyword.trim()) {
       query.title = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
     }
@@ -56,7 +57,10 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
       id: opportunity.id,
       type: opportunity.type,
       title: opportunity.title,
+      slug: opportunity.props.slug,
       description: opportunity.props.description,
+      benefits: opportunity.props.benefits,
+      requirements: opportunity.props.requirements,
       organizationId: opportunity.props.organizationId,
       createdBy: opportunity.props.createdBy,
       organizerName: opportunity.props.organizerName,
@@ -67,6 +71,10 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
       submitDeadline: opportunity.props.submitDeadline,
       timezone: opportunity.props.timezone,
       fundingLevel: opportunity.props.fundingLevel,
+      minGpa: opportunity.props.minGpa ?? 0.0,
+      requiredIelts: opportunity.props.requiredIelts ?? 0.0,
+      coverImageUrl: opportunity.props.coverImageUrl,
+      isPromoted: opportunity.props.isPromoted ?? false,
       competitionMode: opportunity.props.competitionMode,
       minTeamSize: opportunity.props.minTeamSize,
       maxTeamSize: opportunity.props.maxTeamSize,
@@ -85,7 +93,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
   async update(opportunity: Opportunity): Promise<void> {
     await this.model
       .updateOne(
-        { id: String(opportunity.id) },
+        { id: { $eq: String(opportunity.id) } },
         {
           $set: {
             title: opportunity.title,
@@ -105,7 +113,10 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     id: string;
     type: string;
     title: string;
+    slug?: string;
     description: string;
+    benefits?: string;
+    requirements?: string;
     organizationId?: string;
     createdBy?: string;
     organizerName: string;
@@ -116,6 +127,10 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     submitDeadline?: Date;
     timezone: string;
     fundingLevel?: string;
+    minGpa?: number;
+    requiredIelts?: number;
+    coverImageUrl?: string;
+    isPromoted?: boolean;
     competitionMode?: string;
     minTeamSize?: number;
     maxTeamSize?: number;
@@ -128,7 +143,10 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     return new Opportunity(doc.id, {
       type: doc.type as OpportunityType,
       title: doc.title,
+      slug: doc.slug,
       description: doc.description,
+      benefits: doc.benefits,
+      requirements: doc.requirements,
       organizationId: doc.organizationId,
       createdBy: doc.createdBy,
       organizerName: doc.organizerName,
@@ -138,7 +156,11 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
       registerDeadline: new Date(doc.registerDeadline),
       submitDeadline: doc.submitDeadline ? new Date(doc.submitDeadline) : undefined,
       timezone: doc.timezone,
-      fundingLevel: doc.fundingLevel as 'FULL' | 'PARTIAL' | 'OTHER' | undefined,
+      fundingLevel: doc.fundingLevel as FundingLevel | undefined,
+      minGpa: doc.minGpa,
+      requiredIelts: doc.requiredIelts,
+      coverImageUrl: doc.coverImageUrl,
+      isPromoted: doc.isPromoted,
       competitionMode: doc.competitionMode as 'INDIVIDUAL' | 'TEAM' | undefined,
       minTeamSize: doc.minTeamSize,
       maxTeamSize: doc.maxTeamSize,

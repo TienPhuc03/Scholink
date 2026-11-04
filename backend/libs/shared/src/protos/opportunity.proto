@@ -8,15 +8,19 @@ service OpportunityGrpcService {
   rpc GetOpportunityById (GetOpportunityByIdRequest) returns (OpportunityMessage);
   rpc CreateOpportunity (CreateOpportunityRequest) returns (OpportunityMessage);
 
-  // Application & Immutable Preview RPCs (API Gateway -> Opportunity Service)
+  // Application & Immutable Preview RPCs (API Gateway / Collaboration -> Opportunity Service)
   rpc CreateApplicationPreview (CreatePreviewRequest) returns (PreviewResponse);
   rpc GetApplicationPreview (GetPreviewRequest) returns (PreviewResponse);
+  rpc CreateSubmissionIntent (CreateSubmissionIntentRequest) returns (SubmissionIntentResponse);
+  rpc AbortSubmissionIntent (AbortSubmissionIntentRequest) returns (SubmissionIntentResponse);
+  rpc GetSubmissionById (GetSubmissionByIdRequest) returns (SubmissionIntentResponse);
   rpc SubmitApplication (SubmitApplicationRequest) returns (SubmitApplicationResponse);
   rpc GetMyApplications (GetMyApplicationsRequest) returns (GetMyApplicationsResponse);
+  rpc GetApplicationById (GetApplicationByIdRequest) returns (ApplicationDetailResponse);
   rpc WithdrawApplication (WithdrawApplicationRequest) returns (WithdrawApplicationResponse);
-
-  // Team Submission Intent RPC (Collaboration Service Timeout Worker -> Opportunity Service)
-  rpc AbortSubmissionIntent (AbortSubmissionIntentRequest) returns (AbortSubmissionIntentResponse);
+  rpc CheckReadiness (CheckReadinessRequest) returns (CheckReadinessResponse);
+  rpc ApplySnapshotRetentionDecision (ApplySnapshotRetentionRequest) returns (ApplySnapshotRetentionResponse);
+  rpc EvaluateTestResultLog (EvaluateTestResultLogRequest) returns (EvaluateTestResultLogResponse);
 }
 
 message ListOpportunitiesRequest {
@@ -47,6 +51,7 @@ message OpportunityMessage {
   repeated string tags = 17;
   int32 ruleVersion = 18;
   int32 version = 19;
+  repeated string requiredFields = 20;
 }
 
 message ListOpportunitiesResponse {
@@ -77,6 +82,13 @@ message CreateOpportunityRequest {
   int32 minTeamSize = 15;
   int32 maxTeamSize = 16;
   repeated string tags = 17;
+  repeated string requiredFields = 18;
+}
+
+message ScreeningReasonMessage {
+  string ruleFieldKey = 1;
+  string reasonCode = 2;
+  string message = 3;
 }
 
 message CreatePreviewRequest {
@@ -105,6 +117,74 @@ message PreviewResponse {
   string payloadHash = 10;
   string screening = 11;
   string expiresAt = 12;
+  repeated ScreeningReasonMessage screeningReasons = 13;
+}
+
+message TeamMemberConsentMessage {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  int32 profileVersion = 4;
+  string payloadHash = 5;
+  string consentId = 6;
+}
+
+message TeamMemberSnapshotMessage {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  int32 profileVersion = 4;
+  string snapshotJson = 5;
+  string manifestJson = 6;
+  string payloadHash = 7;
+  string consentId = 8;
+  string screening = 9;
+  repeated ScreeningReasonMessage screeningReasons = 10;
+}
+
+message CreateSubmissionIntentRequest {
+  string leaderId = 1;
+  string opportunityId = 2;
+  string teamId = 3;
+  string submissionId = 4;
+  string reservationId = 5;
+  int64 fencingToken = 6;
+  int32 rosterVersion = 7;
+  repeated string memberIds = 8;
+}
+
+message AbortSubmissionIntentRequest {
+  string submissionId = 1;
+  string actorId = 2;
+  string opportunityId = 3;
+  string teamId = 4;
+  string reason = 5;
+  string reservationId = 6;
+  int64 fencingToken = 7;
+  string team_id = 8;
+  string reservation_id = 9;
+  int64 fencing_token = 10;
+}
+
+message GetSubmissionByIdRequest {
+  string submissionId = 1;
+}
+
+message SubmissionIntentResponse {
+  string submissionId = 1;
+  string opportunityId = 2;
+  string teamId = 3;
+  string leaderId = 4;
+  string status = 5;
+  string applicationId = 6;
+  string reservationId = 7;
+  int64 fencingToken = 8;
+  int32 rosterVersion = 9;
+  repeated string memberIds = 10;
+  bool aborted = 11;
+  string reason = 12;
+  string outcome = 13;
+  string message = 14;
 }
 
 message SubmitApplicationRequest {
@@ -119,6 +199,10 @@ message SubmitApplicationRequest {
   int32 profileVersion = 9;
   string payloadHash = 10;
   string consentId = 11;
+  int32 rosterVersion = 12;
+  string reservationId = 13;
+  int64 fencingToken = 14;
+  repeated TeamMemberConsentMessage memberConsents = 15;
 }
 
 message SubmitApplicationResponse {
@@ -133,6 +217,12 @@ message SubmitApplicationResponse {
   string snapshotId = 9;
   string payloadHash = 10;
   string consentId = 11;
+  repeated ScreeningReasonMessage screeningReasons = 12;
+  string submissionType = 13;
+  string teamId = 14;
+  string submissionId = 15;
+  int32 rosterVersion = 16;
+  repeated TeamMemberConsentMessage consentRefs = 17;
 }
 
 message GetMyApplicationsRequest {
@@ -155,10 +245,72 @@ message ApplicationSummaryMessage {
   string submittedAt = 13;
   int32 revision = 14;
   int32 version = 15;
+  repeated ScreeningReasonMessage screeningReasons = 16;
+  int32 rosterVersion = 17;
+  repeated string memberIds = 18;
 }
 
 message GetMyApplicationsResponse {
   repeated ApplicationSummaryMessage items = 1;
+}
+
+message GetApplicationByIdRequest {
+  string applicationId = 1;
+  string studentId = 2;
+}
+
+message ApplicationRevisionMessage {
+  string id = 1;
+  string applicationId = 2;
+  int32 revision = 3;
+  string previewId = 4;
+  string snapshotId = 5;
+  int32 profileVersion = 6;
+  int32 ruleVersion = 7;
+  string snapshotJson = 8;
+  string manifestJson = 9;
+  string payloadHash = 10;
+  string consentId = 11;
+  string screening = 12;
+  string submittedAt = 13;
+  repeated ScreeningReasonMessage screeningReasons = 14;
+  int32 rosterVersion = 15;
+  repeated TeamMemberSnapshotMessage memberSnapshots = 16;
+  repeated TeamMemberConsentMessage consentRefs = 17;
+}
+
+message ApplicationEventMessage {
+  string id = 1;
+  string applicationId = 2;
+  string actorId = 3;
+  string fromStatus = 4;
+  string toStatus = 5;
+  int32 revision = 6;
+  string reason = 7;
+}
+
+message ApplicationDetailResponse {
+  string id = 1;
+  string opportunityId = 2;
+  string studentId = 3;
+  string teamId = 4;
+  string submissionType = 5;
+  string status = 6;
+  string screening = 7;
+  string previewId = 8;
+  string snapshotId = 9;
+  int32 profileVersion = 10;
+  int32 ruleVersion = 11;
+  string payloadHash = 12;
+  string consentId = 13;
+  string submittedAt = 14;
+  int32 revision = 15;
+  int32 version = 16;
+  repeated ScreeningReasonMessage screeningReasons = 17;
+  repeated ApplicationRevisionMessage revisions = 18;
+  repeated ApplicationEventMessage events = 19;
+  int32 rosterVersion = 20;
+  repeated string memberIds = 21;
 }
 
 message WithdrawApplicationRequest {
@@ -173,14 +325,72 @@ message WithdrawApplicationResponse {
   int32 version = 4;
 }
 
-message AbortSubmissionIntentRequest {
-  string team_id = 1;
-  string reservation_id = 2;
-  int64 fencing_token = 3;
-  string reason = 4;
+message CheckReadinessRequest {
+  string studentId = 1;
+  string opportunityId = 2;
 }
 
-message AbortSubmissionIntentResponse {
-  string outcome = 1; // "ABORTED" or "COMMITTED"
-  string message = 2;
+message CheckReadinessResponse {
+  string opportunityId = 1;
+  string studentId = 2;
+  int32 profileVersion = 3;
+  int32 ruleVersion = 4;
+  int32 completionScore = 5;
+  int32 readinessScore = 6;
+  bool isReady = 7;
+  string screening = 8;
+  repeated string missingFields = 9;
+  repeated ScreeningReasonMessage screeningReasons = 10;
+}
+
+message ApplySnapshotRetentionRequest {
+  string studentId = 1;
+  string decision = 2;
+  string trackingId = 3;
+}
+
+message ApplySnapshotRetentionResponse {
+  string studentId = 1;
+  string decision = 2;
+  string trackingId = 3;
+  int32 purgedPreviewsCount = 4;
+  int32 withdrawnApplicationsCount = 5;
+  int32 retainedSnapshotsCount = 6;
+  int32 purgedSnapshotsCount = 7;
+  string processedAt = 8;
+}
+
+message TestCaseLogItemMessage {
+  string tcId = 1;
+  string acId = 2;
+  string title = 3;
+  string status = 4;
+  string note = 5;
+}
+
+message AcTestSummaryMessage {
+  string acId = 1;
+  int32 totalCases = 2;
+  int32 passedCases = 3;
+  int32 failedCases = 4;
+  int32 notRunCases = 5;
+  bool canClaimAc = 6;
+  string acStatus = 7;
+}
+
+message EvaluateTestResultLogRequest {
+  string runId = 1;
+  bool strictClaim = 2;
+  repeated TestCaseLogItemMessage testCases = 3;
+}
+
+message EvaluateTestResultLogResponse {
+  string runId = 1;
+  string evaluatedAt = 2;
+  int32 totalCases = 3;
+  int32 passedCases = 4;
+  int32 failedCases = 5;
+  int32 notRunCases = 6;
+  bool canClaimAllAc = 7;
+  repeated AcTestSummaryMessage acSummaries = 8;
 }

@@ -1,8 +1,10 @@
 import { AggregateRoot, DomainException, ErrorCode } from '@shared';
+import { ScreeningReason } from './opportunity.entity';
 
 export type ApplicationStatus =
   | 'DRAFT'
   | 'SUBMITTED'
+  | 'REVIEWING'
   | 'INELIGIBLE'
   | 'SHORTLISTED'
   | 'INTERVIEW'
@@ -18,9 +20,15 @@ export interface ApplicationProps {
   readonly opportunityId: string;
   readonly studentId: string;
   readonly teamId?: string;
+  readonly submissionId?: string;
+  readonly rosterVersion?: number;
+  readonly reservationId?: string;
+  readonly fencingToken?: number;
+  readonly memberIds?: readonly string[];
   readonly submissionType: 'INDIVIDUAL' | 'TEAM';
   readonly status: ApplicationStatus;
   readonly screening?: ScreeningStatus;
+  readonly screeningReasons?: readonly ScreeningReason[];
   readonly previewId: string;
   readonly snapshotId: string;
   readonly profileVersion: number;
@@ -46,7 +54,9 @@ export class Application extends AggregateRoot<string> {
     );
     this._props = Object.freeze({
       ...props,
+      memberIds: Object.freeze([...(props.memberIds ?? [])]),
       screening: props.screening ?? 'ELIGIBLE',
+      screeningReasons: Object.freeze([...(props.screeningReasons ?? [])]),
       ruleVersion: props.ruleVersion ?? 1,
     });
   }
@@ -59,12 +69,24 @@ export class Application extends AggregateRoot<string> {
     return this._props.studentId;
   }
 
+  get teamId(): string | undefined {
+    return this._props.teamId;
+  }
+
+  get memberIds(): readonly string[] {
+    return this._props.memberIds ?? [];
+  }
+
   get status(): ApplicationStatus {
     return this._props.status;
   }
 
   get screening(): ScreeningStatus {
     return this._props.screening ?? 'ELIGIBLE';
+  }
+
+  get screeningReasons(): readonly ScreeningReason[] {
+    return this._props.screeningReasons ?? [];
   }
 
   get revision(): number {
@@ -79,6 +101,17 @@ export class Application extends AggregateRoot<string> {
     return this._props.status === 'WITHDRAWN' || this._props.status === 'REOPENED';
   }
 
+  public isActiveMemberHoldingStatus(): boolean {
+    return (
+      this._props.status === 'SUBMITTED' ||
+      this._props.status === 'REVIEWING' ||
+      this._props.status === 'SHORTLISTED' ||
+      this._props.status === 'INTERVIEW' ||
+      this._props.status === 'INELIGIBLE' ||
+      this._props.status === 'ACCEPTED'
+    );
+  }
+
   /**
    * Mục 11 & FR-APP-07 SRS: Rút hồ sơ trước khi ACCEPTED / REJECTED (Immutable update)
    */
@@ -86,7 +119,8 @@ export class Application extends AggregateRoot<string> {
     if (
       this._props.status === 'ACCEPTED' ||
       this._props.status === 'REJECTED' ||
-      this._props.status === 'CANCELLED'
+      this._props.status === 'CANCELLED' ||
+      this._props.status === 'WITHDRAWN'
     ) {
       throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
@@ -103,7 +137,7 @@ export class Application extends AggregateRoot<string> {
   }
 
   /**
-   * Mục 11 & FR-APP-07 SRS: Nộp lại trước hạn giữ nguyên Application, tăng revision và gắn snapshot mới
+   * Mục 11 & FR-APP-07, BR20 SRS: Nộp lại trước hạn giữ nguyên Application, tăng revision và gắn snapshot mới
    */
   public resubmit(params: {
     previewId: string;
@@ -112,7 +146,13 @@ export class Application extends AggregateRoot<string> {
     ruleVersion: number;
     payloadHash: string;
     consentId: string;
+    submissionId?: string;
+    rosterVersion?: number;
+    reservationId?: string;
+    fencingToken?: number;
+    memberIds?: readonly string[];
     screening?: ScreeningStatus;
+    screeningReasons?: readonly ScreeningReason[];
   }): Application {
     if (!this.canResubmit()) {
       throw DomainException.conflict(
@@ -121,16 +161,28 @@ export class Application extends AggregateRoot<string> {
       );
     }
 
+    const nextScreening = params.screening ?? 'ELIGIBLE';
+    const nextStatus: ApplicationStatus =
+      nextScreening === 'INELIGIBLE' ? 'INELIGIBLE' : 'SUBMITTED';
+
     return new Application(this.id, {
       ...this._props,
-      status: 'SUBMITTED',
-      screening: params.screening ?? 'ELIGIBLE',
+      status: nextStatus,
+      screening: nextScreening,
+      screeningReasons: Object.freeze([...(params.screeningReasons ?? [])]),
       previewId: params.previewId,
       snapshotId: params.snapshotId,
       profileVersion: params.profileVersion,
       ruleVersion: params.ruleVersion,
       payloadHash: params.payloadHash,
       consentId: params.consentId,
+      submissionId: params.submissionId ?? this._props.submissionId,
+      rosterVersion: params.rosterVersion ?? this._props.rosterVersion,
+      reservationId: params.reservationId ?? this._props.reservationId,
+      fencingToken: params.fencingToken ?? this._props.fencingToken,
+      memberIds: params.memberIds
+        ? Object.freeze([...params.memberIds])
+        : this._props.memberIds,
       submittedAt: new Date(),
       revision: this._props.revision + 1,
       version: this.version + 1,

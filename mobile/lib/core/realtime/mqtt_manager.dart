@@ -52,7 +52,7 @@ class MqttManagerImpl implements MqttManager {
     client.connectionMessage = connMessage;
 
     try {
-      final MqttConnectionStatus? status = await client.connect();
+      final MqttClientConnectionStatus? status = await client.connect();
       if (status?.state == MqttConnectionState.connected) {
         debugPrint('[MQTT] Connected successfully to $_server:$_port');
 

@@ -52,7 +52,7 @@ import { CrawlerUseCase } from "./application/use-cases/crawler.use-case";
 import { AdminOpportunityController } from "./presentation/admin-opportunity.controller";
 import { BookmarkUseCase } from "./application/use-cases/bookmark.use-case";
 import { EventEmitterModule } from "@nestjs/event-emitter";
-
+import { COLLABORATION_GRPC_CLIENT } from "./application/use-cases/collaboration.use-case";
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
@@ -76,6 +76,22 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
               "libs/shared/src/protos/identity.proto",
             ),
             url: config.get<string>("IDENTITY_GRPC_URL", "localhost:50051"),
+          },
+        }),
+      },
+      {
+        name: COLLABORATION_GRPC_CLIENT,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: "collaboration",
+            protoPath: join(process.cwd(), "proto/collaboration.proto"),
+            url: config.get<string>(
+              "COLLABORATION_GRPC_URL",
+              "localhost:50053",
+            ),
           },
         }),
       },

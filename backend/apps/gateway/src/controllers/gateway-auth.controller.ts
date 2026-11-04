@@ -1,7 +1,9 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
+  Param,
   Req,
   HttpCode,
   HttpStatus,
@@ -31,6 +33,8 @@ import {
   ForgotPasswordDtoSchema,
   ResetPasswordDto,
   ResetPasswordDtoSchema,
+  RequestAccountDeletionDto,
+  RequestAccountDeletionDtoSchema,
 } from '@shared';
 import { GATEWAY_IDENTITY_GRPC, IdentityGrpcClient } from '../grpc-clients.interface';
 
@@ -209,6 +213,58 @@ export class GatewayAuthController implements OnModuleInit {
       this.identityService.logout({
         userId: req.user.userId,
         sessionId: req.user.sessionId || '',
+      }),
+    );
+  }
+
+  @Post('delete-account')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'F40 / FR-AUTH-08: Xác thực lại mật khẩu, xóa tài khoản, thu hồi phiên tức thì và tạo mã tracking xóa dữ liệu cá nhân',
+  })
+  @ApiResponse({ status: 200, description: 'Tài khoản đã bị thu hồi phiên và tạo mã tracking xóa dữ liệu' })
+  async requestAccountDeletion(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(RequestAccountDeletionDtoSchema)) dto: RequestAccountDeletionDto,
+  ) {
+    return firstValueFrom(
+      this.identityService.requestAccountDeletion({
+        ...dto,
+        userId: req.user.userId,
+      }),
+    );
+  }
+
+  @Get('delete-account/:trackingId')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'F40 / FR-AUTH-08: Tra cứu trạng thái theo dõi xóa dữ liệu cá nhân theo trackingId',
+  })
+  @ApiResponse({ status: 200, description: 'Thông tin tracking xóa dữ liệu cá nhân' })
+  async getDeletionTracking(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('trackingId') trackingId: string,
+  ) {
+    return firstValueFrom(
+      this.identityService.getDeletionTracking({
+        userId: req.user.userId,
+        trackingId,
+      }),
+    );
+  }
+
+  @Get('export-data')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'F40 / FR-AUTH-08: Xuất dữ liệu cá nhân (Data Export) không lộ thông tin mật khẩu/secret',
+  })
+  @ApiResponse({ status: 200, description: 'Bản xuất dữ liệu cá nhân' })
+  async exportPersonalData(@Req() req: { user: AuthenticatedUser }) {
+    return firstValueFrom(
+      this.identityService.exportPersonalData({
+        userId: req.user.userId,
       }),
     );
   }

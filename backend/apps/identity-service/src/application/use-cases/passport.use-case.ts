@@ -1,6 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
+import { IUserRepository, USER_REPOSITORY } from '../../domain/ports/user.repository.port';
 import { UpdatePassportDto, CreateConsentDto, CertificateInput } from '../dtos/passport.dto';
 import { Consent } from '../../domain/consent.entity';
 import { Passport, PassportProps, Certificate } from '../../domain/passport.entity';
@@ -45,9 +46,13 @@ export class PassportUseCase {
     @Inject(PASSPORT_REPOSITORY) private readonly passportRepo: IPassportRepository,
     private readonly mediaUseCase: MediaUseCase,
     private readonly cryptoService: CryptoService,
+    @Optional()
+    @Inject(USER_REPOSITORY)
+    private readonly userRepo?: IUserRepository,
   ) {}
 
   async getMyPassport(studentId: string) {
+    await this.assertAccountActive(studentId, false);
     const passport = await this.passportRepo.findByStudentId(studentId);
     if (!passport) {
       throw DomainException.notFound('Passport');
@@ -63,6 +68,7 @@ export class PassportUseCase {
    *   và đang ở trạng thái `READY` (asset chưa sẵn sàng -> 409 ASSET_NOT_AVAILABLE).
    */
   async updateMyPassport(studentId: string, dto: UpdatePassportDto) {
+    await this.assertAccountActive(studentId, false);
     const currentPassport = await this.passportRepo.findByStudentId(studentId);
     if (!currentPassport) {
       throw DomainException.notFound('Passport');
@@ -94,6 +100,7 @@ export class PassportUseCase {
   }
 
   async createConsent(studentId: string, dto: CreateConsentDto) {
+    await this.assertAccountActive(studentId, true);
     const passport = await this.passportRepo.findByStudentId(studentId);
     if (!passport) {
       throw DomainException.notFound('Passport');
@@ -120,6 +127,7 @@ export class PassportUseCase {
       ruleVersion: dto.ruleVersion,
       manifestHash: dto.manifestHash,
       payloadHash: dto.payloadHash,
+      scope: dto.scope ?? ['SNAPSHOT', 'ATTACHMENTS'],
       expiresAt,
     });
 
@@ -130,6 +138,7 @@ export class PassportUseCase {
       previewId: consent.previewId,
       snapshotId: consent.snapshotId,
       payloadHash: consent.payloadHash,
+      scope: consent.scope,
       expiresAt: expiresAt.toISOString(),
     });
   }
@@ -139,6 +148,7 @@ export class PassportUseCase {
    * Nếu có đính kèm `attachmentIds`, xác minh toàn bộ `attachmentIds` đều thuộc về `studentId` và ở trạng thái `READY`.
    */
   async getProfileSnapshot(studentId: string, attachmentIds: readonly string[] = []) {
+    await this.assertAccountActive(studentId, true);
     const passport = await this.passportRepo.findByStudentId(studentId);
     if (!passport) {
       throw DomainException.notFound('Passport');
@@ -184,7 +194,8 @@ export class PassportUseCase {
   }
 
   /**
-   * Mục 26 SRS: Xác thực Consent qua gRPC trước khi Opportunity Service commit Application
+   * Mục 26 SRS: Xác thực Consent, phạm vi scope và hậu kiểm trạng thái tệp READY qua gRPC
+   * ngay trước khi Opportunity Service commit Application
    */
   async validateConsent(params: {
     studentId: string;
@@ -194,7 +205,10 @@ export class PassportUseCase {
     opportunityId: string;
     expectedRuleVersion: number;
     expectedPayloadHash: string;
+    attachmentIds?: readonly string[];
+    requiredScope?: readonly string[];
   }) {
+    await this.assertAccountActive(params.studentId, true);
     const [passport, consent] = await Promise.all([
       this.passportRepo.findByStudentId(params.studentId),
       this.passportRepo.findConsentById(params.consentId),
@@ -215,12 +229,63 @@ export class PassportUseCase {
       currentProfileVersion: passport.version,
       expectedRuleVersion: params.expectedRuleVersion,
       expectedPayloadHash: params.expectedPayloadHash,
+      requiredScope: params.requiredScope,
     });
+
+    // Hậu kiểm toàn bộ tệp đính kèm trong Preview và tệp ast_* trong Passport vẫn ở trạng thái READY
+    const assetIdsToReverify = new Set<string>(params.attachmentIds ?? []);
+    if (passport.props.cvAssetId?.startsWith('ast_')) {
+      assetIdsToReverify.add(passport.props.cvAssetId);
+    }
+    if (passport.props.pitchVideoAssetId?.startsWith('ast_')) {
+      assetIdsToReverify.add(passport.props.pitchVideoAssetId);
+    }
+    for (const cert of passport.props.certificates ?? []) {
+      if (cert.assetId?.startsWith('ast_')) {
+        assetIdsToReverify.add(cert.assetId);
+      }
+    }
+
+    if (assetIdsToReverify.size > 0) {
+      await this.mediaUseCase.verifyAssetsUsableByStudent(
+        params.studentId,
+        Array.from(assetIdsToReverify),
+      );
+    }
 
     return Object.freeze({
       valid: true,
       profileVersion: passport.version,
     });
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-02, FR-AUTH-08, E13, NFR11:
+   * Kiểm tra trạng thái tài khoản tại biên ứng tuyển/hồ sơ:
+   * - Nếu tài khoản đã bị xóa (DELETED) hoặc khóa (BLOCKED) -> thu hồi quyền truy cập ngay lập tức (401 UNAUTHENTICATED).
+   * - Nếu tài khoản chưa xác minh OTP (PENDING_VERIFICATION) -> chặn không cho tạo Preview, ký Consent hoặc nộp hồ sơ (403 FORBIDDEN_RESOURCE).
+   */
+  private async assertAccountActive(
+    studentId: string,
+    requireVerifiedForApply: boolean,
+  ): Promise<void> {
+    if (!this.userRepo) return;
+    const user = await this.userRepo.findById(studentId);
+    if (!user) return;
+
+    if (user.status === 'DELETED' || user.status === 'BLOCKED') {
+      throw new DomainException(
+        ErrorCode.UNAUTHENTICATED,
+        'Tài khoản đã bị xóa hoặc khóa, phiên làm việc đã bị thu hồi',
+        401,
+      );
+    }
+
+    if (requireVerifiedForApply && user.status === 'PENDING_VERIFICATION') {
+      throw DomainException.forbidden(
+        'Tài khoản chưa xác minh OTP không được tạo Preview, ký Consent hoặc nộp hồ sơ ứng tuyển',
+      );
+    }
   }
 
   /**
