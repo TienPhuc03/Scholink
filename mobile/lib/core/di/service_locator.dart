@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 // Core Infrastructure
 import '../database/local_cache_manager.dart';
+import '../database/room_database.dart';
 import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
 import '../storage/secure_storage_helper.dart';
@@ -10,7 +11,7 @@ import '../storage/secure_storage_helper.dart';
 import '../../features/auth/auth_repository.dart';
 import '../../features/auth/login_viewmodel.dart';
 
-// Feature 2: Opportunity
+// Feature 2: Opportunity (Tuần 1 - F02 & Tuần 2 - F11)
 import '../../features/opportunity/opportunity_repository.dart';
 import '../../features/opportunity/opportunity_viewmodel.dart';
 
@@ -26,9 +27,13 @@ import '../../features/chat/chat_viewmodel.dart';
 import '../../features/passport/passport_repository.dart';
 import '../../features/passport/passport_viewmodel.dart';
 
+// Feature 6: Notification & Calendar Sync (Tuần 3 - F20)
+import '../../features/notification/notification_repository.dart';
+import '../../features/notification/notification_viewmodel.dart';
+
 final GetIt sl = GetIt.instance;
 
-/// Simple Dependency Injection setup for MVVM + Repository pattern.
+/// Centralized Dependency Injection setup for MVVM + Repository pattern.
 Future<void> setupServiceLocator() async {
   // 1. Core Infrastructure Singletons
   final SecureStorageHelper secureStorage = SecureStorageHelperImpl();
@@ -36,6 +41,10 @@ Future<void> setupServiceLocator() async {
 
   final LocalCacheManager localCache = await SharedPreferencesCacheManager.create();
   sl.registerSingleton<LocalCacheManager>(localCache);
+
+  // Room Database for structured table schemas and offline caching
+  final RoomDatabase roomDb = RoomDatabaseImpl(localCache);
+  sl.registerSingleton<RoomDatabase>(roomDb);
 
   final ApiClient apiClient = DioApiClient(secureStorage: secureStorage);
   sl.registerSingleton<ApiClient>(apiClient);
@@ -54,6 +63,7 @@ Future<void> setupServiceLocator() async {
   sl.registerLazySingleton<OpportunityRepository>(
     () => OpportunityRepository(
       apiClient: sl<ApiClient>(),
+      roomDb: sl<RoomDatabase>(),
       localCache: sl<LocalCacheManager>(),
     ),
   );
@@ -68,6 +78,13 @@ Future<void> setupServiceLocator() async {
 
   sl.registerLazySingleton<PassportRepository>(
     () => PassportRepository(sl<ApiClient>()),
+  );
+
+  sl.registerLazySingleton<NotificationRepository>(
+    () => NotificationRepository(
+      apiClient: sl<ApiClient>(),
+      roomDb: sl<RoomDatabase>(),
+    ),
   );
 
   // 3. Feature ViewModels (Factory instances for Views)
@@ -96,5 +113,9 @@ Future<void> setupServiceLocator() async {
 
   sl.registerFactory<PassportViewModel>(
     () => PassportViewModel(sl<PassportRepository>()),
+  );
+
+  sl.registerFactory<NotificationViewModel>(
+    () => NotificationViewModel(sl<NotificationRepository>()),
   );
 }

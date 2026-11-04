@@ -9,7 +9,12 @@ import 'features/auth/login_view.dart';
 import 'features/auth/login_viewmodel.dart';
 import 'features/chat/chat_view.dart';
 import 'features/chat/chat_viewmodel.dart';
+import 'features/notification/notification_inbox_view.dart';
+import 'features/notification/notification_viewmodel.dart';
+import 'features/notification/reminder_settings_sheet.dart';
+import 'features/opportunity/opportunity_detail_view.dart';
 import 'features/opportunity/opportunity_list_view.dart';
+import 'features/opportunity/opportunity_model.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
 import 'features/passport/passport_view.dart';
 import 'features/passport/passport_viewmodel.dart';
@@ -61,6 +66,26 @@ class _ScholinkAppState extends State<ScholinkApp> {
     });
   }
 
+  void _openOpportunityDetail(OpportunityModel opp) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext ctx) => OpportunityDetailView(
+          opportunity: opp,
+          viewModel: sl<OpportunityViewModel>(),
+          isGuest: _isGuest,
+          onOpenReminderSettings: () {
+            ReminderSettingsSheet.show(
+              ctx,
+              opportunity: opp,
+              viewModel: sl<NotificationViewModel>(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -95,12 +120,22 @@ class _ScholinkAppState extends State<ScholinkApp> {
         children: <Widget>[
           OpportunityListView(
             viewModel: sl<OpportunityViewModel>(),
+            isGuest: _isGuest,
+            onOpportunityTap: _openOpportunityDetail,
+            onOpenNotificationInbox: () {
+              setState(() {
+                _currentTabIndex = 3; // Switch to Notification Inbox Tab
+              });
+            },
           ),
           TeamListView(
             viewModel: sl<TeamViewModel>(),
           ),
           ChatView(
             viewModel: sl<ChatViewModel>(),
+          ),
+          NotificationInboxView(
+            viewModel: sl<NotificationViewModel>(),
           ),
           PassportView(
             viewModel: sl<PassportViewModel>(),
@@ -129,6 +164,11 @@ class _ScholinkAppState extends State<ScholinkApp> {
             icon: Icon(Icons.chat_bubble_outline_rounded),
             selectedIcon: Icon(Icons.chat_bubble_rounded, color: AppColors.primary),
             label: 'Chat',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_none_rounded),
+            selectedIcon: Icon(Icons.notifications_rounded, color: AppColors.primary),
+            label: 'Thông báo',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
