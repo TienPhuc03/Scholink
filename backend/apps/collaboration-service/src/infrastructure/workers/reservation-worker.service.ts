@@ -58,7 +58,7 @@ export class ReservationWorkerService implements OnModuleInit, OnModuleDestroy {
           if (intentResult.outcome === 'COMMITTED') {
             // Reconcile: COMMITTED đối chiếu Application
             this.logger.log(`[Worker] Opportunity đã COMMITTED application cho reservation ${res.id}. Reconcile xác nhận đội...`);
-            res.confirm();
+            res.confirm(true);
             await this.teamRepo.updateReservation(res);
 
             const team = await this.teamRepo.findById(res.teamId);

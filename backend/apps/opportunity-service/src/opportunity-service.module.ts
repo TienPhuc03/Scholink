@@ -22,6 +22,10 @@ import {
   BookmarkSchema,
   ExternalRegistrationModel,
   ExternalRegistrationSchema,
+  CrawlerSourceModel,
+  CrawlerSourceSchema,
+  CrawlerAlertModel,
+  CrawlerAlertSchema,
 } from "./infrastructure/persistence/opportunity.schema";
 import {
   SubmissionPreviewModel,
@@ -107,6 +111,8 @@ import { COLLABORATION_GRPC_CLIENT } from "./application/use-cases/collaboration
         name: ExternalRegistrationModel.name,
         schema: ExternalRegistrationSchema,
       },
+      { name: CrawlerSourceModel.name, schema: CrawlerSourceSchema },
+      { name: CrawlerAlertModel.name, schema: CrawlerAlertSchema },
       { name: SubmissionPreviewModel.name, schema: SubmissionPreviewSchema },
       { name: ApplicationModel.name, schema: ApplicationSchema },
       {

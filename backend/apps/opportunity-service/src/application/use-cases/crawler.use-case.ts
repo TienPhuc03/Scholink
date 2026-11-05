@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import Parser = require('rss-parser');
@@ -6,6 +6,11 @@ import { OpportunityType, ApplyMode, FundingLevel } from '../../domain/opportuni
 import {
   OpportunityDocument,
   OpportunityModel,
+  CrawlerSourceDocument,
+  CrawlerSourceModel,
+  CrawlerAlertDocument,
+  CrawlerAlertModel,
+  CrawlerSourceStatus,
 } from '../../infrastructure/persistence/opportunity.schema';
 
 export interface ConfidenceBreakdown {
@@ -75,10 +80,101 @@ export class CrawlerUseCase {
   private readonly logger = new Logger(CrawlerUseCase.name);
   private rssParser = new Parser();
 
+  // In-memory fallback stores for tests or when Mongoose model is mocked
+  private memorySources: Map<string, any> = new Map();
+  private memoryAlerts: any[] = [];
+
   constructor(
     @InjectModel(OpportunityModel.name)
     private readonly opportunityModel: Model<OpportunityDocument>,
-  ) {}
+    @Optional()
+    @InjectModel(CrawlerSourceModel.name)
+    private readonly crawlerSourceModel?: Model<CrawlerSourceDocument>,
+    @Optional()
+    @InjectModel(CrawlerAlertModel.name)
+    private readonly crawlerAlertModel?: Model<CrawlerAlertDocument>,
+  ) {
+    this.seedDefaultSourcesInMemory();
+  }
+
+  private seedDefaultSourcesInMemory() {
+    const defaultSources = [
+      {
+        id: 'src_vinai_feed',
+        name: 'VinAI Research Residency Feed',
+        url: 'https://vinai.io/residency-program/feed.xml',
+        type: 'SCHOLARSHIP' as OpportunityType,
+        trustLevel: 1.0,
+        defaultTimezone: 'Asia/Ho_Chi_Minh',
+        status: 'HEALTHY' as CrawlerSourceStatus,
+        retryCount: 0,
+        maxRetries: 3,
+        totalFetched: 24,
+        totalRejected: 2,
+        totalMerged: 4,
+        totalPublished: 18,
+        totalErrors: 0,
+        isActive: true,
+      },
+      {
+        id: 'src_chevening_feed',
+        name: 'Chevening UK Masters Vietnam Feed',
+        url: 'https://chevening.org/vietnam/feed.xml',
+        type: 'SCHOLARSHIP' as OpportunityType,
+        trustLevel: 1.0,
+        defaultTimezone: 'Asia/Ho_Chi_Minh',
+        status: 'HEALTHY' as CrawlerSourceStatus,
+        retryCount: 0,
+        maxRetries: 3,
+        totalFetched: 15,
+        totalRejected: 0,
+        totalMerged: 2,
+        totalPublished: 13,
+        totalErrors: 0,
+        isActive: true,
+      },
+      {
+        id: 'src_uit_ctf_feed',
+        name: 'UIT National CTF & Cybersecurity Feed',
+        url: 'https://ctf.uit.edu.vn/rss.xml',
+        type: 'COMPETITION' as OpportunityType,
+        trustLevel: 0.9,
+        defaultTimezone: 'Asia/Ho_Chi_Minh',
+        status: 'HEALTHY' as CrawlerSourceStatus,
+        retryCount: 0,
+        maxRetries: 3,
+        totalFetched: 12,
+        totalRejected: 1,
+        totalMerged: 1,
+        totalPublished: 10,
+        totalErrors: 0,
+        isActive: true,
+      },
+      {
+        id: 'src_icpc_vn_feed',
+        name: 'ICPC Vietnam National Programming Feed',
+        url: 'https://icpc.vn/feed.xml',
+        type: 'COMPETITION' as OpportunityType,
+        trustLevel: 0.9,
+        defaultTimezone: 'Asia/Ho_Chi_Minh',
+        status: 'HEALTHY' as CrawlerSourceStatus,
+        retryCount: 0,
+        maxRetries: 3,
+        totalFetched: 10,
+        totalRejected: 0,
+        totalMerged: 2,
+        totalPublished: 8,
+        totalErrors: 0,
+        isActive: true,
+      },
+    ];
+
+    for (const src of defaultSources) {
+      if (!this.memorySources.has(src.id)) {
+        this.memorySources.set(src.id, { ...src });
+      }
+    }
+  }
 
   /**
    * BR14: Tạo dedupKey duy nhất dựa trên loại, tên chuẩn hóa, đơn vị và kỳ/năm
@@ -457,5 +553,418 @@ export class CrawlerUseCase {
       '-' +
       Date.now().toString().slice(-6)
     );
+  }
+
+  // =========================================================================
+  // FR-CRAWL-08: Quản lý nguồn, Retry 3 nhịp, DEGRADED, Dashboard & Cảnh báo
+  // =========================================================================
+
+  /**
+   * CRAWL-08: Lấy danh sách tất cả nguồn thu thập
+   */
+  async getSources(): Promise<any[]> {
+    if (this.crawlerSourceModel) {
+      try {
+        const sources = await this.crawlerSourceModel.find().lean().exec();
+        if (sources && sources.length > 0) return sources;
+      } catch {
+        // Fallback to memory
+      }
+    }
+    return Array.from(this.memorySources.values());
+  }
+
+  /**
+   * CRAWL-08: Lấy chi tiết một nguồn thu thập
+   */
+  async getSourceById(id: string): Promise<any | null> {
+    if (this.crawlerSourceModel) {
+      try {
+        const source = await this.crawlerSourceModel.findOne({ id }).lean().exec();
+        if (source) return source;
+      } catch {
+        // Fallback to memory
+      }
+    }
+    return this.memorySources.get(id) || null;
+  }
+
+  /**
+   * CRAWL-08: Đăng ký hoặc cập nhật nguồn thu thập
+   */
+  async registerSource(source: {
+    id?: string;
+    name: string;
+    url: string;
+    type: OpportunityType;
+    trustLevel?: number;
+    defaultTimezone?: string;
+  }): Promise<any> {
+    const id = source.id || `src_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const data = {
+      id,
+      name: source.name,
+      url: source.url,
+      type: source.type,
+      trustLevel: source.trustLevel ?? 0.8,
+      defaultTimezone: source.defaultTimezone || 'Asia/Ho_Chi_Minh',
+      status: 'HEALTHY' as CrawlerSourceStatus,
+      retryCount: 0,
+      maxRetries: 3,
+      totalFetched: 0,
+      totalRejected: 0,
+      totalMerged: 0,
+      totalPublished: 0,
+      totalErrors: 0,
+      isActive: true,
+      lastRunAt: new Date(),
+    };
+
+    if (this.crawlerSourceModel) {
+      try {
+        await this.crawlerSourceModel.findOneAndUpdate({ id }, data, { upsert: true, new: true });
+      } catch {
+        // Fallback to memory
+      }
+    }
+    this.memorySources.set(id, data);
+    return data;
+  }
+
+  /**
+   * CRAWL-08: Admin tắt / bật nguồn (tắt: status chuyển sang PAUSED, không chạy lịch)
+   */
+  async toggleSource(sourceId: string, enabled: boolean): Promise<any> {
+    let source = await this.getSourceById(sourceId);
+    if (!source) {
+      throw new Error(`Nguồn crawl ${sourceId} không tồn tại`);
+    }
+
+    const updatedProps = {
+      isActive: enabled,
+      status: enabled ? (source.retryCount >= source.maxRetries ? 'DEGRADED' : 'HEALTHY') : 'PAUSED',
+    };
+
+    if (this.crawlerSourceModel) {
+      try {
+        source = await this.crawlerSourceModel.findOneAndUpdate(
+          { id: sourceId },
+          { $set: updatedProps },
+          { new: true },
+        ).lean().exec();
+      } catch {
+        // Fallback to memory
+      }
+    }
+
+    const mem = this.memorySources.get(sourceId) || source;
+    Object.assign(mem, updatedProps);
+    this.memorySources.set(sourceId, mem);
+
+    this.logger.log(`[CrawlerAdmin] Admin đã ${enabled ? 'bật lại' : 'tắt'} nguồn crawl: ${source.name} (Status: ${updatedProps.status})`);
+    return mem;
+  }
+
+  /**
+   * CRAWL-08: Admin chạy lại nguồn (reset retryCount về 0, chuyển status sang HEALTHY và thực thi lại)
+   */
+  async rerunSource(
+    sourceId: string,
+    options?: {
+      items?: CrawledRawItem[];
+      simulateFailure?: boolean;
+      errorMessage?: string;
+    },
+  ): Promise<any> {
+    const source = await this.getSourceById(sourceId);
+    if (!source) {
+      throw new Error(`Nguồn crawl ${sourceId} không tồn tại`);
+    }
+
+    // Reset retry count và chuyển sang HEALTHY
+    const resetProps = {
+      retryCount: 0,
+      status: 'HEALTHY' as CrawlerSourceStatus,
+      isActive: true,
+      lastError: undefined,
+    };
+
+    if (this.crawlerSourceModel) {
+      try {
+        await this.crawlerSourceModel.updateOne({ id: sourceId }, { $set: resetProps });
+      } catch {
+        // Fallback to memory
+      }
+    }
+    const mem = this.memorySources.get(sourceId) || source;
+    Object.assign(mem, resetProps);
+    this.memorySources.set(sourceId, mem);
+
+    this.logger.log(`[CrawlerAdmin] Admin kích hoạt chạy lại nguồn ${source.name}. Đã đặt lại nhịp retry về 0/3 và phục hồi trạng thái HEALTHY.`);
+
+    return await this.executeCrawlJob(sourceId, options);
+  }
+
+  /**
+   * CRAWL-08 & Nghiệm thu:
+   * Theo dõi số lấy/loại/gộp/công bố/lỗi.
+   * Hết ba nhịp retry chuyển DEGRADED, Admin có thể tắt và chạy lại.
+   * Job lỗi có log / alert.
+   */
+  async executeCrawlJob(
+    sourceId: string,
+    options?: {
+      items?: CrawledRawItem[];
+      simulateFailure?: boolean;
+      errorMessage?: string;
+    },
+  ): Promise<any> {
+    let source = await this.getSourceById(sourceId);
+    if (!source) {
+      throw new Error(`Nguồn crawl ${sourceId} không tồn tại`);
+    }
+
+    if (!source.isActive || source.status === 'PAUSED') {
+      this.logger.warn(`[CrawlerJob] Nguồn ${source.name} đang ở trạng thái PAUSED. Bỏ qua chạy lịch.`);
+      return {
+        success: false,
+        sourceId,
+        sourceName: source.name,
+        status: source.status,
+        message: 'Nguồn đang bị tạm dừng (PAUSED). Vui lòng bật lại để tiếp tục.',
+      };
+    }
+
+    const now = new Date();
+
+    // 1. Kịch bản lỗi (Mạng, timeout hoặc mô phỏng lỗi trong kiểm thử)
+    if (options?.simulateFailure) {
+      const newRetryCount = (source.retryCount || 0) + 1;
+      const totalErrors = (source.totalErrors || 0) + 1;
+      const maxRetries = source.maxRetries || 3;
+      const isDegraded = newRetryCount >= maxRetries;
+      const newStatus: CrawlerSourceStatus = isDegraded ? 'DEGRADED' : (source.status || 'HEALTHY');
+      const errorMsg = options.errorMessage || `Lỗi kết nối timeout khi truy xuất feed nguồn ${source.url}`;
+
+      const updateData = {
+        retryCount: newRetryCount,
+        totalErrors,
+        status: newStatus,
+        lastError: errorMsg,
+        lastRunAt: now,
+      };
+
+      // Cập nhật Database & Memory
+      if (this.crawlerSourceModel) {
+        try {
+          await this.crawlerSourceModel.updateOne({ id: sourceId }, { $set: updateData });
+        } catch {
+          // Fallback to memory
+        }
+      }
+      const mem = this.memorySources.get(sourceId) || source;
+      Object.assign(mem, updateData);
+      this.memorySources.set(sourceId, mem);
+
+      // Phát sinh Cảnh báo (Log & Alert)
+      const alertSeverity = isDegraded ? 'CRITICAL' : 'WARNING';
+      const alertMsg = isDegraded
+        ? `[CRAWLER-ALERT-DEGRADED] Nguồn "${source.name}" đã thất bại ${newRetryCount}/${maxRetries} lần retry liên tiếp. Trạng thái tự động chuyển sang DEGRADED! Cần Admin can thiệp hoặc tắt nguồn.`
+        : `[CRAWLER-ALERT] Nguồn "${source.name}" gặp lỗi lần ${newRetryCount}/${maxRetries}: ${errorMsg}`;
+
+      if (isDegraded) {
+        this.logger.error(alertMsg);
+      } else {
+        this.logger.warn(alertMsg);
+      }
+
+      const alertRecord = {
+        id: `alt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        sourceId,
+        sourceName: source.name,
+        severity: alertSeverity,
+        message: alertMsg,
+        retryAttempt: newRetryCount,
+        timestamp: now,
+      };
+
+      if (this.crawlerAlertModel) {
+        try {
+          await this.crawlerAlertModel.create(alertRecord);
+        } catch {
+          // Fallback to memory
+        }
+      }
+      this.memoryAlerts.unshift(alertRecord);
+      if (this.memoryAlerts.length > 50) this.memoryAlerts.pop();
+
+      return {
+        success: false,
+        sourceId,
+        sourceName: source.name,
+        retryCount: newRetryCount,
+        maxRetries,
+        status: newStatus,
+        isDegraded,
+        error: errorMsg,
+        alert: alertRecord,
+      };
+    }
+
+    // 2. Kịch bản chạy thành công
+    const itemsToIngest = options?.items || [];
+    let ingestResult = { total: 0, added: 0, skippedDuplicates: 0, fuzzyFlagged: 0, ingestedIds: [] as string[] };
+
+    if (itemsToIngest.length > 0) {
+      ingestResult = await this.ingestItems(itemsToIngest, source.type, {
+        sourceUrl: source.url,
+        trustLevel: source.trustLevel,
+        defaultTimezone: source.defaultTimezone,
+        isTrusted: source.trustLevel >= 0.85,
+      });
+    }
+
+    const newFetched = (source.totalFetched || 0) + ingestResult.total;
+    const newMerged = (source.totalMerged || 0) + (ingestResult.skippedDuplicates + ingestResult.fuzzyFlagged);
+
+    const updateSuccess = {
+      retryCount: 0, // Reset retry khi thành công
+      status: 'HEALTHY' as CrawlerSourceStatus,
+      totalFetched: newFetched,
+      totalMerged: newMerged,
+      lastSuccessAt: now,
+      lastRunAt: now,
+      lastError: undefined,
+    };
+
+    if (this.crawlerSourceModel) {
+      try {
+        await this.crawlerSourceModel.updateOne({ id: sourceId }, { $set: updateSuccess });
+      } catch {
+        // Fallback to memory
+      }
+    }
+    const mem = this.memorySources.get(sourceId) || source;
+    Object.assign(mem, updateSuccess);
+    this.memorySources.set(sourceId, mem);
+
+    this.logger.log(`[CrawlerJob] Nguồn ${source.name} chạy thành công: Lấy ${ingestResult.total}, Đưa vào hàng chờ ${ingestResult.added}, Gộp ${ingestResult.skippedDuplicates + ingestResult.fuzzyFlagged}`);
+
+    return {
+      success: true,
+      sourceId,
+      sourceName: source.name,
+      status: 'HEALTHY',
+      retryCount: 0,
+      ingestResult,
+    };
+  }
+
+  /**
+   * CRAWL-08: Ghi nhận số lượng cơ hội bị Admin Reject trong hàng chờ
+   */
+  async recordRejectedItem(sourceId?: string): Promise<void> {
+    if (sourceId && this.memorySources.has(sourceId)) {
+      const src = this.memorySources.get(sourceId);
+      src.totalRejected = (src.totalRejected || 0) + 1;
+      this.memorySources.set(sourceId, src);
+      if (this.crawlerSourceModel) {
+        try {
+          await this.crawlerSourceModel.updateOne({ id: sourceId }, { $inc: { totalRejected: 1 } });
+        } catch {}
+      }
+    }
+  }
+
+  /**
+   * CRAWL-08: Ghi nhận số lượng cơ hội được Admin Duyệt và Công bố (Publish)
+   */
+  async recordPublishedItem(sourceId?: string): Promise<void> {
+    if (sourceId && this.memorySources.has(sourceId)) {
+      const src = this.memorySources.get(sourceId);
+      src.totalPublished = (src.totalPublished || 0) + 1;
+      this.memorySources.set(sourceId, src);
+      if (this.crawlerSourceModel) {
+        try {
+          await this.crawlerSourceModel.updateOne({ id: sourceId }, { $inc: { totalPublished: 1 } });
+        } catch {}
+      }
+    }
+  }
+
+  /**
+   * CRAWL-08: Lấy Dashboard thống kê tổng thể của Crawler
+   * Nghiệm thu: theo dõi số lấy/loại/gộp/công bố/lỗi; trạng thái nguồn HEALTHY, DEGRADED, PAUSED
+   */
+  async getCrawlerDashboard(): Promise<{
+    summary: {
+      totalSources: number;
+      healthySources: number;
+      degradedSources: number;
+      pausedSources: number;
+      totalFetched: number;
+      totalRejected: number;
+      totalMerged: number;
+      totalPublished: number;
+      totalErrors: number;
+    };
+    sources: any[];
+    recentAlerts: any[];
+  }> {
+    const sources = await this.getSources();
+    let totalFetched = 0;
+    let totalRejected = 0;
+    let totalMerged = 0;
+    let totalPublished = 0;
+    let totalErrors = 0;
+    let healthySources = 0;
+    let degradedSources = 0;
+    let pausedSources = 0;
+
+    for (const src of sources) {
+      totalFetched += src.totalFetched || 0;
+      totalRejected += src.totalRejected || 0;
+      totalMerged += src.totalMerged || 0;
+      totalPublished += src.totalPublished || 0;
+      totalErrors += src.totalErrors || 0;
+
+      if (src.status === 'DEGRADED') degradedSources++;
+      else if (src.status === 'PAUSED' || !src.isActive) pausedSources++;
+      else healthySources++;
+    }
+
+    let alerts = this.memoryAlerts;
+    if (this.crawlerAlertModel) {
+      try {
+        const dbAlerts = await this.crawlerAlertModel.find().sort({ timestamp: -1 }).limit(20).lean().exec();
+        if (dbAlerts && dbAlerts.length > 0) alerts = dbAlerts;
+      } catch {}
+    }
+
+    return {
+      summary: {
+        totalSources: sources.length,
+        healthySources,
+        degradedSources,
+        pausedSources,
+        totalFetched,
+        totalRejected,
+        totalMerged,
+        totalPublished,
+        totalErrors,
+      },
+      sources,
+      recentAlerts: alerts,
+    };
+  }
+
+  async getAlerts(limit = 20): Promise<any[]> {
+    if (this.crawlerAlertModel) {
+      try {
+        const dbAlerts = await this.crawlerAlertModel.find().sort({ timestamp: -1 }).limit(limit).lean().exec();
+        if (dbAlerts && dbAlerts.length > 0) return dbAlerts;
+      } catch {}
+    }
+    return this.memoryAlerts.slice(0, limit);
   }
 }

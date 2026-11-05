@@ -218,6 +218,10 @@ class InMemoryChatRepository implements IChatRepository {
     return null;
   }
 
+  async findMessagesByRoom(roomId: string, afterSeq?: number, limit?: number): Promise<Message[]> {
+    return [];
+  }
+
   async saveMessageWithOutboxInTransaction(): Promise<any> {
     return { message: {} as any, isDuplicate: false };
   }
@@ -232,12 +236,9 @@ class InMemoryChatRepository implements IChatRepository {
     return [];
   }
 
-  async markOutboxPublished(): Promise<void> {}
+  async markOutboxPublished(id: string): Promise<void> {}
 
-  async markOutboxFailed(): Promise<void> {}
-
-  async markOutboxPublished(): Promise<void> {}
-  async markOutboxFailed(): Promise<void> {}
+  async markOutboxFailed(id: string, error: string, nextRetryAt: Date, retryCount: number): Promise<void> {}
 }
 
 /**

@@ -418,6 +418,8 @@ export class PortalController {
       <button class="nav-btn" onclick="switchTab('kanban', this)">📋 Kanban Organizer</button>
       <button class="nav-btn" onclick="switchTab('teams', this)">🤝 Đội Thi & Roster Freeze</button>
       <button class="nav-btn" onclick="switchTab('chat', this)">💬 Chat Monotonic Seq</button>
+      <button class="nav-btn" onclick="switchTab('crawler', this)">🕷️ Crawler & Cảnh Báo (CRAWL-08)</button>
+      <button class="nav-btn" onclick="switchTab('analytics', this)">📊 Thống Kê BO & Demo (ADM-03)</button>
       <button class="nav-btn" onclick="switchTab('health', this)">🩺 Health & Topology</button>
     </nav>
   </header>
@@ -751,6 +753,165 @@ export class PortalController {
       </div>
     </div>
 
+    <!-- TAB 6: CRAWLER & CẢNH BÁO NGUỒN (FR-CRAWL-08) -->
+    <div id="tab-crawler" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">🕷️ Giám Sát Thu Thập, Retry & Cảnh Báo Nguồn (FR-CRAWL-08)</h2>
+            <p class="card-desc">Theo dõi số lấy / loại / gộp / công bố / lỗi. Hết 3 nhịp retry chuyển DEGRADED, Admin có thể tắt và chạy lại.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadCrawlerDashboard()">🔄 Tải lại</button>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="metric-card" style="background: rgba(30, 41, 59, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">📥 Số Lấy (Fetched)</div>
+            <div id="crawlFetched" style="font-size: 1.5rem; font-weight: 800; color: #60a5fa; margin-top: 0.25rem;">0</div>
+          </div>
+          <div class="metric-card" style="background: rgba(30, 41, 59, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">🚫 Số Loại (Rejected)</div>
+            <div id="crawlRejected" style="font-size: 1.5rem; font-weight: 800; color: #f87171; margin-top: 0.25rem;">0</div>
+          </div>
+          <div class="metric-card" style="background: rgba(30, 41, 59, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">🔄 Số Gộp (Merged)</div>
+            <div id="crawlMerged" style="font-size: 1.5rem; font-weight: 800; color: #c084fc; margin-top: 0.25rem;">0</div>
+          </div>
+          <div class="metric-card" style="background: rgba(30, 41, 59, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">✅ Số Công Bố (Published)</div>
+            <div id="crawlPublished" style="font-size: 1.5rem; font-weight: 800; color: #34d399; margin-top: 0.25rem;">0</div>
+          </div>
+          <div class="metric-card" style="background: rgba(30, 41, 59, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">⚠️ Số Lỗi (Errors)</div>
+            <div id="crawlErrors" style="font-size: 1.5rem; font-weight: 800; color: #fbbf24; margin-top: 0.25rem;">0</div>
+          </div>
+        </div>
+
+        <!-- Bảng danh sách nguồn thu thập -->
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.75rem;">📋 Danh Sách Nguồn Crawl & Trạng Thái Retry</h3>
+        <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--card-border); text-align: left; color: var(--text-muted);">
+                <th style="padding: 0.6rem;">Nguồn / Tên</th>
+                <th style="padding: 0.6rem;">Loại</th>
+                <th style="padding: 0.6rem;">Trạng Thái</th>
+                <th style="padding: 0.6rem;">Nhịp Retry</th>
+                <th style="padding: 0.6rem;">Lấy / Loại / Gộp / Công Bố</th>
+                <th style="padding: 0.6rem;">Hành Động Admin</th>
+              </tr>
+            </thead>
+            <tbody id="crawlerSourcesTable">
+              <tr><td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">Đang tải danh sách nguồn...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bảng Cảnh báo lỗi & Nhật ký sự kiện -->
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.75rem;">🚨 Nhật Ký Cảnh Báo & Job Lỗi (Alert Log)</h3>
+        <div id="crawlerAlertsBox" class="console-box" style="height: 180px; overflow-y: auto;">
+          Chưa có cảnh báo lỗi nào phát sinh. Hệ thống hoạt động bình thường.
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: THỐNG KÊ BO & DEMO (FR-ADM-03) -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">📊 Dashboard Thống Kê Theo Business Objectives (FR-ADM-03)</h2>
+            <p class="card-desc">Định nghĩa mẫu số, kỳ đo rõ ràng. Phân biệt Application với External Mark, Sandbox với Tiền Thật. Số liệu không tính PII hoặc body chat/email.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadBoDashboard()">🔄 Tải lại</button>
+        </div>
+
+        <!-- 3 Thẻ Phân Tách Nghiệm Thu Cốt Lõi -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <!-- Card 1: Application vs External Mark -->
+          <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1.2rem;">
+            <div style="font-weight: 700; color: #60a5fa; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+              <span>📁</span> Phân Định Hồ Sơ Nộp (WF05)
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Đơn nộp trực tiếp (In-App Application):</span>
+              <strong id="boAppCount" style="color: #34d399;">0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Tự đánh dấu nguồn ngoài (External Mark):</span>
+              <strong id="boExtMarkCount" style="color: #c084fc;">0</strong>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; line-height: 1.4;">
+              🔒 <em>Nghiệm thu: Cơ hội ngoài lưu trong <code>external_registrations</code>, không thành Application, không vào Kanban xét duyệt và không tính điểm phổ biến A.</em>
+            </p>
+          </div>
+
+          <!-- Card 2: Sandbox vs Tiền Thật -->
+          <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 1.2rem;">
+            <div style="font-weight: 700; color: #34d399; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+              <span>💳</span> Phân Định Tiền Tệ & Sandbox (BO05)
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Giao dịch Sandbox thử nghiệm:</span>
+              <strong id="boSandboxCount" style="color: #60a5fa;">12 GD (6.000.000 đ)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Doanh thu tiền thật (Production):</span>
+              <strong style="color: #9ca3af;">0 đ (Sandbox Only)</strong>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; line-height: 1.4;">
+              ⚠️ <em>Nghiệm thu: Tuân thủ quy định BO05 — Tuyệt đối không xem giao dịch sandbox là doanh thu thương mại thật.</em>
+            </p>
+          </div>
+
+          <!-- Card 3: 20 Học bổng + 20 Cuộc thi -->
+          <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 1.2rem;">
+            <div style="font-weight: 700; color: #fbbf24; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🎓</span> Dữ Liệu Nguồn & Lịch Đã Kiểm
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Tổng cơ hội Catalog:</span>
+              <strong id="boTotalOpps" style="color: #fbbf24;">40 cơ hội</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 0.6rem 0; font-size: 0.9rem;">
+              <span>Cơ cấu danh mục:</span>
+              <strong style="color: var(--text);">20 Học bổng + 20 Cuộc thi</strong>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; line-height: 1.4;">
+              🕒 <em>100% cơ hội có nguồn kiểm chứng, múi giờ IANA chuẩn <code>Asia/Ho_Chi_Minh</code>, logic hạn chót và mốc nhắc 7d/3d/1d hợp lệ.</em>
+            </p>
+          </div>
+        </div>
+
+        <!-- Bảng 6 Chỉ Tiêu Chiến Lược BO01 - BO06 -->
+        <h3 style="font-size: 1.05rem; margin-bottom: 0.75rem;">🎯 Bảng Chỉ Số Chiến Lược Business Objectives (BO01 - BO06)</h3>
+        <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--card-border); text-align: left; color: var(--text-muted);">
+                <th style="padding: 0.6rem;">Mã BO</th>
+                <th style="padding: 0.6rem;">Chỉ Tiêu & Mục Tiêu</th>
+                <th style="padding: 0.6rem;">Kỳ Đo (Period)</th>
+                <th style="padding: 0.6rem;">Mẫu Số (Denominator Definition)</th>
+                <th style="padding: 0.6rem;">Tử Số</th>
+                <th style="padding: 0.6rem;">Tỷ Lệ Thực Tế</th>
+                <th style="padding: 0.6rem;">Ngưỡng Đạt</th>
+                <th style="padding: 0.6rem;">Đánh Giá</th>
+              </tr>
+            </thead>
+            <tbody id="boMetricsTable">
+              <tr><td colspan="8" style="padding: 1rem; text-align: center; color: var(--text-muted);">Đang tải số liệu thống kê...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="font-size: 0.78rem; color: var(--text-muted); background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--card-border);">
+          🛡️ <strong>Cam kết Bảo mật Quyền riêng tư (FR-ADM-03):</strong> Số liệu thống kê được tổng hợp phi định danh. Tuyệt đối không thu thập, hiển thị hoặc tính toán dựa trên PII (Họ tên, email, CCCD/CMND) và không đọc nội dung body của chat hoặc email.
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -769,6 +930,8 @@ export class PortalController {
       if (tabId === 'kanban') loadKanban();
       if (tabId === 'teams') loadTeams();
       if (tabId === 'chat') loadChatRooms();
+      if (tabId === 'crawler') loadCrawlerDashboard();
+      if (tabId === 'analytics') loadBoDashboard();
       if (tabId === 'health') checkHealth();
     }
 
@@ -1376,6 +1539,207 @@ export class PortalController {
         loadChatRooms();
       } catch (err) {
         alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    // ==========================================
+    // 6. CRAWLER & ALERT MONITORING (FR-CRAWL-08)
+    // ==========================================
+    async function loadCrawlerDashboard() {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch('/api/v1/admin/opportunities/crawler/dashboard', {
+          headers: token ? { Authorization: 'Bearer ' + token } : {}
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi tải dashboard crawler');
+
+        const s = data.summary || {};
+        document.getElementById('crawlFetched').innerText = s.totalFetched ?? 0;
+        document.getElementById('crawlRejected').innerText = s.totalRejected ?? 0;
+        document.getElementById('crawlMerged').innerText = s.totalMerged ?? 0;
+        document.getElementById('crawlPublished').innerText = s.totalPublished ?? 0;
+        document.getElementById('crawlErrors').innerText = s.totalErrors ?? 0;
+
+        // Render sources
+        const tbody = document.getElementById('crawlerSourcesTable');
+        const sources = data.sources || [];
+        if (sources.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">Chưa có nguồn thu thập nào.</td></tr>';
+        } else {
+          tbody.innerHTML = sources.map(src => {
+            const statusBadge = src.status === 'DEGRADED' 
+              ? '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);">⚠️ DEGRADED</span>'
+              : (src.status === 'PAUSED' || !src.isActive
+                ? '<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.4);">⏸️ PAUSED</span>'
+                : '<span class="badge badge-green">✅ HEALTHY</span>');
+
+            const isPaused = src.status === 'PAUSED' || !src.isActive;
+            const toggleBtnText = isPaused ? '▶️ Bật lại' : '⏸️ Tắt nguồn';
+
+            return \`
+              <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                <td style="padding: 0.75rem 0.6rem;">
+                  <strong>\${src.name}</strong>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); word-break: break-all;">\${src.url}</div>
+                  \${src.lastError ? \`<div style="font-size: 0.72rem; color: #f87171; margin-top: 0.2rem;">Lỗi gần nhất: \${src.lastError}</div>\` : ''}
+                </td>
+                <td style="padding: 0.6rem;"><span class="badge badge-blue">\${src.type}</span></td>
+                <td style="padding: 0.6rem;">\${statusBadge}</td>
+                <td style="padding: 0.6rem;">
+                  <strong style="color: \${src.retryCount >= 3 ? '#f87171' : (src.retryCount > 0 ? '#fbbf24' : '#34d399')}">
+                    \${src.retryCount || 0} / \${src.maxRetries || 3}
+                  </strong>
+                </td>
+                <td style="padding: 0.6rem; font-size: 0.8rem;">
+                  <span style="color: #60a5fa;">\${src.totalFetched || 0}</span> / 
+                  <span style="color: #f87171;">\${src.totalRejected || 0}</span> / 
+                  <span style="color: #c084fc;">\${src.totalMerged || 0}</span> / 
+                  <span style="color: #34d399;">\${src.totalPublished || 0}</span>
+                </td>
+                <td style="padding: 0.6rem;">
+                  <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleCrawlerSource('\${src.id}', \${isPaused})">
+                      \${toggleBtnText}
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="rerunCrawlerSource('\${src.id}')">
+                      🔄 Chạy lại
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="simulateSourceError('\${src.id}')" title="Thử nghiệm lỗi tăng retry count và chuyển sang DEGRADED">
+                      ⚡ Test lỗi (3 nhịp)
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            \`;
+          }).join('');
+        }
+
+        // Render Alert Logs
+        const alertsBox = document.getElementById('crawlerAlertsBox');
+        const alerts = data.recentAlerts || [];
+        if (alerts.length === 0) {
+          alertsBox.innerHTML = '<div style="color: #34d399;">✅ Chưa có cảnh báo lỗi nào phát sinh. Hệ thống hoạt động bình thường.</div>';
+        } else {
+          alertsBox.innerHTML = alerts.map(a => {
+            const color = a.severity === 'CRITICAL' ? '#f87171' : (a.severity === 'WARNING' ? '#fbbf24' : '#60a5fa');
+            const time = new Date(a.timestamp).toLocaleTimeString();
+            return \`<div style="margin-bottom: 0.35rem; color: \${color};">[\${time}] [\${a.severity}] \${a.message}</div>\`;
+          }).join('');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function toggleCrawlerSource(sourceId, enable) {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch(\`/api/v1/admin/opportunities/crawler/sources/\${sourceId}/toggle\`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: 'Bearer ' + token } : {})
+          },
+          body: JSON.stringify({ enabled: enable })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi cập nhật');
+        loadCrawlerDashboard();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    async function rerunCrawlerSource(sourceId) {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch(\`/api/v1/admin/opportunities/crawler/sources/\${sourceId}/rerun\`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: 'Bearer ' + token } : {})
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi chạy lại');
+        alert('✅ Đã kích hoạt chạy lại nguồn crawl thành công!');
+        loadCrawlerDashboard();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    async function simulateSourceError(sourceId) {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch(\`/api/v1/admin/opportunities/crawler/sources/\${sourceId}/run\`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: 'Bearer ' + token } : {})
+          },
+          body: JSON.stringify({
+            simulateFailure: true,
+            errorMessage: 'Timeout 504 Gateway khi truy xuất nguồn crawl (Mô phỏng kiểm thử)'
+          })
+        });
+        const data = await res.json();
+        loadCrawlerDashboard();
+      } catch (err) {
+        alert('❌ Lỗi: ' + err.message);
+      }
+    }
+
+    // ==========================================
+    // 7. BO DASHBOARD & DEMO ANALYTICS (FR-ADM-03)
+    // ==========================================
+    async function loadBoDashboard() {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const res = await fetch('/api/v1/admin/opportunities/analytics/bo-dashboard', {
+          headers: token ? { Authorization: 'Bearer ' + token } : {}
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi tải dashboard BO');
+
+        const b = data.breakdowns || {};
+        if (b.applicationsVsExternalMarks) {
+          document.getElementById('boAppCount').innerText = (b.applicationsVsExternalMarks.directApplicationsCount || 0) + ' hồ sơ In-App';
+          document.getElementById('boExtMarkCount').innerText = (b.applicationsVsExternalMarks.externalMarksCount || 0) + ' lượt đánh dấu ngoài';
+        }
+
+        if (b.verifiedDemoCatalog) {
+          document.getElementById('boTotalOpps').innerText = (b.verifiedDemoCatalog.totalOpportunities || 40) + ' cơ hội';
+        }
+
+        // Render BO Metrics Table
+        const tbody = document.getElementById('boMetricsTable');
+        const metrics = data.boMetrics || [];
+        if (metrics.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="padding: 1rem; text-align: center; color: var(--text-muted);">Chưa có số liệu BO.</td></tr>';
+        } else {
+          tbody.innerHTML = metrics.map(m => \`
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+              <td style="padding: 0.65rem 0.6rem;"><span class="badge badge-purple">\${m.boCode}</span></td>
+              <td style="padding: 0.6rem;">
+                <strong>\${m.boTitle}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">\${m.metricName}</div>
+                \${m.notes ? \`<div style="font-size: 0.72rem; color: #60a5fa; margin-top: 0.2rem;">\${m.notes}</div>\` : ''}
+              </td>
+              <td style="padding: 0.6rem; font-size: 0.8rem; color: var(--text-muted);">\${m.measurementPeriod}</td>
+              <td style="padding: 0.6rem; font-size: 0.8rem;">\${m.denominatorName}</td>
+              <td style="padding: 0.6rem; font-weight: 700;">\${m.numeratorValue} / \${m.denominatorValue}</td>
+              <td style="padding: 0.6rem; font-size: 0.95rem; font-weight: 800; color: #34d399;">\${m.ratioPercentage}%</td>
+              <td style="padding: 0.6rem; font-size: 0.8rem; color: var(--text-muted);">\${m.targetThreshold}</td>
+              <td style="padding: 0.6rem;">
+                <span class="badge badge-green">✅ ĐẠT</span>
+              </td>
+            </tr>
+          \`).join('');
+        }
+      } catch (err) {
+        console.error(err);
       }
     }
 

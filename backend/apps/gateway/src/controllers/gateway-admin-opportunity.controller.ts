@@ -216,5 +216,124 @@ export class GatewayAdminOpportunityController {
       }),
     });
   }
+
+  // =========================================================================
+  // FR-CRAWL-08: Quản lý nguồn crawler, retry 3 nhịp, DEGRADED & cảnh báo
+  // =========================================================================
+
+  @Get('crawler/dashboard')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Lấy dashboard thống kê số lấy/loại/gộp/công bố/lỗi (CRAWL-08)' })
+  async getCrawlerDashboard(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/admin/opportunities/crawler/dashboard', {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Get('crawler/sources')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Lấy danh sách các nguồn thu thập' })
+  async getCrawlerSources(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/admin/opportunities/crawler/sources', {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Post('crawler/sources')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Đăng ký hoặc cập nhật nguồn thu thập' })
+  async registerCrawlerSource(
+    @Headers('authorization') auth: string,
+    @Body() body: any,
+  ) {
+    return forwardOpportunity('/api/v1/admin/opportunities/crawler/sources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Post('crawler/sources/:id/toggle')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Admin tắt hoặc bật lại nguồn crawler (CRAWL-08)' })
+  async toggleCrawlerSource(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return forwardOpportunity(`/api/v1/admin/opportunities/crawler/sources/${id}/toggle`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Post('crawler/sources/:id/rerun')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Admin chạy lại nguồn crawler (Reset nhịp retry về 0 - CRAWL-08)' })
+  async rerunCrawlerSource(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return forwardOpportunity(`/api/v1/admin/opportunities/crawler/sources/${id}/rerun`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Post('crawler/sources/:id/run')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Chạy job crawler cho một nguồn (có kiểm thử lỗi / retry)' })
+  async runCrawlerSource(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return forwardOpportunity(`/api/v1/admin/opportunities/crawler/sources/${id}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Get('crawler/alerts')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Lấy danh sách cảnh báo nguồn lỗi / DEGRADED (CRAWL-08)' })
+  async getCrawlerAlerts(
+    @Headers('authorization') auth: string,
+    @Query('limit') limit?: number,
+  ) {
+    const query = limit ? `?limit=${limit}` : '';
+    return forwardOpportunity(`/api/v1/admin/opportunities/crawler/alerts${query}`, {
+      headers: { Authorization: auth },
+    });
+  }
+
+  // =========================================================================
+  // FR-ADM-03: Dashboard BO, Mẫu số, Kỳ đo & Phân định App vs External / Sandbox
+  // =========================================================================
+
+  @Get('analytics/bo-dashboard')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Lấy báo cáo Dashboard theo BO01-BO06 (ADM-03)' })
+  async getBoDashboard(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/admin/opportunities/analytics/bo-dashboard', {
+      headers: { Authorization: auth },
+    });
+  }
 }
 
