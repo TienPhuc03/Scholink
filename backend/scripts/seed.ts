@@ -1306,8 +1306,145 @@ async function seedOpportunities(organizerId: string, orgId: string) {
     await Opportunity.updateOne({ id: opp.id }, { $set: opp }, { upsert: true });
   }
 
+  // =========================================================================
+  // SEED CRAWLER SOURCES (CRAWL-08) & SAMPLE EXTERNAL REGISTRATION (WF05)
+  // =========================================================================
+  const crawlerSourceSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      type: { type: String, required: true },
+      trustLevel: { type: Number, default: 0.8 },
+      defaultTimezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
+      status: { type: String, default: 'HEALTHY' },
+      retryCount: { type: Number, default: 0 },
+      maxRetries: { type: Number, default: 3 },
+      totalFetched: { type: Number, default: 0 },
+      totalRejected: { type: Number, default: 0 },
+      totalMerged: { type: Number, default: 0 },
+      totalPublished: { type: Number, default: 0 },
+      totalErrors: { type: Number, default: 0 },
+      isActive: { type: Boolean, default: true },
+      lastRunAt: Date,
+      lastSuccessAt: Date,
+    },
+    { timestamps: true },
+  );
+
+  const CrawlerSource = conn.model('crawler_sources', crawlerSourceSchema);
+
+  const crawlerSources = [
+    {
+      id: 'src_vinai_feed',
+      name: 'VinAI Research Residency Feed',
+      url: 'https://vinai.io/residency-program/feed.xml',
+      type: 'SCHOLARSHIP',
+      trustLevel: 1.0,
+      defaultTimezone: 'Asia/Ho_Chi_Minh',
+      status: 'HEALTHY',
+      retryCount: 0,
+      maxRetries: 3,
+      totalFetched: 24,
+      totalRejected: 2,
+      totalMerged: 4,
+      totalPublished: 18,
+      totalErrors: 0,
+      isActive: true,
+      lastRunAt: new Date(),
+      lastSuccessAt: new Date(),
+    },
+    {
+      id: 'src_chevening_feed',
+      name: 'Chevening UK Masters Vietnam Feed',
+      url: 'https://chevening.org/vietnam/feed.xml',
+      type: 'SCHOLARSHIP',
+      trustLevel: 1.0,
+      defaultTimezone: 'Asia/Ho_Chi_Minh',
+      status: 'HEALTHY',
+      retryCount: 0,
+      maxRetries: 3,
+      totalFetched: 15,
+      totalRejected: 0,
+      totalMerged: 2,
+      totalPublished: 13,
+      totalErrors: 0,
+      isActive: true,
+      lastRunAt: new Date(),
+      lastSuccessAt: new Date(),
+    },
+    {
+      id: 'src_uit_ctf_feed',
+      name: 'UIT National CTF & Cybersecurity Feed',
+      url: 'https://ctf.uit.edu.vn/rss.xml',
+      type: 'COMPETITION',
+      trustLevel: 0.9,
+      defaultTimezone: 'Asia/Ho_Chi_Minh',
+      status: 'HEALTHY',
+      retryCount: 0,
+      maxRetries: 3,
+      totalFetched: 12,
+      totalRejected: 1,
+      totalMerged: 1,
+      totalPublished: 10,
+      totalErrors: 0,
+      isActive: true,
+      lastRunAt: new Date(),
+      lastSuccessAt: new Date(),
+    },
+    {
+      id: 'src_icpc_vn_feed',
+      name: 'ICPC Vietnam National Programming Feed',
+      url: 'https://icpc.vn/feed.xml',
+      type: 'COMPETITION',
+      trustLevel: 0.9,
+      defaultTimezone: 'Asia/Ho_Chi_Minh',
+      status: 'HEALTHY',
+      retryCount: 0,
+      maxRetries: 3,
+      totalFetched: 10,
+      totalRejected: 0,
+      totalMerged: 2,
+      totalPublished: 8,
+      totalErrors: 0,
+      isActive: true,
+      lastRunAt: new Date(),
+      lastSuccessAt: new Date(),
+    },
+  ];
+
+  for (const src of crawlerSources) {
+    await CrawlerSource.updateOne({ id: src.id }, { $set: src }, { upsert: true });
+  }
+
+  // Seed sample external registration (WF05: External registration không tạo Application)
+  const extRegSchema = new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true },
+      userId: { type: String, required: true },
+      opportunityId: { type: String, required: true },
+      status: { type: String, required: true, default: 'EXTERNAL_MARKED' },
+    },
+    { timestamps: true },
+  );
+  extRegSchema.index({ userId: 1, opportunityId: 1 }, { unique: true });
+
+  const ExtReg = conn.model('external_registrations', extRegSchema);
+  await ExtReg.updateOne(
+    { userId: 'usr_student_001', opportunityId: 'opp_chevening_vn_2026' },
+    {
+      $set: {
+        id: 'ext_reg_sample_001',
+        userId: 'usr_student_001',
+        opportunityId: 'opp_chevening_vn_2026',
+        status: 'EXTERNAL_MARKED',
+      },
+    },
+    { upsert: true },
+  );
+
   await conn.close();
-  console.log(`  ✅ Hoàn tất Seed cho Opportunity Database (${items.length} Cơ hội chuẩn: 20 Học bổng + 20 Cuộc thi có nguồn thực & múi giờ IANA)`);
+  console.log(`  ✅ Hoàn tất Seed cho Opportunity Database (${items.length} Cơ hội: 20 Học bổng + 20 Cuộc thi đã kiểm, 4 Nguồn Crawler CRAWL-08, 1 External Mark WF05)`);
 }
 
 async function seedBillingAndNotifications(studentId: string) {

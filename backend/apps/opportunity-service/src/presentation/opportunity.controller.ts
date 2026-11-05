@@ -151,4 +151,43 @@ export class OpportunityController {
   ) {
     return this.bookmarkUseCase.toggleBookmark(req.user.userId, opportunityId);
   }
+
+  // ================= WF05 & APP-04: External Registration Marking =================
+  @Post(":id/external-mark")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Tự đánh dấu đã nộp hồ sơ tại website nguồn ngoài (FR-APP-04, WF05)",
+    description: "Chỉ áp dụng cho cơ hội EXTERNAL. Lưu vào external_registrations, KHÔNG tạo Application record.",
+  })
+  @ApiParam({ name: "id", description: "ID cơ hội EXTERNAL" })
+  @ApiResponse({
+    status: 200,
+    description: "Cập nhật trạng thái External Registration thành công",
+  })
+  async toggleExternalMark(
+    @Req() req: { user: AuthenticatedUser },
+    @Param("id") opportunityId: string,
+    @Body() body?: { marked?: boolean },
+  ) {
+    return this.opportunityUseCase.toggleExternalMark(
+      req.user.userId,
+      opportunityId,
+      body?.marked,
+    );
+  }
+
+  @Get(":id/external-mark")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Kiểm tra trạng thái tự đánh dấu nộp tại nguồn (FR-APP-04)",
+  })
+  @ApiParam({ name: "id", description: "ID cơ hội EXTERNAL" })
+  async getExternalMarkStatus(
+    @Req() req: { user: AuthenticatedUser },
+    @Param("id") opportunityId: string,
+  ) {
+    return this.opportunityUseCase.getExternalMarkStatus(req.user.userId, opportunityId);
+  }
 }

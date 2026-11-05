@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import * as crypto from 'crypto';
 import {
   IOpportunityRepository,
@@ -11,13 +11,24 @@ import {
   QueryOpportunityDto,
   OpportunityDetailResponseDto,
 } from '../dtos/opportunity.dto';
-import { DomainException, PaginationHelper, PaginatedResult, AuthenticatedUser } from '@shared';
+import { DomainException, ErrorCode, PaginationHelper, PaginatedResult, AuthenticatedUser } from '@shared';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import {
+  ExternalRegistrationModel,
+  ExternalRegistrationDocument,
+} from '../../infrastructure/persistence/opportunity.schema';
 
 @Injectable()
 export class OpportunityUseCase {
+  private memoryExternalRegs = new Map<string, any>();
+
   constructor(
     @Inject(OPPORTUNITY_REPOSITORY)
     private readonly opportunityRepo: IOpportunityRepository,
+    @Optional()
+    @InjectModel(ExternalRegistrationModel.name)
+    private readonly externalRegModel?: Model<ExternalRegistrationDocument>,
   ) {}
 
   private generateSlug(title: string): string {
@@ -123,5 +134,112 @@ export class OpportunityUseCase {
       ruleVersion: opportunity.ruleVersion,
       version: opportunity.version,
     }) as OpportunityDetailResponseDto;
+  }
+
+  /**
+   * WF05 & FR-APP-04: Tự đánh dấu đã nộp tại nguồn (EXTERNAL_MARKED)
+   * Nghiệm thu: Lưu vào external_registrations, KHÔNG tạo Application record.
+   * Chặn không cho tự đánh dấu nếu cơ hội là IN_APP.
+   */
+  async toggleExternalMark(
+    userId: string,
+    opportunityId: string,
+    targetMarked?: boolean,
+  ): Promise<{
+    opportunityId: string;
+    userId: string;
+    isExternalMarked: boolean;
+    status: 'EXTERNAL_MARKED' | 'REMOVED';
+    sourceUrl?: string;
+  }> {
+    const opp = await this.opportunityRepo.findById(opportunityId);
+    if (!opp) {
+      throw DomainException.notFound('Cơ hội');
+    }
+
+    if (opp.applyMode !== 'EXTERNAL') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Chỉ cơ hội EXTERNAL mới hỗ trợ tự đánh dấu nộp tại nguồn ngoài',
+      );
+    }
+
+    const key = `${userId}:${opportunityId}`;
+    let existing: any = null;
+    if (this.externalRegModel) {
+      try {
+        existing = await this.externalRegModel.findOne({ userId, opportunityId });
+      } catch {}
+    } else {
+      existing = this.memoryExternalRegs.get(key) || null;
+    }
+
+    let newStatus: 'EXTERNAL_MARKED' | 'REMOVED';
+
+    if (typeof targetMarked === 'boolean') {
+      newStatus = targetMarked ? 'EXTERNAL_MARKED' : 'REMOVED';
+    } else {
+      newStatus = existing?.status === 'EXTERNAL_MARKED' ? 'REMOVED' : 'EXTERNAL_MARKED';
+    }
+
+    if (existing) {
+      existing.status = newStatus;
+      if (typeof existing.save === 'function') await existing.save();
+      this.memoryExternalRegs.set(key, existing);
+    } else {
+      const record = {
+        id: `ext_reg_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+        userId,
+        opportunityId,
+        status: newStatus,
+      };
+      if (this.externalRegModel) {
+        try {
+          await this.externalRegModel.create(record);
+        } catch {}
+      }
+      this.memoryExternalRegs.set(key, record);
+    }
+
+    return {
+      opportunityId,
+      userId,
+      isExternalMarked: newStatus === 'EXTERNAL_MARKED',
+      status: newStatus,
+      sourceUrl: opp.props.sourceUrl,
+    };
+  }
+
+  async getExternalMarkStatus(
+    userId: string,
+    opportunityId: string,
+  ): Promise<{
+    opportunityId: string;
+    userId: string;
+    isExternalMarked: boolean;
+    status: string;
+    sourceUrl?: string;
+  }> {
+    const opp = await this.opportunityRepo.findById(opportunityId);
+    if (!opp) {
+      throw DomainException.notFound('Cơ hội');
+    }
+
+    let existing: any = null;
+    if (this.externalRegModel) {
+      try {
+        existing = await this.externalRegModel.findOne({ userId, opportunityId });
+      } catch {}
+    } else {
+      existing = this.memoryExternalRegs.get(`${userId}:${opportunityId}`) || null;
+    }
+
+    return {
+      opportunityId,
+      userId,
+      isExternalMarked: existing?.status === 'EXTERNAL_MARKED',
+      status: existing?.status || 'UNMARKED',
+      sourceUrl: opp.props.sourceUrl,
+    };
   }
 }
