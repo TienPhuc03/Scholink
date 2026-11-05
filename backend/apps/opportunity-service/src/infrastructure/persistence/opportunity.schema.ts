@@ -111,6 +111,27 @@ export class OpportunityModel {
 
   @Prop({ default: 1 })
   version: number;
+
+  @Prop({ type: Object })
+  rawPayload?: Record<string, unknown>;
+
+  @Prop()
+  confidenceScore?: number;
+
+  @Prop({ type: Object })
+  confidenceBreakdown?: Record<string, number>;
+
+  @Prop()
+  reviewReason?: string;
+
+  @Prop({ type: [String], default: [] })
+  candidateMergeIds?: string[];
+
+  @Prop()
+  reviewedBy?: string;
+
+  @Prop()
+  reviewedAt?: Date;
 }
 
 export const OpportunitySchema = SchemaFactory.createForClass(OpportunityModel);
@@ -134,7 +155,7 @@ export class OpportunityRevisionModel {
   @Prop({ type: Object, required: true })
   snapshot: Record<string, unknown>;
 
-  @Prop({ required: true, enum: ['PENDING_REVIEW', 'APPROVED', 'REJECTED'], default: 'PENDING_REVIEW' })
+  @Prop({ required: true, enum: ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'EXTENDED', 'CANCELLED'], default: 'PENDING_REVIEW' })
   status: string;
 
   @Prop()

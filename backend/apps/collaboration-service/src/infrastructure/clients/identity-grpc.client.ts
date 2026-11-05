@@ -30,7 +30,7 @@ export class IdentityGrpcClient implements IIdentityClientPort, OnModuleInit {
   async validateMemberProfile(studentId: string): Promise<MemberProfileValidationResult> {
     if (this.grpcService && typeof this.grpcService.getProfileSnapshot === 'function') {
       try {
-        const res = await firstValueFrom(
+        const res: any = await firstValueFrom(
           this.grpcService.getProfileSnapshot({
             studentId,
             attachmentIds: [],

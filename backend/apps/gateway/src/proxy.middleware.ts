@@ -74,6 +74,11 @@ export class ReverseProxyMiddleware implements NestMiddleware {
       return next();
     }
 
+    // F32: Admin opportunities and crawler review endpoint is managed by GatewayAdminOpportunityController
+    if (originalUrl.startsWith('/api/v1/admin/opportunities')) {
+      return next();
+    }
+
     // Check if request matches any downstream microservice route
     const matchedRoute = MICROSERVICE_ROUTES.find((route) =>
       originalUrl.startsWith(route.prefix),

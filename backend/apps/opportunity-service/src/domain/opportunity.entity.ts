@@ -64,6 +64,14 @@ export interface OpportunityProps {
   readonly requiredFields?: readonly string[];
   readonly tags?: readonly string[];
   readonly ruleVersion?: number;
+  readonly dedupKey?: string;
+  readonly rawPayload?: Record<string, unknown>;
+  readonly confidenceScore?: number;
+  readonly confidenceBreakdown?: Record<string, number>;
+  readonly reviewReason?: string;
+  readonly candidateMergeIds?: readonly string[];
+  readonly reviewedBy?: string;
+  readonly reviewedAt?: Date;
   readonly createdAt?: Date;
   readonly updatedAt?: Date;
   readonly version?: number;
@@ -244,17 +252,91 @@ export class Opportunity extends AggregateRoot<string> {
     }
   }
 
-  public publish(): Opportunity {
+  public validateSchemaCompleteness(): { isComplete: boolean; missingFields: string[] } {
+    const missing: string[] = [];
+    if (!this._props.title?.trim()) missing.push('title');
+    if (!this._props.description?.trim()) missing.push('description');
+    if (!this._props.organizerName?.trim()) missing.push('organizerName');
+    if (!this._props.registerDeadline || isNaN(new Date(this._props.registerDeadline).getTime())) missing.push('registerDeadline');
+    if (!this._props.timezone?.trim()) missing.push('timezone');
+    if (this._props.applyMode === 'EXTERNAL' && !this._props.sourceUrl?.trim()) missing.push('sourceUrl');
+
+    if (this._props.type === 'SCHOLARSHIP') {
+      if (!this._props.fundingLevel) missing.push('fundingLevel');
+    } else if (this._props.type === 'COMPETITION') {
+      if (!this._props.competitionMode) missing.push('competitionMode');
+      if (this._props.minTeamSize === undefined || this._props.minTeamSize === null || this._props.minTeamSize < 1) missing.push('minTeamSize');
+      if (this._props.maxTeamSize === undefined || this._props.maxTeamSize === null || this._props.maxTeamSize < 1) missing.push('maxTeamSize');
+    }
+
+    return {
+      isComplete: missing.length === 0,
+      missingFields: missing,
+    };
+  }
+
+  public publish(actorId?: string, reason?: string): Opportunity {
     if (this._props.status !== 'PENDING_REVIEW' && this._props.status !== 'DRAFT') {
       throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
         `Không thể công bố cơ hội đang ở trạng thái ${this._props.status}`,
       );
     }
+
+    // Không công bố khi chưa đủ schema (CRAWL-03, CRAWL-05)
+    const validation = this.validateSchemaCompleteness();
+    if (!validation.isComplete) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        `Không thể công bố cơ hội khi chưa đủ schema bắt buộc: ${validation.missingFields.join(', ')}`,
+        400,
+      );
+    }
+
     return new Opportunity(this.id, {
       ...this._props,
       status: 'PUBLISHED',
+      reviewedBy: actorId || this._props.reviewedBy,
+      reviewedAt: new Date(),
+      reviewReason: reason || this._props.reviewReason,
       version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  public reject(actorId: string, reason: string): Opportunity {
+    if (this._props.status === 'PUBLISHED') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Không thể từ chối cơ hội đã công bố',
+      );
+    }
+    return new Opportunity(this.id, {
+      ...this._props,
+      status: 'REJECTED',
+      reviewedBy: actorId,
+      reviewedAt: new Date(),
+      reviewReason: reason,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  public extendDeadline(newDeadline: Date, timezone?: string, reason?: string): Opportunity {
+    if (new Date(newDeadline).getTime() <= new Date(this._props.registerDeadline).getTime()) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Hạn đăng ký mới phải sau hạn đăng ký hiện tại',
+        400,
+      );
+    }
+    return new Opportunity(this.id, {
+      ...this._props,
+      registerDeadline: new Date(newDeadline),
+      timezone: timezone || this._props.timezone,
+      reviewReason: reason || this._props.reviewReason,
+      version: this.version + 1,
+      ruleVersion: (this._props.ruleVersion || 1) + 1,
       updatedAt: new Date(),
     });
   }
