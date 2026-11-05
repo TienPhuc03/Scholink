@@ -88,10 +88,10 @@ export class ReminderModel {
     enum: ["SCHEDULED", "SENT", "SUPPRESSED_QUIET_DEADLINE", "CANCELLED"],
     default: "SCHEDULED",
   })
+  status: string;
+
   @Prop({ required: true })
   reason: string;
-
-  status: string;
 }
 
 export const ReminderSchema = SchemaFactory.createForClass(ReminderModel);
