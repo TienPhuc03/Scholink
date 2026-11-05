@@ -85,6 +85,14 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
         ? [...opportunity.props.requiredFields]
         : [],
       tags: opportunity.props.tags ? [...opportunity.props.tags] : [],
+      dedupKey: opportunity.props.dedupKey,
+      rawPayload: opportunity.props.rawPayload,
+      confidenceScore: opportunity.props.confidenceScore,
+      confidenceBreakdown: opportunity.props.confidenceBreakdown,
+      reviewReason: opportunity.props.reviewReason,
+      candidateMergeIds: opportunity.props.candidateMergeIds ? [...opportunity.props.candidateMergeIds] : [],
+      reviewedBy: opportunity.props.reviewedBy,
+      reviewedAt: opportunity.props.reviewedAt,
       ruleVersion: opportunity.ruleVersion,
       version: opportunity.version,
     });
@@ -101,6 +109,18 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
             status: opportunity.status,
             registerDeadline: opportunity.registerDeadline,
             submitDeadline: opportunity.props.submitDeadline,
+            timezone: opportunity.props.timezone,
+            fundingLevel: opportunity.props.fundingLevel,
+            competitionMode: opportunity.props.competitionMode,
+            minTeamSize: opportunity.props.minTeamSize,
+            maxTeamSize: opportunity.props.maxTeamSize,
+            benefits: opportunity.props.benefits,
+            requirements: opportunity.props.requirements,
+            tags: opportunity.props.tags ? [...opportunity.props.tags] : [],
+            reviewedBy: opportunity.props.reviewedBy,
+            reviewedAt: opportunity.props.reviewedAt,
+            reviewReason: opportunity.props.reviewReason,
+            candidateMergeIds: opportunity.props.candidateMergeIds ? [...opportunity.props.candidateMergeIds] : [],
             ruleVersion: opportunity.ruleVersion,
             version: opportunity.version,
           },
@@ -137,6 +157,14 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     eligibilityRules?: Record<string, unknown>[];
     requiredFields?: string[];
     tags?: string[];
+    dedupKey?: string;
+    rawPayload?: Record<string, unknown>;
+    confidenceScore?: number;
+    confidenceBreakdown?: Record<string, number>;
+    reviewReason?: string;
+    candidateMergeIds?: string[];
+    reviewedBy?: string;
+    reviewedAt?: Date;
     ruleVersion?: number;
     version: number;
   }): Opportunity {
@@ -167,6 +195,14 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
       eligibilityRules: doc.eligibilityRules,
       requiredFields: doc.requiredFields,
       tags: doc.tags,
+      dedupKey: doc.dedupKey,
+      rawPayload: doc.rawPayload,
+      confidenceScore: doc.confidenceScore,
+      confidenceBreakdown: doc.confidenceBreakdown,
+      reviewReason: doc.reviewReason,
+      candidateMergeIds: doc.candidateMergeIds,
+      reviewedBy: doc.reviewedBy,
+      reviewedAt: doc.reviewedAt,
       ruleVersion: doc.ruleVersion ?? 1,
       version: doc.version,
     });
