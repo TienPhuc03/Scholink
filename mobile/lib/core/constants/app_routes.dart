@@ -7,6 +7,9 @@ abstract final class AppRoutes {
   static const String resetPassword = '/auth/reset-password';
   static const String passportEdit = '/passport/edit';
   static const String opportunityDetail = '/opportunities/detail';
+  static const String apply = '/applications/apply';
+  static const String myApplications = '/applications/mine';
+  static const String applicationDetail = '/applications/detail';
 }
 
 /// Bottom navigation tabs of the main shell, in display order.

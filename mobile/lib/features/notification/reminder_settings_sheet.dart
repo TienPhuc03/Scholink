@@ -192,8 +192,8 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: widget.viewModel.lastSyncIsSuccess
-                    ? AppColors.success.withOpacity(0.12)
-                    : AppColors.error.withOpacity(0.12),
+                    ? AppColors.success.withValues(alpha: 0.12)
+                    : AppColors.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: widget.viewModel.lastSyncIsSuccess ? AppColors.success : AppColors.error,
@@ -214,8 +214,8 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: widget.viewModel.lastSyncIsSuccess
-                            ? Colors.green[900]
-                            : Colors.red[900],
+                            ? AppColors.success.withValues(alpha: 0.8)
+                            : AppColors.error.withValues(alpha: 0.8),
                       ),
                     ),
                   ),

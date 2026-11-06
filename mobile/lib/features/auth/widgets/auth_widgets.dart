@@ -355,13 +355,18 @@ class AuthPrimaryButton extends StatelessWidget {
               children: <Widget>[
                 Icon(icon, size: 16),
                 const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontFamily: _bodyFont,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 20 / 14,
+                // Flexible so long labels ellipsize when the button shares a row (e.g. with "Quay lại").
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: _bodyFont,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 20 / 14,
+                    ),
                   ),
                 ),
               ],

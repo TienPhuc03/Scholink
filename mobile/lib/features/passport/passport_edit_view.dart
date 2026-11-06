@@ -62,7 +62,16 @@ class _PassportEditViewState extends State<PassportEditView> {
   @override
   void dispose() {
     for (final TextEditingController c in <TextEditingController>[
-      _fullName, _bio, _region, _institution, _major, _startYear, _endYear, _gpa, _newSkill, _newAchievement,
+      _fullName,
+      _bio,
+      _region,
+      _institution,
+      _major,
+      _startYear,
+      _endYear,
+      _gpa,
+      _newSkill,
+      _newAchievement,
     ]) {
       c.dispose();
     }
@@ -549,38 +558,41 @@ class _Section extends StatelessWidget {
       if (i > 0) spaced.add(const SizedBox(height: 14));
       spaced.add(children[i]);
     }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    // Material (not a coloured Container) so SwitchListTile ink and background stay visible.
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderLight),
+        side: const BorderSide(color: AppColors.borderLight),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(icon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(icon, size: 20, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Be Vietnam Pro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
+              ],
+            ),
+            if (subtitle != null) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ],
-          ),
-          if (subtitle != null) ...<Widget>[
-            const SizedBox(height: 4),
-            Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            const SizedBox(height: 14),
+            ...spaced,
           ],
-          const SizedBox(height: 14),
-          ...spaced,
-        ],
+        ),
       ),
     );
   }

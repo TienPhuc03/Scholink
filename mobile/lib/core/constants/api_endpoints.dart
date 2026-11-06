@@ -17,6 +17,18 @@ abstract final class ApiEndpoints {
 
   // Passport lives under the profiles routes of the gateway (GET/PUT /api/v1/profiles/me).
   static const String passport = '/api/v1/profiles/me';
+  static const String readiness = '/api/v1/profiles/me/readiness';
+  static const String consents = '/api/v1/profiles/me/consents';
+
+  // Media (identity service, F13): simulated storage, see media.use-case.ts
+  static const String mediaUploadUrl = '/api/v1/media/upload-url';
+  static String mediaComplete(String assetId) => '/api/v1/media/$assetId/complete';
+
+  // Applications (opportunity service, F19)
+  static const String applicationPreviews = '/api/v1/applications/previews';
+  static const String applications = '/api/v1/applications';
+  static const String myApplications = '/api/v1/applications/me';
+  static String applicationDetail(String id) => '/api/v1/applications/$id';
 
   // Opportunity Service routes
   static const String opportunities = '/api/v1/opportunities';

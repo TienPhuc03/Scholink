@@ -7,6 +7,13 @@ import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
 import '../storage/secure_storage_helper.dart';
 
+// Feature: Application (F19)
+import '../../features/application/application_repository.dart';
+import '../../features/application/apply_viewmodel.dart';
+import '../../features/application/file_attachment_picker.dart';
+import '../../features/application/media_repository.dart';
+import '../../features/application/submission_store.dart';
+
 // Feature 1: Auth
 import '../../features/auth/auth_repository.dart';
 import '../../features/auth/email_verification_viewmodel.dart';
@@ -88,6 +95,23 @@ Future<void> setupServiceLocator() async {
       apiClient: sl<ApiClient>(),
       roomDb: sl<RoomDatabase>(),
     ),
+  );
+
+  // F19: individual application flow (view models are built per screen in app.dart)
+  sl.registerLazySingleton<ApplicationRepository>(
+    () => ApplicationRepository(sl<ApiClient>()),
+  );
+
+  sl.registerLazySingleton<MediaRepository>(
+    () => MediaRepository(sl<ApiClient>()),
+  );
+
+  sl.registerLazySingleton<SubmissionStore>(
+    () => SubmissionStore(sl<LocalCacheManager>()),
+  );
+
+  sl.registerLazySingleton<AttachmentPicker>(
+    () => FileAttachmentPicker(),
   );
 
   // 3. Feature ViewModels (Factory instances for Views)

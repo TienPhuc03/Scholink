@@ -12,10 +12,14 @@ class PassportView extends StatefulWidget {
   /// Called after the user confirms logout; the app clears the session and shows login.
   final Future<void> Function() onLogout;
 
+  /// Opens "Hồ sơ ứng tuyển của tôi" (F19).
+  final VoidCallback? onOpenMyApplications;
+
   const PassportView({
     super.key,
     required this.viewModel,
     required this.onLogout,
+    this.onOpenMyApplications,
   });
 
   @override
@@ -116,6 +120,10 @@ class _PassportViewState extends State<PassportView> {
               padding: const EdgeInsets.all(16.0),
               children: <Widget>[
                 _buildCompletionCard(passport),
+                if (widget.onOpenMyApplications != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _buildMyApplicationsEntry(),
+                ],
                 const SizedBox(height: 16),
                 _buildIdentityCard(passport),
                 const SizedBox(height: 16),
@@ -301,6 +309,45 @@ class _PassportViewState extends State<PassportView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Q6: entry to "Hồ sơ ứng tuyển của tôi" right under the completion card.
+  Widget _buildMyApplicationsEntry() {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        key: const Key('passport_my_applications'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: widget.onOpenMyApplications,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: const Row(
+            children: <Widget>[
+              Icon(Icons.assignment_turned_in_outlined, color: AppColors.primary),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Hồ sơ ứng tuyển của tôi',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    SizedBox(height: 2),
+                    Text('Theo dõi trạng thái các hồ sơ đã nộp',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            ],
+          ),
+        ),
       ),
     );
   }

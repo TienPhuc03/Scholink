@@ -5,6 +5,14 @@ import 'core/di/service_locator.dart';
 import 'core/theme/app_theme.dart';
 
 // Flat Feature imports for MVVM + Repository Architecture
+import 'features/application/application_detail_view.dart';
+import 'features/application/application_repository.dart';
+import 'features/application/apply_view.dart';
+import 'features/application/apply_viewmodel.dart';
+import 'features/application/media_repository.dart';
+import 'features/application/my_applications_view.dart';
+import 'features/application/my_applications_viewmodel.dart';
+import 'features/application/submission_store.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/email_verification_view.dart';
 import 'features/auth/email_verification_viewmodel.dart';
@@ -24,6 +32,7 @@ import 'features/opportunity/opportunity_detail_view.dart';
 import 'features/opportunity/opportunity_list_view.dart';
 import 'features/opportunity/opportunity_model.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
+import 'features/passport/passport_edit_view.dart';
 import 'features/passport/passport_view.dart';
 import 'features/passport/passport_viewmodel.dart';
 import 'features/team/team_list_view.dart';
@@ -214,9 +223,80 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: sl<NotificationViewModel>(),
             );
           },
+          onApplyInApp: () => _openApply(opp),
         ),
       ),
     );
+  }
+
+  // ---------- Application flow (F19) ----------
+
+  void _openApply(OpportunityModel opp) {
+    final ApplyViewModel vm = ApplyViewModel(
+      applications: sl<ApplicationRepository>(),
+      media: sl<MediaRepository>(),
+      store: sl<SubmissionStore>(),
+      picker: sl<AttachmentPicker>(),
+      opportunityId: opp.id,
+      opportunityTitle: opp.title,
+    );
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.apply),
+        builder: (BuildContext ctx) => ApplyView(
+          viewModel: vm,
+          onEditPassport: _editPassportFromApply,
+          onOpenApplication: (String id, {required bool justSubmitted}) =>
+              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: justSubmitted),
+        ),
+      ),
+    );
+  }
+
+  /// Q4: "Cập nhật Passport" from the readiness step; the shared Passport tab view model
+  /// is reused so the tab shows the saved data too.
+  Future<void> _editPassportFromApply() async {
+    final PassportViewModel passportVm = _tabs.passport;
+    if (passportVm.passport == null) await passportVm.loadPassport();
+    if (passportVm.passport == null) {
+      _showMessage(passportVm.errorMessage ?? 'Không tải được Passport.', color: AppColors.error);
+      return;
+    }
+    await _nav.push<bool>(
+      MaterialPageRoute<bool>(
+        settings: const RouteSettings(name: AppRoutes.passportEdit),
+        builder: (_) => PassportEditView(viewModel: passportVm),
+      ),
+    );
+  }
+
+  void _openMyApplications() {
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.myApplications),
+        builder: (_) => MyApplicationsView(
+          viewModel: MyApplicationsViewModel(sl<ApplicationRepository>()),
+          onOpenApplication: (String id) => _openApplicationDetail(id),
+        ),
+      ),
+    );
+  }
+
+  /// Q11: after a successful submit the apply flow is replaced by the detail,
+  /// so "back" returns to the opportunity.
+  void _openApplicationDetail(String id, {bool justSubmitted = false, bool replace = false}) {
+    final MaterialPageRoute<void> route = MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AppRoutes.applicationDetail),
+      builder: (_) => ApplicationDetailView(
+        viewModel: ApplicationDetailViewModel(sl<ApplicationRepository>(), applicationId: id),
+        justSubmitted: justSubmitted,
+      ),
+    );
+    if (replace) {
+      _nav.pushReplacement<void, void>(route);
+    } else {
+      _nav.push<void>(route);
+    }
   }
 
   @override
@@ -261,7 +341,11 @@ class _ScholinkAppState extends State<ScholinkApp> {
           if (_isGuest)
             const SizedBox.shrink()
           else
-            PassportView(viewModel: _tabs.passport, onLogout: _handleLogout),
+            PassportView(
+              viewModel: _tabs.passport,
+              onLogout: _handleLogout,
+              onOpenMyApplications: _openMyApplications,
+            ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
