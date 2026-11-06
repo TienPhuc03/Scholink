@@ -6,29 +6,41 @@ import '../../core/network/api_client.dart';
 import 'passport_model.dart';
 
 /// Single concrete Repository for Passport in MVVM + Repository pattern.
+/// Backed by the gateway's `GET/PUT /api/v1/profiles/me` (owner taken from the token).
 class PassportRepository {
   final ApiClient _apiClient;
 
   PassportRepository(this._apiClient);
 
-  Future<Result<PassportModel, Failure>> getMyPassport() async {
-    try {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(
+  Future<Result<PassportModel, Failure>> getMyPassport() {
+    return _guard(() async {
+      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.passport);
+      return _parse(response.data);
+    });
+  }
+
+  Future<Result<PassportModel, Failure>> updateMyPassport(
+    PassportDraft draft, {
+    required int expectedVersion,
+  }) {
+    return _guard(() async {
+      final Response<dynamic> response = await _apiClient.put<dynamic>(
         ApiEndpoints.passport,
+        data: draft.toUpdateJson(expectedVersion: expectedVersion),
       );
+      return _parse(response.data);
+    });
+  }
 
-      final dynamic resData = response.data;
-      final dynamic payload = (resData is Map<String, dynamic>)
-          ? (resData['data'] ?? resData)
-          : resData;
+  PassportModel _parse(dynamic resData) {
+    final dynamic payload = resData is Map<String, dynamic> ? (resData['data'] ?? resData) : resData;
+    if (payload is Map<String, dynamic>) return PassportModel.fromJson(payload);
+    throw const ServerFailure(message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.');
+  }
 
-      if (payload is Map<String, dynamic>) {
-        return SuccessResult<PassportModel, Failure>(PassportModel.fromJson(payload));
-      }
-
-      return const FailureResult<PassportModel, Failure>(
-        ServerFailure(message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.'),
-      );
+  Future<Result<PassportModel, Failure>> _guard(Future<PassportModel> Function() action) async {
+    try {
+      return SuccessResult<PassportModel, Failure>(await action());
     } on Failure catch (failure) {
       return FailureResult<PassportModel, Failure>(failure);
     } catch (e) {

@@ -441,9 +441,9 @@ class _LoginViewState extends State<LoginView> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.08),
+              color: AppColors.error.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.error.withOpacity(0.3)),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: <Widget>[
@@ -697,21 +697,21 @@ class _LoginViewState extends State<LoginView> {
                       label: const Text('Student', style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'student@scholink.edu.vn',
-                        'Password@123',
+                        'Student@2026',
                       ),
                     ),
                     ActionChip(
                       label: const Text('Applicant 1', style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'applicant1@scholink.edu.vn',
-                        'Password@123',
+                        'Student@2026',
                       ),
                     ),
                     ActionChip(
                       label: const Text('Applicant 2', style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'applicant2@scholink.edu.vn',
-                        'Password@123',
+                        'Student@2026',
                       ),
                     ),
                   ],

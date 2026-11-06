@@ -9,7 +9,10 @@ import '../storage/secure_storage_helper.dart';
 
 // Feature 1: Auth
 import '../../features/auth/auth_repository.dart';
+import '../../features/auth/email_verification_viewmodel.dart';
 import '../../features/auth/login_viewmodel.dart';
+import '../../features/auth/password_reset_viewmodel.dart';
+import '../../features/auth/register_viewmodel.dart';
 
 // Feature 2: Opportunity (Tuần 1 - F02 & Tuần 2 - F11)
 import '../../features/opportunity/opportunity_repository.dart';
@@ -90,6 +93,19 @@ Future<void> setupServiceLocator() async {
   // 3. Feature ViewModels (Factory instances for Views)
   sl.registerFactory<LoginViewModel>(
     () => LoginViewModel(sl<AuthRepository>()),
+  );
+
+  // F10: register, email OTP verification and password reset flows
+  sl.registerFactory<RegisterViewModel>(
+    () => RegisterViewModel(sl<AuthRepository>()),
+  );
+
+  sl.registerFactory<EmailVerificationViewModel>(
+    () => EmailVerificationViewModel(sl<AuthRepository>()),
+  );
+
+  sl.registerFactory<PasswordResetViewModel>(
+    () => PasswordResetViewModel(sl<AuthRepository>()),
   );
 
   sl.registerFactory<OpportunityViewModel>(
