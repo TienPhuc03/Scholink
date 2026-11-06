@@ -245,6 +245,8 @@ message ApplicationSummaryMessage {
   repeated ScreeningReasonMessage screeningReasons = 16;
   int32 rosterVersion = 17;
   repeated string memberIds = 18;
+  string opportunityTitle = 19;
+  string opportunityType = 20;
 }
 
 message GetMyApplicationsResponse {
@@ -284,6 +286,7 @@ message ApplicationEventMessage {
   string toStatus = 5;
   int32 revision = 6;
   string reason = 7;
+  string createdAt = 8;
 }
 
 message ApplicationDetailResponse {
@@ -308,6 +311,8 @@ message ApplicationDetailResponse {
   repeated ApplicationEventMessage events = 19;
   int32 rosterVersion = 20;
   repeated string memberIds = 21;
+  string opportunityTitle = 22;
+  string opportunityType = 23;
 }
 
 message WithdrawApplicationRequest {

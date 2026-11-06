@@ -1117,6 +1117,7 @@ export class ApplicationUseCase implements OnModuleInit {
 
   async getMyApplications(studentId: string) {
     const applications = await this.applicationRepo.findManyByStudent(studentId);
+    const labels = await this.loadOpportunityLabels(applications.map((app) => app.opportunityId));
     return applications.map((app) =>
       Object.freeze({
         ...app.props,
@@ -1124,8 +1125,26 @@ export class ApplicationUseCase implements OnModuleInit {
         screeningReasons: app.screeningReasons,
         submittedAt: app.props.submittedAt.toISOString(),
         version: app.version,
+        opportunityTitle: labels.get(app.opportunityId)?.title ?? '',
+        opportunityType: labels.get(app.opportunityId)?.type ?? '',
       }),
     );
+  }
+
+  /**
+   * Title and type of each distinct opportunity, so student-facing lists can show
+   * a readable name. Opportunities live in this service, so this is a local lookup.
+   */
+  private async loadOpportunityLabels(
+    opportunityIds: readonly string[],
+  ): Promise<Map<string, { title: string; type: string }>> {
+    const unique = [...new Set(opportunityIds.filter(Boolean))];
+    const found = await Promise.all(unique.map((id) => this.opportunityRepo.findById(id)));
+    const labels = new Map<string, { title: string; type: string }>();
+    found.forEach((opp, i) => {
+      if (opp) labels.set(unique[i], { title: opp.title, type: String(opp.type) });
+    });
+    return labels;
   }
 
   /**
@@ -1144,13 +1163,14 @@ export class ApplicationUseCase implements OnModuleInit {
       throw DomainException.forbidden('Bạn không có quyền xem hồ sơ ứng tuyển của sinh viên khác');
     }
 
-    const [revisions, events] = await Promise.all([
+    const [revisions, events, labels] = await Promise.all([
       this.applicationRepo.findRevisionsByApplicationId
         ? this.applicationRepo.findRevisionsByApplicationId(application.id)
         : Promise.resolve([]),
       this.applicationRepo.findEventsByApplicationId
         ? this.applicationRepo.findEventsByApplicationId(application.id)
         : Promise.resolve([]),
+      this.loadOpportunityLabels([application.opportunityId]),
     ]);
 
     return Object.freeze({
@@ -1159,13 +1179,21 @@ export class ApplicationUseCase implements OnModuleInit {
       screeningReasons: application.screeningReasons,
       submittedAt: application.props.submittedAt.toISOString(),
       version: application.version,
+      opportunityTitle: labels.get(application.opportunityId)?.title ?? '',
+      opportunityType: labels.get(application.opportunityId)?.type ?? '',
       revisions: revisions.map((r) =>
         Object.freeze({
           ...r,
           submittedAt: r.submittedAt.toISOString(),
         }),
       ),
-      events,
+      // Timeline needs when each status change happened (FR-APP-03).
+      events: events.map((e) =>
+        Object.freeze({
+          ...e,
+          createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : '',
+        }),
+      ),
     });
   }
 
