@@ -8,6 +8,7 @@ import {
   Req,
   Inject,
   OnModuleInit,
+  Param,
   UseGuards,
 } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
@@ -32,6 +33,10 @@ import {
   CreateConsentDtoSchema,
   CheckReadinessQueryDto,
   CheckReadinessQueryDtoSchema,
+  UpdateFieldPrivacyDto,
+  UpdateFieldPrivacyDtoSchema,
+  ProfileViewQueryDto,
+  ProfileViewQueryDtoSchema,
 } from '@shared';
 import {
   GATEWAY_IDENTITY_GRPC,
@@ -66,6 +71,47 @@ export class GatewayProfileController implements OnModuleInit {
   async getMyPassport(@Req() req: { user: AuthenticatedUser }) {
     return firstValueFrom(
       this.identityService.getMyPassport({ studentId: req.user.userId }),
+    );
+  }
+
+  @Put('me/privacy')
+  @Roles('STUDENT')
+  @ApiOperation({
+    summary: 'Chọn quyền hiển thị PRIVATE / TEAMMATES / PUBLIC cho từng trường Passport (FR-PROF-05)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        fieldPrivacy: {
+          type: 'object',
+          additionalProperties: { type: 'string', enum: ['PRIVATE', 'TEAMMATES', 'PUBLIC'] },
+          example: { email: 'PRIVATE', phone: 'TEAMMATES', education: 'PUBLIC' },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Passport kèm quyền hiển thị mới (không đổi phiên bản hồ sơ)' })
+  async updateFieldPrivacy(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(UpdateFieldPrivacyDtoSchema)) dto: UpdateFieldPrivacyDto,
+  ) {
+    return firstValueFrom(
+      this.identityService.updateFieldPrivacy({ studentId: req.user.userId, fieldPrivacy: dto.fieldPrivacy }),
+    );
+  }
+
+  @Get('me/view')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Xem thử Passport của mình như người khác thấy (FR-PROF-05)' })
+  @ApiQuery({ name: 'audience', required: false, enum: ['PUBLIC', 'TEAMMATES'] })
+  @ApiResponse({ status: 200, description: 'Các trường được hiển thị cho đối tượng đã chọn' })
+  async previewMyProfile(
+    @Req() req: { user: AuthenticatedUser },
+    @Query(new ZodValidationPipe(ProfileViewQueryDtoSchema)) query: ProfileViewQueryDto,
+  ) {
+    return firstValueFrom(
+      this.identityService.getProfileView({ studentId: req.user.userId, audience: query.audience }),
     );
   }
 
@@ -200,5 +246,14 @@ export class GatewayProfileController implements OnModuleInit {
         studentId: req.user.userId,
       }),
     );
+  }
+
+  /** FR-PROF-05: public view of another student's Passport. Declared last so `me/...` routes win. */
+  @Get(':studentId')
+  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
+  @ApiOperation({ summary: 'Xem hồ sơ công khai của một sinh viên: chỉ các trường đặt PUBLIC (FR-PROF-05)' })
+  @ApiResponse({ status: 200, description: 'Hồ sơ công khai' })
+  async getPublicProfile(@Param('studentId') studentId: string) {
+    return firstValueFrom(this.identityService.getProfileView({ studentId, audience: 'PUBLIC' }));
   }
 }

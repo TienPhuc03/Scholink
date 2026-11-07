@@ -52,6 +52,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       isLookingForTeammate: passport.props.isLookingForTeammate,
       isOpenForScholarship: passport.props.isOpenForScholarship,
       isOpenForMentoring: passport.props.isOpenForMentoring,
+      ...(passport.props.fieldPrivacy ? { fieldPrivacy: { ...passport.props.fieldPrivacy } } : {}),
       completionScore: passport.completionScore,
       scoreVersion: passport.scoreVersion,
       version: passport.version,
@@ -77,6 +78,7 @@ export class MongoosePassportRepository implements IPassportRepository {
             isLookingForTeammate: passport.props.isLookingForTeammate,
             isOpenForScholarship: passport.props.isOpenForScholarship,
             isOpenForMentoring: passport.props.isOpenForMentoring,
+            ...(passport.props.fieldPrivacy ? { fieldPrivacy: { ...passport.props.fieldPrivacy } } : {}),
             completionScore: passport.completionScore,
             scoreVersion: passport.scoreVersion,
             version: passport.version,
@@ -217,6 +219,7 @@ export class MongoosePassportRepository implements IPassportRepository {
     isLookingForTeammate: boolean;
     isOpenForScholarship: boolean;
     isOpenForMentoring: boolean;
+    fieldPrivacy?: Record<string, string>;
     completionScore: number;
     scoreVersion?: number;
     version: number;
@@ -237,6 +240,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       isLookingForTeammate: doc.isLookingForTeammate,
       isOpenForScholarship: doc.isOpenForScholarship,
       isOpenForMentoring: doc.isOpenForMentoring,
+      fieldPrivacy: doc.fieldPrivacy,
       completionScore: doc.completionScore,
       scoreVersion: doc.scoreVersion ?? 1,
     });

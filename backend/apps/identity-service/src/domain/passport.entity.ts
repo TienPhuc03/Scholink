@@ -47,6 +47,8 @@ export interface PassportProps {
   readonly isLookingForTeammate: boolean;
   readonly isOpenForScholarship: boolean;
   readonly isOpenForMentoring: boolean;
+  /** FR-PROF-05: field -> PRIVATE | TEAMMATES | PUBLIC; missing keys use the defaults. */
+  readonly fieldPrivacy?: Readonly<Record<string, string>>;
   readonly completionScore?: number;
   readonly scoreVersion?: number;
   readonly createdAt?: Date;
@@ -225,6 +227,19 @@ export class Passport extends AggregateRoot<string> {
   /**
    * Immutable update: Trả về bản sao Passport mới với profileVersion tăng thêm 1
    */
+  /**
+   * FR-PROF-05: who may see each field. Content is unchanged, so the profile version is kept:
+   * an open application preview stays valid when the student only changes visibility.
+   */
+  public withFieldPrivacy(fieldPrivacy: Readonly<Record<string, string>>): Passport {
+    return new Passport(this.id, {
+      ...this._props,
+      fieldPrivacy: Object.freeze({ ...fieldPrivacy }),
+      profileVersion: this.version,
+      updatedAt: new Date(),
+    });
+  }
+
   public updateProfile(changes: Partial<PassportProps>): Passport {
     const nextVersion = this.version + 1;
     return new Passport(this.id, {

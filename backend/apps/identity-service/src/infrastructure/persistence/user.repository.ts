@@ -94,6 +94,7 @@ export class MongooseUserRepository implements IUserRepository {
             role: user.role,
             status: user.status,
             sessionVersion: user.sessionVersion,
+            phone: user.props.phone ?? null,
             ...(user.props.deletedAt ? { deletedAt: user.props.deletedAt } : {}),
             version: user.version,
           },
@@ -298,6 +299,7 @@ export class MongooseUserRepository implements IUserRepository {
     fullName: string;
     role: string;
     status: string;
+    phone?: string | null;
     sessionVersion?: number;
     deletedAt?: Date;
     version: number;
@@ -309,6 +311,8 @@ export class MongooseUserRepository implements IUserRepository {
       fullName: doc.fullName,
       role: doc.role as UserRole,
       status: doc.status as UserStatus,
+      // Mapped so that other account updates (password reset, block…) keep the stored phone.
+      phone: doc.phone ?? undefined,
       sessionVersion: doc.sessionVersion ?? 1,
       deletedAt: doc.deletedAt ? new Date(doc.deletedAt) : undefined,
       version: doc.version,

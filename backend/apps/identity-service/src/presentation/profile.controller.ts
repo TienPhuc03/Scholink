@@ -29,6 +29,16 @@ export class ProfileController {
     return this.passportUseCase.updateMyPassport(studentId, dto);
   }
 
+  @GrpcMethod('IdentityGrpcService', 'UpdateFieldPrivacy')
+  async updateFieldPrivacy(data: { studentId: string; fieldPrivacy?: Record<string, string> }) {
+    return this.passportUseCase.updateFieldPrivacy(data.studentId, data.fieldPrivacy ?? {});
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'GetProfileView')
+  async getProfileView(data: { studentId: string; audience: string }) {
+    return this.passportUseCase.getProfileView(data.studentId, data.audience as 'PUBLIC' | 'TEAMMATES');
+  }
+
   @GrpcMethod('IdentityGrpcService', 'CreateConsent')
   async createConsent(data: CreateConsentDto & { studentId: string }) {
     const { studentId, ...dto } = data;

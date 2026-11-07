@@ -7,6 +7,13 @@ import { Consent } from '../../domain/consent.entity';
 import { Passport, PassportProps, Certificate } from '../../domain/passport.entity';
 import { MediaUseCase } from './media.use-case';
 import { DomainException, ErrorCode, CryptoService } from '@shared';
+import {
+  ProfileAudience,
+  ProfileContact,
+  buildProfileView,
+  invalidPrivacyEntries,
+  resolveFieldPrivacy,
+} from '../../domain/profile-visibility';
 
 const CONSENT_TTL_MS = 10 * 60 * 1000;
 
@@ -57,7 +64,51 @@ export class PassportUseCase {
     if (!passport) {
       throw DomainException.notFound('Passport');
     }
-    return this.toResponse(passport);
+    return this.toResponse(passport, await this.loadContact(studentId));
+  }
+
+  /**
+   * FR-PROF-05: sets who may see each field. Only visibility changes, so the profile version
+   * (and any open application preview) stays as it is.
+   */
+  async updateFieldPrivacy(studentId: string, update: Record<string, unknown>) {
+    await this.assertAccountActive(studentId, false);
+    const invalid = invalidPrivacyEntries(update ?? {});
+    if (invalid.length > 0) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Quyền hiển thị không hợp lệ: chỉ nhận PRIVATE, TEAMMATES hoặc PUBLIC cho các trường được hỗ trợ',
+        400,
+        invalid,
+      );
+    }
+    const passport = await this.passportRepo.findByStudentId(studentId);
+    if (!passport) {
+      throw DomainException.notFound('Passport');
+    }
+    const merged = { ...resolveFieldPrivacy(passport.props.fieldPrivacy), ...(update as Record<string, string>) };
+    const updated = passport.withFieldPrivacy(merged);
+    await this.passportRepo.update(updated);
+    return this.toResponse(updated, await this.loadContact(studentId));
+  }
+
+  /**
+   * FR-PROF-05: the Passport of [studentId] as [audience] may see it. Callers decide the audience:
+   * PUBLIC for anyone signed in, TEAMMATES only after Collaboration has checked the shared team.
+   */
+  async getProfileView(studentId: string, audience: ProfileAudience) {
+    if (audience !== 'PUBLIC' && audience !== 'TEAMMATES') {
+      throw new DomainException(ErrorCode.VALIDATION_ERROR, 'audience phải là PUBLIC hoặc TEAMMATES', 400);
+    }
+    const user = this.userRepo ? await this.userRepo.findById(studentId) : null;
+    if (user && (user.status === 'DELETED' || user.status === 'BLOCKED')) {
+      throw DomainException.notFound('Hồ sơ');
+    }
+    const passport = await this.passportRepo.findByStudentId(studentId);
+    if (!passport) {
+      throw DomainException.notFound('Hồ sơ');
+    }
+    return buildProfileView(passport, { email: user?.email, phone: user?.phone }, audience);
   }
 
   /**
@@ -81,7 +132,7 @@ export class PassportUseCase {
       );
     }
 
-    const { certificates, expectedVersion: _ignoredExpectedVersion, ...rest } = dto;
+    const { certificates, expectedVersion: _ignoredExpectedVersion, phone, ...rest } = dto;
     const changes: Partial<PassportProps> = certificates
       ? { ...rest, certificates: certificates.map(toSelfDeclaredCertificate) }
       : rest;
@@ -96,7 +147,13 @@ export class PassportUseCase {
     const updatedPassport = currentPassport.updateProfile(changes);
     await this.passportRepo.update(updatedPassport);
 
-    return this.toResponse(updatedPassport);
+    // FR-PROF-05: the phone lives on the account, next to the email.
+    if (phone !== undefined && this.userRepo) {
+      const user = await this.userRepo.findById(studentId);
+      if (user) await this.userRepo.update(user.withPhone(phone));
+    }
+
+    return this.toResponse(updatedPassport, await this.loadContact(studentId));
   }
 
   async createConsent(studentId: string, dto: CreateConsentDto) {
@@ -306,9 +363,18 @@ export class PassportUseCase {
     return candidates;
   }
 
-  private toResponse(passport: Passport) {
+  private async loadContact(studentId: string): Promise<ProfileContact> {
+    const user = this.userRepo ? await this.userRepo.findById(studentId) : null;
+    return { email: user?.email, phone: user?.phone };
+  }
+
+  /** Owner's own view: every field, the resolved visibility settings and the contact details. */
+  private toResponse(passport: Passport, contact: ProfileContact = {}) {
     return Object.freeze({
       ...passport.props,
+      fieldPrivacy: resolveFieldPrivacy(passport.props.fieldPrivacy),
+      email: contact.email ?? '',
+      phone: contact.phone ?? '',
       id: passport.id,
       certificates: (passport.props.certificates ?? []).map(toCertificateResponse),
       scoreBreakdown: passport.scoreBreakdown,
