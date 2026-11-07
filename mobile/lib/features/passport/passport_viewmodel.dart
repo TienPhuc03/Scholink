@@ -50,6 +50,18 @@ class PassportViewModel extends BaseViewModel {
     _hadVersionConflict = false;
     notifyListeners();
 
+    // FR-PROF-05: visibility is saved on its own endpoint first. It does not bump the profile
+    // version, so the content update below still matches expectedVersion.
+    if (_privacyChanged(current, draft)) {
+      final Failure? privacyFailure = (await _repository.updateFieldPrivacy(draft)).errorOrNull;
+      if (privacyFailure != null) {
+        _isSaving = false;
+        _saveError = 'Chưa lưu được quyền hiển thị: ${privacyFailure.message}';
+        notifyListeners();
+        return false;
+      }
+    }
+
     final Result<PassportModel, Failure> result =
         await _repository.updateMyPassport(draft, expectedVersion: current.profileVersion);
 
@@ -73,6 +85,9 @@ class PassportViewModel extends BaseViewModel {
     notifyListeners();
     return false;
   }
+
+  static bool _privacyChanged(PassportModel current, PassportDraft draft) => privacyFields
+      .any((PrivacyFieldInfo f) => current.visibilityOf(f.key) != (draft.fieldPrivacy[f.key] ?? f.byDefault));
 
   void clearSaveError() {
     if (_saveError == null) return;

@@ -369,8 +369,9 @@ class _LoginViewState extends State<LoginView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            // Remember me checkbox
-            InkWell(
+            // Remember me checkbox (Flexible: large system text must not push the row off screen, F37)
+            Flexible(
+              child: InkWell(
               borderRadius: BorderRadius.circular(4),
               onTap: () {
                 setState(() {
@@ -399,18 +400,22 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Ghi nhớ đăng nhập',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                    const Flexible(
+                      child: Text(
+                        'Ghi nhớ đăng nhập',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+              ),
             ),
+            const SizedBox(width: 8),
 
             // Forgot password link
             InkWell(
@@ -651,12 +656,14 @@ class _LoginViewState extends State<LoginView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Text(
+                Flexible(
+                  child: Text(
                   _showDemoQuickFill ? 'Ẩn tài khoản Demo' : 'Hiển thị tài khoản Demo (Kiểm thử nhanh)',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textMuted,
                     decoration: TextDecoration.underline,
+                  ),
                   ),
                 ),
                 Icon(

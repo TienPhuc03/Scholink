@@ -5,6 +5,7 @@ import '../errors/failures.dart';
 import '../storage/secure_storage_helper.dart';
 import 'auth_interceptor.dart';
 import 'idempotency_interceptor.dart';
+import 'session_events.dart';
 
 /// Contract for standardized HTTP network operations.
 abstract interface class ApiClient {
@@ -42,6 +43,7 @@ class DioApiClient implements ApiClient {
     required SecureStorageHelper secureStorage,
     String? baseUrl,
     Dio? dio,
+    SessionEvents? sessionEvents,
   }) {
     final BaseOptions options = BaseOptions(
       baseUrl: baseUrl ?? ApiEndpoints.defaultBaseUrl,
@@ -58,7 +60,7 @@ class DioApiClient implements ApiClient {
 
     // Add interceptors
     _dio.interceptors.addAll(<Interceptor>[
-      AuthInterceptor(secureStorage: secureStorage, dio: _dio),
+      AuthInterceptor(secureStorage: secureStorage, dio: _dio, sessionEvents: sessionEvents),
       IdempotencyInterceptor(),
       LogInterceptor(
         requestHeader: false,

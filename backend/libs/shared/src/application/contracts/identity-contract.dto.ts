@@ -147,6 +147,12 @@ export type CertificateInput = z.infer<typeof CertificateInputSchema>;
 
 export const UpdatePassportDtoSchema = z.object({
   expectedVersion: z.number().int().min(1, 'expectedVersion phải >= 1').optional(),
+  // FR-PROF-05: stored on the account; empty string removes it.
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(\+?[0-9][0-9 .-]{7,18}[0-9])?$/, 'Số điện thoại không hợp lệ')
+    .optional(),
   fullName: z.string().transform(sanitizePlainText).pipe(z.string().min(2).max(100)).optional(),
   bio: z.string().transform(sanitizePlainText).pipe(z.string().max(500)).optional(),
   avatarAssetId: z.string().trim().max(120).optional(),
@@ -183,6 +189,19 @@ export const UpdatePassportDtoSchema = z.object({
 });
 
 export type UpdatePassportDto = z.infer<typeof UpdatePassportDtoSchema>;
+
+/** FR-PROF-05: `PUT /profiles/me/privacy`. Unknown fields are rejected by the Identity service. */
+export const UpdateFieldPrivacyDtoSchema = z.object({
+  fieldPrivacy: z.record(z.string(), z.enum(['PRIVATE', 'TEAMMATES', 'PUBLIC'])),
+});
+
+export type UpdateFieldPrivacyDto = z.infer<typeof UpdateFieldPrivacyDtoSchema>;
+
+export const ProfileViewQueryDtoSchema = z.object({
+  audience: z.enum(['PUBLIC', 'TEAMMATES']).default('PUBLIC'),
+});
+
+export type ProfileViewQueryDto = z.infer<typeof ProfileViewQueryDtoSchema>;
 
 export const ConsentScopeSchema = z.enum(['SNAPSHOT', 'ATTACHMENTS']);
 export type ConsentScope = z.infer<typeof ConsentScopeSchema>;

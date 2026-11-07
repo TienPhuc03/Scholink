@@ -42,6 +42,11 @@ export interface IdentityGrpcClient {
   }): Observable<Record<string, unknown>>;
   exportPersonalData(data: { userId: string }): Observable<Record<string, unknown>>;
   getMyPassport(data: { studentId: string }): Observable<Record<string, unknown>>;
+  updateFieldPrivacy(data: {
+    studentId: string;
+    fieldPrivacy: Record<string, string>;
+  }): Observable<Record<string, unknown>>;
+  getProfileView(data: { studentId: string; audience: string }): Observable<Record<string, unknown>>;
   updateMyPassport(
     data: UpdatePassportDto & { studentId: string },
   ): Observable<Record<string, unknown>>;

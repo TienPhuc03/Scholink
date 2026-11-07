@@ -10,6 +10,9 @@ export interface TeamMemberConsent {
   profileVersion: number;
   rosterVersion: number;
   confirmedAt: Date;
+  /** F37: the member's own preview and Identity consent, needed by the leader to commit the team Application. */
+  previewId?: string;
+  identityConsentId?: string;
 }
 
 export interface SubmissionReservationProps {

@@ -7,6 +7,13 @@ abstract final class AppRoutes {
   static const String resetPassword = '/auth/reset-password';
   static const String passportEdit = '/passport/edit';
   static const String opportunityDetail = '/opportunities/detail';
+  static const String apply = '/applications/apply';
+  static const String myApplications = '/applications/mine';
+  static const String applicationDetail = '/applications/detail';
+  static const String applicationSnapshot = '/applications/snapshot';
+  static const String teamSubmission = '/applications/team-submission';
+  static const String profilePreview = '/passport/preview';
+  static const String teammateProfile = '/teams/member-profile';
 }
 
 /// Bottom navigation tabs of the main shell, in display order.

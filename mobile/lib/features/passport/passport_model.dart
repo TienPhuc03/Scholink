@@ -124,6 +124,48 @@ class CertificateModel {
       };
 }
 
+/// FR-PROF-05: who may see a Passport field.
+enum FieldVisibility {
+  private('PRIVATE', 'Chỉ mình tôi'),
+  teammates('TEAMMATES', 'Đồng đội'),
+  public('PUBLIC', 'Công khai');
+
+  final String apiValue;
+  final String label;
+
+  const FieldVisibility(this.apiValue, this.label);
+
+  static FieldVisibility? parse(dynamic raw) {
+    for (final FieldVisibility v in values) {
+      if (v.apiValue == raw?.toString().toUpperCase()) return v;
+    }
+    return null;
+  }
+}
+
+typedef PrivacyFieldInfo = ({String key, String label, FieldVisibility byDefault});
+
+/// Fields whose visibility the student chooses, with their labels and the server defaults.
+/// Full name and avatar are always visible.
+const List<PrivacyFieldInfo> privacyFields = <PrivacyFieldInfo>[
+  (key: 'email', label: 'Email', byDefault: FieldVisibility.private),
+  (key: 'phone', label: 'Số điện thoại', byDefault: FieldVisibility.private),
+  (key: 'bio', label: 'Giới thiệu', byDefault: FieldVisibility.public),
+  (key: 'regionCode', label: 'Khu vực', byDefault: FieldVisibility.public),
+  (key: 'skills', label: 'Kỹ năng', byDefault: FieldVisibility.public),
+  (key: 'education', label: 'Học vấn', byDefault: FieldVisibility.teammates),
+  (key: 'certificates', label: 'Chứng chỉ', byDefault: FieldVisibility.teammates),
+  (key: 'achievements', label: 'Thành tích', byDefault: FieldVisibility.teammates),
+  (key: 'cv', label: 'CV', byDefault: FieldVisibility.teammates),
+  (key: 'pitchVideo', label: 'Video giới thiệu', byDefault: FieldVisibility.teammates),
+];
+
+/// Server settings over the defaults; unknown keys and values are ignored.
+Map<String, FieldVisibility> resolveFieldPrivacy(dynamic raw) => <String, FieldVisibility>{
+      for (final PrivacyFieldInfo f in privacyFields)
+        f.key: (raw is Map ? FieldVisibility.parse(raw[f.key]) : null) ?? f.byDefault,
+    };
+
 /// Unified Passport Model for MVVM Architecture.
 class PassportModel {
   final String studentId;
@@ -142,6 +184,11 @@ class PassportModel {
   final bool isOpenForScholarship;
   final bool isOpenForMentoring;
 
+  /// Owner-only data (FR-PROF-05): contact details and the visibility of each field.
+  final String? email;
+  final String? phone;
+  final Map<String, FieldVisibility> fieldPrivacy;
+
   const PassportModel({
     required this.studentId,
     required this.fullName,
@@ -158,9 +205,15 @@ class PassportModel {
     this.isLookingForTeammate = false,
     this.isOpenForScholarship = false,
     this.isOpenForMentoring = false,
+    this.email,
+    this.phone,
+    this.fieldPrivacy = const <String, FieldVisibility>{},
   });
 
   bool get isHighQualityProfile => completionScore >= 80;
+
+  FieldVisibility visibilityOf(String field) =>
+      fieldPrivacy[field] ?? privacyFields.firstWhere((PrivacyFieldInfo f) => f.key == field).byDefault;
 
   factory PassportModel.fromJson(Map<String, dynamic> json) {
     final dynamic payload = json['data'] ?? json;
@@ -187,6 +240,9 @@ class PassportModel {
       isLookingForTeammate: (map['isLookingForTeammate'] as bool?) ?? false,
       isOpenForScholarship: (map['isOpenForScholarship'] as bool?) ?? false,
       isOpenForMentoring: (map['isOpenForMentoring'] as bool?) ?? false,
+      email: _nonEmpty(map['email']),
+      phone: _nonEmpty(map['phone']),
+      fieldPrivacy: resolveFieldPrivacy(map['fieldPrivacy']),
     );
   }
 }
@@ -204,6 +260,8 @@ class PassportDraft {
   bool isLookingForTeammate;
   bool isOpenForScholarship;
   bool isOpenForMentoring;
+  String phone;
+  Map<String, FieldVisibility> fieldPrivacy;
 
   PassportDraft({
     required this.fullName,
@@ -216,7 +274,10 @@ class PassportDraft {
     this.isLookingForTeammate = false,
     this.isOpenForScholarship = false,
     this.isOpenForMentoring = false,
-  })  : skills = skills ?? <String>[],
+    this.phone = '',
+    Map<String, FieldVisibility>? fieldPrivacy,
+  })  : fieldPrivacy = fieldPrivacy ?? resolveFieldPrivacy(null),
+        skills = skills ?? <String>[],
         achievements = achievements ?? <String>[],
         certificates = certificates ?? <CertificateModel>[];
 
@@ -231,7 +292,16 @@ class PassportDraft {
         isLookingForTeammate: p.isLookingForTeammate,
         isOpenForScholarship: p.isOpenForScholarship,
         isOpenForMentoring: p.isOpenForMentoring,
+        phone: p.phone ?? '',
+        fieldPrivacy: <String, FieldVisibility>{...resolveFieldPrivacy(null), ...p.fieldPrivacy},
       );
+
+  /// Body for `PUT /api/v1/profiles/me/privacy` (does not change the profile version).
+  Map<String, dynamic> toPrivacyJson() => <String, dynamic>{
+        'fieldPrivacy': <String, String>{
+          for (final MapEntry<String, FieldVisibility> e in fieldPrivacy.entries) e.key: e.value.apiValue,
+        },
+      };
 
   /// Body for `PUT /api/v1/profiles/me`. Sends [expectedVersion] for optimistic locking
   /// (409 VERSION_MISMATCH when someone else saved first).
@@ -250,7 +320,75 @@ class PassportDraft {
       'isLookingForTeammate': isLookingForTeammate,
       'isOpenForScholarship': isOpenForScholarship,
       'isOpenForMentoring': isOpenForMentoring,
+      'phone': phone.trim(),
     };
+  }
+}
+
+/// Another person's view of a Passport (FR-PROF-05): `GET /profiles/:id`, `/profiles/me/view`
+/// or the teammate profile. Fields that were not granted are absent; [visibleFields] tells
+/// "hidden" apart from "empty", because gRPC sends unset values as "" or [].
+class ProfileView {
+  final String studentId;
+  final String fullName;
+  final String? avatarAssetId;
+  final String audience;
+  final Set<String> visibleFields;
+  final String? email;
+  final String? phone;
+  final String? bio;
+  final String? regionCode;
+  final List<String> skills;
+  final EducationModel? education;
+  final List<CertificateModel> certificates;
+  final List<String> achievements;
+  final String? cvAssetId;
+  final String? pitchVideoAssetId;
+
+  const ProfileView({
+    required this.studentId,
+    required this.fullName,
+    required this.audience,
+    required this.visibleFields,
+    this.avatarAssetId,
+    this.email,
+    this.phone,
+    this.bio,
+    this.regionCode,
+    this.skills = const <String>[],
+    this.education,
+    this.certificates = const <CertificateModel>[],
+    this.achievements = const <String>[],
+    this.cvAssetId,
+    this.pitchVideoAssetId,
+  });
+
+  bool shows(String field) => visibleFields.contains(field);
+
+  factory ProfileView.fromJson(Map<String, dynamic> json) {
+    final dynamic payload = json['data'] ?? json;
+    final Map<String, dynamic> map = payload is Map<String, dynamic> ? payload : <String, dynamic>{};
+    final Set<String> visible = _stringList(map['visibleFields']).toSet();
+    final dynamic certRaw = map['certificates'];
+    return ProfileView(
+      studentId: _nonEmpty(map['studentId']) ?? '',
+      fullName: _nonEmpty(map['fullName']) ?? 'Sinh viên',
+      avatarAssetId: _nonEmpty(map['avatarAssetId']),
+      audience: _nonEmpty(map['audience']) ?? 'PUBLIC',
+      visibleFields: visible,
+      email: visible.contains('email') ? _nonEmpty(map['email']) : null,
+      phone: visible.contains('phone') ? _nonEmpty(map['phone']) : null,
+      bio: visible.contains('bio') ? _nonEmpty(map['bio']) : null,
+      regionCode: visible.contains('regionCode') ? _nonEmpty(map['regionCode']) : null,
+      skills: visible.contains('skills') ? _stringList(map['skills']) : const <String>[],
+      education: visible.contains('education') ? EducationModel.fromJsonOrNull(map['education']) : null,
+      certificates: visible.contains('certificates') && certRaw is List
+          ? certRaw.map(CertificateModel.fromJsonOrNull).whereType<CertificateModel>().toList()
+          : const <CertificateModel>[],
+      achievements: visible.contains('achievements') ? _stringList(map['achievements']) : const <String>[],
+      cvAssetId: visible.contains('cv') ? _nonEmpty(map['cvAssetId']) : null,
+      pitchVideoAssetId: visible.contains('pitchVideo') ? _nonEmpty(map['pitchVideoAssetId']) : null,
+    );
   }
 }
 

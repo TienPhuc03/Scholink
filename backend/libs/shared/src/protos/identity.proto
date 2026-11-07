@@ -19,6 +19,8 @@ service IdentityGrpcService {
   // Profile, MediaAsset & Passport RPCs (API Gateway -> Identity Service)
   rpc GetMyPassport (GetMyPassportRequest) returns (PassportResponse);
   rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
+  rpc UpdateFieldPrivacy (UpdateFieldPrivacyRequest) returns (PassportResponse);
+  rpc GetProfileView (GetProfileViewRequest) returns (ProfileViewResponse);
   rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
   rpc CreateUploadUrl (CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
   rpc CompleteUpload (CompleteUploadRequest) returns (MediaAssetResponse);
@@ -223,6 +225,39 @@ message UpdateMyPassportRequest {
   optional bool isOpenForMentoring = 13;
   repeated CertificateMessage certificates = 14;
   optional int32 expectedVersion = 15;
+  optional string phone = 16;
+}
+
+// FR-PROF-05: field -> PRIVATE | TEAMMATES | PUBLIC; omitted fields keep their setting.
+message UpdateFieldPrivacyRequest {
+  string studentId = 1;
+  map<string, string> fieldPrivacy = 2;
+}
+
+// audience: PUBLIC (anyone signed in) or TEAMMATES (caller checked the shared team).
+message GetProfileViewRequest {
+  string studentId = 1;
+  string audience = 2;
+}
+
+// Fields not granted to the audience are left out; `visibleFields` lists what was granted,
+// so an empty list or string is told apart from a hidden field.
+message ProfileViewResponse {
+  string studentId = 1;
+  string fullName = 2;
+  string avatarAssetId = 3;
+  string audience = 4;
+  repeated string visibleFields = 5;
+  string email = 6;
+  string phone = 7;
+  string bio = 8;
+  string regionCode = 9;
+  repeated string skills = 10;
+  EducationMessage education = 11;
+  repeated CertificateMessage certificates = 12;
+  repeated string achievements = 13;
+  string cvAssetId = 14;
+  string pitchVideoAssetId = 15;
 }
 
 message PassportResponse {
@@ -246,6 +281,9 @@ message PassportResponse {
   int32 version = 18;
   repeated CertificateMessage certificates = 19;
   ScoreBreakdownMessage scoreBreakdown = 20;
+  map<string, string> fieldPrivacy = 21;
+  string email = 22;
+  string phone = 23;
 }
 
 message CreateConsentRequest {

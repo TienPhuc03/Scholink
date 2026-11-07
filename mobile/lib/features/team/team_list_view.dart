@@ -8,11 +8,16 @@ class TeamListView extends StatefulWidget {
   final String competitionId;
   final String competitionTitle;
 
+  /// F37 (APP-05): opens the team submission flow for the signed-in member's own team.
+  final void Function(TeamModel team, String competitionTitle)? onOpenTeamSubmission;
+
   const TeamListView({
     super.key,
     required this.viewModel,
-    this.competitionId = 'comp_ai_challenge_2026',
-    this.competitionTitle = 'BK AI Challenge 2026',
+    // Matches the seeded TEAM competition (opp_scholink_ai_challenge_2026) so its teams load.
+    this.competitionId = 'opp_scholink_ai_challenge_2026',
+    this.competitionTitle = 'Scholink AI Challenge 2026',
+    this.onOpenTeamSubmission,
   });
 
   @override
@@ -342,6 +347,12 @@ class _TeamListViewState extends State<TeamListView> {
                             ],
                           ],
                         ),
+                        if (isMember && widget.onOpenTeamSubmission != null)
+                          _TeamSubmissionEntry(
+                            team: team,
+                            isLeader: isLeader,
+                            onPressed: () => widget.onOpenTeamSubmission!(team, widget.competitionTitle),
+                          ),
                       ],
                     ),
                   ),
@@ -350,6 +361,38 @@ class _TeamListViewState extends State<TeamListView> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// F37 (Q13): entry to the team submission flow on the member's own team card.
+class _TeamSubmissionEntry extends StatelessWidget {
+  final TeamModel team;
+  final bool isLeader;
+  final VoidCallback onPressed;
+
+  const _TeamSubmissionEntry({required this.team, required this.isLeader, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final String? label = switch (team.status) {
+      TeamStatus.active when isLeader => 'Nộp hồ sơ đội',
+      TeamStatus.submitting => isLeader ? 'Tiếp tục nộp' : 'Xác nhận tham gia nộp',
+      TeamStatus.submitted => 'Xem hồ sơ đội',
+      _ => null,
+    };
+    if (label == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          key: Key('team_submission_entry_${team.id}'),
+          onPressed: onPressed,
+          icon: const Icon(Icons.send_rounded, size: 16),
+          label: Text(label, style: const TextStyle(fontSize: 13)),
+        ),
       ),
     );
   }

@@ -8,6 +8,12 @@ abstract interface class RoomDatabase {
   NotificationDao get notificationDao;
   CalendarDao get calendarDao;
   Future<void> clearAllTables();
+
+  /// Drops data that belongs to the signed-in account (bookmarks, external marks,
+  /// notifications) so the next account on this device does not see it (F37).
+  /// Public opportunities stay cached; calendar sync records stay so device events
+  /// are not created twice.
+  Future<void> clearUserData();
 }
 
 /// Data Access Object (DAO) for Opportunities & Bookmarks table.
@@ -83,6 +89,17 @@ class RoomDatabaseImpl implements RoomDatabase {
   @override
   Future<void> clearAllTables() async {
     await _cacheManager.clear();
+  }
+
+  @override
+  Future<void> clearUserData() async {
+    for (final String key in <String>[
+      _OpportunityDaoImpl._tableBookmarks,
+      _OpportunityDaoImpl._tableExternalMarks,
+      _NotificationDaoImpl._tableNotifications,
+    ]) {
+      await _cacheManager.remove(key);
+    }
   }
 }
 

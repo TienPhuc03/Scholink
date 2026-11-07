@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/widgets/refresh_error_banner.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
@@ -12,10 +13,18 @@ class PassportView extends StatefulWidget {
   /// Called after the user confirms logout; the app clears the session and shows login.
   final Future<void> Function() onLogout;
 
+  /// Opens "Hồ sơ ứng tuyển của tôi" (F19).
+  final VoidCallback? onOpenMyApplications;
+
+  /// FR-PROF-05: shows the Passport as other people see it.
+  final VoidCallback? onPreviewProfile;
+
   const PassportView({
     super.key,
     required this.viewModel,
     required this.onLogout,
+    this.onOpenMyApplications,
+    this.onPreviewProfile,
   });
 
   @override
@@ -115,7 +124,24 @@ class _PassportViewState extends State<PassportView> {
             child: ListView(
               padding: const EdgeInsets.all(16.0),
               children: <Widget>[
+                if (vm.hasError) ...<Widget>[
+                  RefreshErrorBanner(message: vm.errorMessage, onRetry: () => vm.loadPassport()),
+                  const SizedBox(height: 12),
+                ],
                 _buildCompletionCard(passport),
+                if (widget.onOpenMyApplications != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _buildMyApplicationsEntry(),
+                ],
+                if (widget.onPreviewProfile != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('passport_preview_profile'),
+                    onPressed: widget.onPreviewProfile,
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    label: const Text('Xem hồ sơ như người khác thấy'),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _buildIdentityCard(passport),
                 const SizedBox(height: 16),
@@ -305,6 +331,45 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
+  /// Q6: entry to "Hồ sơ ứng tuyển của tôi" right under the completion card.
+  Widget _buildMyApplicationsEntry() {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        key: const Key('passport_my_applications'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: widget.onOpenMyApplications,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: const Row(
+            children: <Widget>[
+              Icon(Icons.assignment_turned_in_outlined, color: AppColors.primary),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Hồ sơ ứng tuyển của tôi',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    SizedBox(height: 2),
+                    Text('Theo dõi trạng thái các hồ sơ đã nộp',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildIdentityCard(PassportModel passport) {
     return _card(
       icon: Icons.badge_outlined,
@@ -338,6 +403,11 @@ class _PassportViewState extends State<PassportView> {
               ),
             ],
           ),
+          if (passport.email != null || passport.phone != null) ...<Widget>[
+            const SizedBox(height: 12),
+            if (passport.email != null) _contactRow(Icons.mail_outline_rounded, passport.email!, passport.visibilityOf('email')),
+            if (passport.phone != null) _contactRow(Icons.phone_outlined, passport.phone!, passport.visibilityOf('phone')),
+          ],
           const Divider(height: 24, color: AppColors.borderLight),
           Text(
             passport.bio ?? 'Chưa có phần giới thiệu. Thêm vài dòng để nhà tài trợ hiểu bạn hơn.',
@@ -351,6 +421,19 @@ class _PassportViewState extends State<PassportView> {
       ),
     );
   }
+
+  /// Contact detail with who can see it (FR-PROF-05).
+  Widget _contactRow(IconData icon, String value, FieldVisibility visibility) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: <Widget>[
+            Icon(icon, size: 16, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(child: Text(value, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
+            Text(visibility.label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          ],
+        ),
+      );
 
   Widget _buildEducationCard(PassportModel passport) {
     final EducationModel? edu = passport.education;

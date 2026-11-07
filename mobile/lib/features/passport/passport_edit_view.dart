@@ -26,6 +26,7 @@ class _PassportEditViewState extends State<PassportEditView> {
   final TextEditingController _fullName = TextEditingController();
   final TextEditingController _bio = TextEditingController();
   final TextEditingController _region = TextEditingController();
+  final TextEditingController _phone = TextEditingController();
   final TextEditingController _institution = TextEditingController();
   final TextEditingController _major = TextEditingController();
   final TextEditingController _startYear = TextEditingController();
@@ -48,6 +49,7 @@ class _PassportEditViewState extends State<PassportEditView> {
     _fullName.text = _draft.fullName;
     _bio.text = _draft.bio;
     _region.text = _draft.regionCode;
+    _phone.text = _draft.phone;
     final EducationModel? edu = _draft.education;
     _institution.text = edu?.institution ?? '';
     _major.text = edu?.major ?? '';
@@ -62,7 +64,17 @@ class _PassportEditViewState extends State<PassportEditView> {
   @override
   void dispose() {
     for (final TextEditingController c in <TextEditingController>[
-      _fullName, _bio, _region, _institution, _major, _startYear, _endYear, _gpa, _newSkill, _newAchievement,
+      _fullName,
+      _bio,
+      _region,
+      _phone,
+      _institution,
+      _major,
+      _startYear,
+      _endYear,
+      _gpa,
+      _newSkill,
+      _newAchievement,
     ]) {
       c.dispose();
     }
@@ -74,7 +86,8 @@ class _PassportEditViewState extends State<PassportEditView> {
     _draft
       ..fullName = _fullName.text
       ..bio = _bio.text
-      ..regionCode = _region.text;
+      ..regionCode = _region.text
+      ..phone = _phone.text;
     final bool hasEducation = _institution.text.trim().isNotEmpty || _major.text.trim().isNotEmpty;
     _draft.education = hasEducation
         ? EducationModel(
@@ -88,7 +101,10 @@ class _PassportEditViewState extends State<PassportEditView> {
         : null;
   }
 
-  String _snapshot() => jsonEncode(_draft.toUpdateJson(expectedVersion: 0));
+  String _snapshot() => jsonEncode(<String, dynamic>{
+        ..._draft.toUpdateJson(expectedVersion: 0),
+        ..._draft.toPrivacyJson(),
+      });
 
   bool get _isDirty {
     _syncDraftFromFields();
@@ -110,6 +126,7 @@ class _PassportEditViewState extends State<PassportEditView> {
         'fullName': PassportValidators.fullName(_fullName.text),
         'bio': PassportValidators.bio(_bio.text),
         'region': PassportValidators.regionCode(_region.text),
+        'phone': PassportValidators.phone(_phone.text),
         'institution': edu.institution,
         'major': edu.major,
         'startYear': edu.startYear,
@@ -250,6 +267,8 @@ class _PassportEditViewState extends State<PassportEditView> {
                       _buildCertificates(),
                       const SizedBox(height: 16),
                       _buildPreferences(),
+                      const SizedBox(height: 16),
+                      _buildPrivacy(),
                     ],
                   ),
                 ),
@@ -321,6 +340,15 @@ class _PassportEditViewState extends State<PassportEditView> {
           controller: _region,
           maxLength: 20,
           errorText: _errors['region'],
+        ),
+        AuthTextField(
+          key: const Key('passport_phone'),
+          label: 'Số điện thoại',
+          hint: 'VD: 0901 234 567',
+          icon: Icons.phone_outlined,
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          errorText: _errors['phone'],
         ),
       ],
     );
@@ -527,6 +555,37 @@ class _PassportEditViewState extends State<PassportEditView> {
       ],
     );
   }
+
+  /// FR-PROF-05: who may see each field. Name and avatar are always visible.
+  Widget _buildPrivacy() {
+    return _Section(
+      title: 'Quyền hiển thị',
+      icon: Icons.visibility_outlined,
+      subtitle: 'Họ tên và ảnh đại diện luôn hiển thị. Hồ sơ ứng tuyển chỉ gửi bản bạn đã đồng ý khi nộp.',
+      children: <Widget>[
+        for (final PrivacyFieldInfo f in privacyFields)
+          Row(
+            key: Key('privacy_row_${f.key}'),
+            children: <Widget>[
+              Expanded(child: Text(f.label, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary))),
+              DropdownButton<FieldVisibility>(
+                key: Key('privacy_${f.key}'),
+                value: _draft.fieldPrivacy[f.key] ?? f.byDefault,
+                underline: const SizedBox.shrink(),
+                style: const TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600),
+                items: <DropdownMenuItem<FieldVisibility>>[
+                  for (final FieldVisibility v in FieldVisibility.values)
+                    DropdownMenuItem<FieldVisibility>(value: v, child: Text(v.label)),
+                ],
+                onChanged: (FieldVisibility? v) {
+                  if (v != null) setState(() => _draft.fieldPrivacy[f.key] = v);
+                },
+              ),
+            ],
+          ),
+      ],
+    );
+  }
 }
 
 String _fmtDate(DateTime d) {
@@ -549,38 +608,41 @@ class _Section extends StatelessWidget {
       if (i > 0) spaced.add(const SizedBox(height: 14));
       spaced.add(children[i]);
     }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    // Material (not a coloured Container) so SwitchListTile ink and background stay visible.
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderLight),
+        side: const BorderSide(color: AppColors.borderLight),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(icon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(icon, size: 20, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Be Vietnam Pro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
+              ],
+            ),
+            if (subtitle != null) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ],
-          ),
-          if (subtitle != null) ...<Widget>[
-            const SizedBox(height: 4),
-            Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            const SizedBox(height: 14),
+            ...spaced,
           ],
-          const SizedBox(height: 14),
-          ...spaced,
-        ],
+        ),
       ),
     );
   }

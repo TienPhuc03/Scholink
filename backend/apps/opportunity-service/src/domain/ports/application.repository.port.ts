@@ -84,6 +84,8 @@ export interface ApplicationEventRecord {
   readonly toStatus: string;
   readonly revision: number;
   readonly reason?: string;
+  /** Set by Mongoose timestamps when read back; not needed when appending. */
+  readonly createdAt?: Date;
 }
 
 export interface ApplicationMemberRecord {

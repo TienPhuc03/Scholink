@@ -112,16 +112,21 @@ export class Application extends AggregateRoot<string> {
     );
   }
 
+  /** Status allows withdrawal (deadline and ownership are checked by the caller). */
+  public isWithdrawable(): boolean {
+    return (
+      this._props.status !== 'ACCEPTED' &&
+      this._props.status !== 'REJECTED' &&
+      this._props.status !== 'CANCELLED' &&
+      this._props.status !== 'WITHDRAWN'
+    );
+  }
+
   /**
    * Mục 11 & FR-APP-07 SRS: Rút hồ sơ trước khi ACCEPTED / REJECTED (Immutable update)
    */
   public withdraw(): Application {
-    if (
-      this._props.status === 'ACCEPTED' ||
-      this._props.status === 'REJECTED' ||
-      this._props.status === 'CANCELLED' ||
-      this._props.status === 'WITHDRAWN'
-    ) {
+    if (!this.isWithdrawable()) {
       throw DomainException.conflict(
         ErrorCode.STATE_CONFLICT,
         `Không thể rút hồ sơ đã ở trạng thái ${this._props.status}`,

@@ -495,6 +495,8 @@ export class TeamUseCase {
       profileVersion: dto.profileVersion,
       rosterVersion: dto.rosterVersion,
       confirmedAt: new Date(),
+      previewId: dto.previewId,
+      identityConsentId: dto.identityConsentId,
     });
 
     await this.teamRepo.updateReservation(reservation);
@@ -506,6 +508,73 @@ export class TeamUseCase {
       hasAllConsents: reservation.hasAllConsents(),
       consents: reservation.consents,
     };
+  }
+
+  /**
+   * F37 (APP-05): current submission session of a team, for its members only. The leader uses
+   * it to follow who has consented and to build the team Application; members to see their state.
+   */
+  async getActiveSubmission(teamId: string, viewerId: string) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+    if (!team.members.some((m) => m.studentId === viewerId)) {
+      throw new DomainException(ErrorCode.FORBIDDEN_RESOURCE, 'Chỉ thành viên của đội mới xem được phiên nộp hồ sơ', 403);
+    }
+
+    const reservation = await this.teamRepo.findActiveReservationByTeam(teamId);
+    if (!reservation) {
+      return { active: false, teamId: team.id, teamStatus: team.status, leaderId: team.leaderId };
+    }
+
+    return {
+      active: true,
+      teamId: team.id,
+      teamStatus: team.status,
+      leaderId: team.leaderId,
+      reservationId: reservation.id,
+      competitionId: reservation.competitionId,
+      status: reservation.status,
+      expired: reservation.isExpired(),
+      leaseExpiresAt: reservation.leaseExpiresAt.toISOString(),
+      fencingToken: reservation.fencingToken,
+      rosterVersion: reservation.rosterVersion,
+      members: [...reservation.members],
+      hasAllConsents: reservation.hasAllConsents(),
+      consents: reservation.consents.map((c) => ({
+        studentId: c.studentId,
+        previewId: c.previewId ?? '',
+        identityConsentId: c.identityConsentId ?? '',
+        snapshotId: c.snapshotId,
+        profileVersion: c.profileVersion,
+        payloadHash: c.payloadHash,
+        confirmedAt: new Date(c.confirmedAt).toISOString(),
+      })),
+    };
+  }
+
+  /**
+   * FR-PROF-05: a teammate's Passport with PUBLIC + TEAMMATES fields. Only Collaboration knows who
+   * shares a team, so it checks both people are members before asking Identity for that audience.
+   */
+  async getTeammateProfile(teamId: string, viewerId: string, studentId: string) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+    const isMember = (id: string) => team.members.some((m) => m.studentId === id);
+    if (!isMember(viewerId) || !isMember(studentId)) {
+      throw new DomainException(
+        ErrorCode.FORBIDDEN_RESOURCE,
+        'Chỉ thành viên trong cùng đội mới xem được hồ sơ đồng đội',
+        403,
+      );
+    }
+    if (!this.identityClient?.getProfileView) {
+      throw new DomainException(ErrorCode.INTERNAL_ERROR, 'Không kết nối được Identity Service để lấy hồ sơ', 503);
+    }
+    return this.identityClient.getProfileView(studentId, 'TEAMMATES');
   }
 
   async submitTeamConsentByTeamId(teamId: string, studentId: string, dto: SubmitTeamConsentDto) {

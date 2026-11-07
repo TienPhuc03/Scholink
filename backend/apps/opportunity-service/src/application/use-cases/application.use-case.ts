@@ -1117,6 +1117,7 @@ export class ApplicationUseCase implements OnModuleInit {
 
   async getMyApplications(studentId: string) {
     const applications = await this.applicationRepo.findManyByStudent(studentId);
+    const labels = await this.loadOpportunityLabels(applications.map((app) => app.opportunityId));
     return applications.map((app) =>
       Object.freeze({
         ...app.props,
@@ -1124,8 +1125,26 @@ export class ApplicationUseCase implements OnModuleInit {
         screeningReasons: app.screeningReasons,
         submittedAt: app.props.submittedAt.toISOString(),
         version: app.version,
+        opportunityTitle: labels.get(app.opportunityId)?.title ?? '',
+        opportunityType: labels.get(app.opportunityId)?.type ?? '',
       }),
     );
+  }
+
+  /**
+   * Title and type of each distinct opportunity, so student-facing lists can show
+   * a readable name. Opportunities live in this service, so this is a local lookup.
+   */
+  private async loadOpportunityLabels(
+    opportunityIds: readonly string[],
+  ): Promise<Map<string, { title: string; type: string }>> {
+    const unique = [...new Set(opportunityIds.filter(Boolean))];
+    const found = await Promise.all(unique.map((id) => this.opportunityRepo.findById(id)));
+    const labels = new Map<string, { title: string; type: string }>();
+    found.forEach((opp, i) => {
+      if (opp) labels.set(unique[i], { title: opp.title, type: String(opp.type) });
+    });
+    return labels;
   }
 
   /**
@@ -1144,14 +1163,21 @@ export class ApplicationUseCase implements OnModuleInit {
       throw DomainException.forbidden('Bạn không có quyền xem hồ sơ ứng tuyển của sinh viên khác');
     }
 
-    const [revisions, events] = await Promise.all([
+    const [revisions, events, opportunity] = await Promise.all([
       this.applicationRepo.findRevisionsByApplicationId
         ? this.applicationRepo.findRevisionsByApplicationId(application.id)
         : Promise.resolve([]),
       this.applicationRepo.findEventsByApplicationId
         ? this.applicationRepo.findEventsByApplicationId(application.id)
         : Promise.resolve([]),
+      this.opportunityRepo.findById(application.opportunityId),
     ]);
+
+    // FR-APP-07: the app shows withdraw/resubmit from these flags instead of re-deriving the rules.
+    // Only the owner (team leader for TEAM) may act, and only while registration is open.
+    const viewerIsOwner = application.studentId === studentId;
+    const registrationOpen = Boolean(opportunity?.isRegistrationOpen());
+    const deadline = opportunity?.registerDeadline ? new Date(opportunity.registerDeadline) : null;
 
     return Object.freeze({
       ...application.props,
@@ -1159,13 +1185,25 @@ export class ApplicationUseCase implements OnModuleInit {
       screeningReasons: application.screeningReasons,
       submittedAt: application.props.submittedAt.toISOString(),
       version: application.version,
+      opportunityTitle: opportunity?.title ?? '',
+      opportunityType: opportunity ? String(opportunity.type) : '',
+      registrationDeadline: deadline && !isNaN(deadline.getTime()) ? deadline.toISOString() : '',
+      viewerIsOwner,
+      canWithdraw: viewerIsOwner && registrationOpen && application.isWithdrawable(),
+      canResubmit: viewerIsOwner && registrationOpen && application.canResubmit(),
       revisions: revisions.map((r) =>
         Object.freeze({
           ...r,
           submittedAt: r.submittedAt.toISOString(),
         }),
       ),
-      events,
+      // Timeline needs when each status change happened (FR-APP-03).
+      events: events.map((e) =>
+        Object.freeze({
+          ...e,
+          createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : '',
+        }),
+      ),
     });
   }
 

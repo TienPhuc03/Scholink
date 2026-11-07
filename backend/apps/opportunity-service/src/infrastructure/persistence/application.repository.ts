@@ -403,6 +403,7 @@ export class MongooseApplicationRepository implements IApplicationRepository {
         toStatus: doc.toStatus,
         revision: doc.revision,
         reason: doc.reason,
+        createdAt: (doc as { createdAt?: Date }).createdAt,
       }),
     );
   }

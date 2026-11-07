@@ -12,12 +12,17 @@ class OpportunityDetailView extends StatefulWidget {
   final bool isGuest;
   final VoidCallback? onOpenReminderSettings;
 
+  /// F19 (TV1): starts the real IN_APP application flow. When null, the old confirmation
+  /// dialog is shown instead.
+  final VoidCallback? onApplyInApp;
+
   const OpportunityDetailView({
     super.key,
     required this.opportunity,
     required this.viewModel,
     this.isGuest = false,
     this.onOpenReminderSettings,
+    this.onApplyInApp,
   });
 
   @override
@@ -520,6 +525,10 @@ class _OpportunityDetailViewState extends State<OpportunityDetailView> {
     }
 
     // Authenticated and online
+    if (widget.onApplyInApp != null) {
+      widget.onApplyInApp!();
+      return;
+    }
     showDialog<void>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(

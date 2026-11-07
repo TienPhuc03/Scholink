@@ -70,6 +70,21 @@ export class User extends AggregateRoot<string> {
     return this._props;
   }
 
+  get phone(): string | undefined {
+    return this._props.phone;
+  }
+
+  /** FR-PROF-05: contact phone; an empty value removes it. */
+  public withPhone(phone: string): User {
+    const trimmed = phone.trim();
+    return new User(this.id, {
+      ...this._props,
+      phone: trimmed.length > 0 ? trimmed : undefined,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
   public activate(): User {
     return new User(this.id, {
       ...this._props,
