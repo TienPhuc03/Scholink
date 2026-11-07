@@ -554,6 +554,29 @@ export class TeamUseCase {
     };
   }
 
+  /**
+   * FR-PROF-05: a teammate's Passport with PUBLIC + TEAMMATES fields. Only Collaboration knows who
+   * shares a team, so it checks both people are members before asking Identity for that audience.
+   */
+  async getTeammateProfile(teamId: string, viewerId: string, studentId: string) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+    const isMember = (id: string) => team.members.some((m) => m.studentId === id);
+    if (!isMember(viewerId) || !isMember(studentId)) {
+      throw new DomainException(
+        ErrorCode.FORBIDDEN_RESOURCE,
+        'Chỉ thành viên trong cùng đội mới xem được hồ sơ đồng đội',
+        403,
+      );
+    }
+    if (!this.identityClient?.getProfileView) {
+      throw new DomainException(ErrorCode.INTERNAL_ERROR, 'Không kết nối được Identity Service để lấy hồ sơ', 503);
+    }
+    return this.identityClient.getProfileView(studentId, 'TEAMMATES');
+  }
+
   async submitTeamConsentByTeamId(teamId: string, studentId: string, dto: SubmitTeamConsentDto) {
     const reservation = await this.teamRepo.findActiveReservationByTeam(teamId);
     if (!reservation) {

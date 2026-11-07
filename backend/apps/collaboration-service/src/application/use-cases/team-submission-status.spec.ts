@@ -86,3 +86,51 @@ describe('TeamUseCase submission status (F37)', () => {
     });
   });
 });
+
+/** FR-PROF-05: teammates see each other's PUBLIC + TEAMMATES fields; outsiders get nothing. */
+describe('TeamUseCase teammate profile (FR-PROF-05)', () => {
+  const team = new Team('team_1', {
+    competitionId: 'opp_comp_1',
+    name: 'Đội A',
+    leaderId: 'stu_leader',
+    minSize: 2,
+    maxSize: 4,
+    status: 'ACTIVE',
+    rosterVersion: 1,
+    fencingToken: 0,
+    members: [
+      { studentId: 'stu_leader', role: 'LEADER', joinedAt: new Date() },
+      { studentId: 'stu_member', role: 'MEMBER', joinedAt: new Date() },
+    ],
+    version: 1,
+  } as never);
+
+  const build = () => {
+    const identity = {
+      validateMemberProfile: jest.fn(),
+      getProfileView: jest.fn(async (studentId: string, audience: string) => ({ studentId, audience })),
+    };
+    const useCase = new TeamUseCase({ findById: jest.fn(async () => team) } as never, {} as never, identity as never);
+    return { useCase, identity };
+  };
+
+  it('asks Identity for the TEAMMATES view when both are in the team', async () => {
+    const { useCase, identity } = build();
+
+    await expect(useCase.getTeammateProfile('team_1', 'stu_leader', 'stu_member')).resolves.toEqual({
+      studentId: 'stu_member',
+      audience: 'TEAMMATES',
+    });
+    expect(identity.getProfileView).toHaveBeenCalledWith('stu_member', 'TEAMMATES');
+  });
+
+  it.each([
+    ['viewer outside the team', 'stu_outsider', 'stu_member'],
+    ['target outside the team', 'stu_leader', 'stu_outsider'],
+  ])('refuses when the %s', async (_label, viewer, target) => {
+    const { useCase, identity } = build();
+
+    await expect(useCase.getTeammateProfile('team_1', viewer, target)).rejects.toMatchObject({ statusCode: 403 });
+    expect(identity.getProfileView).not.toHaveBeenCalled();
+  });
+});

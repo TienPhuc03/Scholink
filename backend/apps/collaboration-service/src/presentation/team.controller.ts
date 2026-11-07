@@ -160,6 +160,18 @@ export class TeamController {
     return this.teamUseCase.submitTeamConsentByTeamId(teamId, req.user.userId, dto);
   }
 
+  @Get(':id/members/:studentId/profile')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Xem hồ sơ đồng đội: các trường PUBLIC và TEAMMATES (FR-PROF-05)' })
+  @ApiResponse({ status: 200, description: 'Hồ sơ đồng đội' })
+  async getTeammateProfile(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') teamId: string,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.teamUseCase.getTeammateProfile(teamId, req.user.userId, studentId);
+  }
+
   @Get(':id/submission')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Xem phiên nộp hồ sơ đội đang mở: ai đã đồng ý, hạn khoá đội (F37)' })

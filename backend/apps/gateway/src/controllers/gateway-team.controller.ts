@@ -187,6 +187,21 @@ export class GatewayTeamController {
     });
   }
 
+  @Get(':id/members/:studentId/profile')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Xem hồ sơ đồng đội: các trường PUBLIC và TEAMMATES (FR-PROF-05)' })
+  @ApiResponse({ status: 200, description: 'Hồ sơ đồng đội' })
+  async getTeammateProfile(
+    @Param('id') teamId: string,
+    @Param('studentId') studentId: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/${teamId}/members/${studentId}/profile`, {
+      method: 'GET',
+      headers: { Authorization: auth },
+    });
+  }
+
   @Get(':id/submission')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Xem phiên nộp hồ sơ đội đang mở: ai đã đồng ý, hạn khoá đội (F37)' })
