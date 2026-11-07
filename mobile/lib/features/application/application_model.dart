@@ -266,6 +266,9 @@ class ApplicationSummary {
   final DateTime? submittedAt;
   final int revision;
 
+  /// Team of a TEAM application; `null` for individual ones.
+  final String? teamId;
+
   const ApplicationSummary({
     required this.id,
     required this.opportunityId,
@@ -276,6 +279,7 @@ class ApplicationSummary {
     required this.screening,
     required this.submittedAt,
     required this.revision,
+    this.teamId,
   });
 
   bool get isTeam => submissionType.toUpperCase() == 'TEAM';
@@ -296,6 +300,7 @@ class ApplicationSummary {
         screening: Screening.parse(json['screening']),
         submittedAt: _date(json['submittedAt']),
         revision: _int(json['revision']) > 0 ? _int(json['revision']) : 1,
+        teamId: _strOrNull(json['teamId']),
       );
 }
 

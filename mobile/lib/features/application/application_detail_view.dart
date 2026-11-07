@@ -18,12 +18,16 @@ class ApplicationDetailView extends StatefulWidget {
   /// Opens the read-only snapshot of one submitted revision (Q5).
   final void Function(ApplicationDetail detail, ApplicationRevision revision)? onOpenRevision;
 
+  /// F37 (Q18): leader resubmits a withdrawn team application through the team flow.
+  final void Function(ApplicationDetail detail)? onResubmitTeam;
+
   const ApplicationDetailView({
     super.key,
     required this.viewModel,
     this.justSubmitted = false,
     this.onResubmit,
     this.onOpenRevision,
+    this.onResubmitTeam,
   });
 
   @override
@@ -242,6 +246,13 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
+      );
+    } else if (d.canResubmit && s.isTeam && widget.onResubmitTeam != null) {
+      content = AuthPrimaryButton(
+        key: const Key('detail_resubmit_team'),
+        label: 'Nộp lại cho đội (lần ${s.revision + 1})',
+        icon: Icons.groups_outlined,
+        onPressed: () => widget.onResubmitTeam!(d),
       );
     } else if (d.canResubmit && !s.isTeam) {
       content = AuthPrimaryButton(

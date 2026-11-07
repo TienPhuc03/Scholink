@@ -11,6 +11,7 @@ abstract final class AppRoutes {
   static const String myApplications = '/applications/mine';
   static const String applicationDetail = '/applications/detail';
   static const String applicationSnapshot = '/applications/snapshot';
+  static const String teamSubmission = '/applications/team-submission';
 }
 
 /// Bottom navigation tabs of the main shell, in display order.

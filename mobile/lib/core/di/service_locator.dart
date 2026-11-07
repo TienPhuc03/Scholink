@@ -14,6 +14,7 @@ import '../../features/application/apply_viewmodel.dart';
 import '../../features/application/file_attachment_picker.dart';
 import '../../features/application/media_repository.dart';
 import '../../features/application/submission_store.dart';
+import '../../features/application/team_submission_repository.dart';
 
 // Feature 1: Auth
 import '../../features/auth/auth_repository.dart';
@@ -118,6 +119,11 @@ void registerDependencies({
   // F19: individual application flow (view models are built per screen in app.dart)
   sl.registerLazySingleton<ApplicationRepository>(
     () => ApplicationRepository(sl<ApiClient>()),
+  );
+
+  // F37: team submission (APP-05)
+  sl.registerLazySingleton<TeamSubmissionRepository>(
+    () => TeamSubmissionRepository(sl<ApiClient>(), sl<ApplicationRepository>()),
   );
 
   sl.registerLazySingleton<MediaRepository>(

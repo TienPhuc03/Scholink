@@ -38,6 +38,13 @@ abstract final class ApiEndpoints {
   // Collaboration Service routes
   static const String teams = '/api/v1/teams';
   static String teamDetail(String id) => '/api/v1/teams/$id';
+
+  // Team submission (APP-05, F37)
+  static String teamSubmission(String teamId) => '/api/v1/teams/$teamId/submission';
+  static String prepareTeamSubmission(String teamId) => '/api/v1/teams/$teamId/prepare-submission';
+  static String reopenTeam(String teamId) => '/api/v1/teams/$teamId/reopen';
+  static String teamSubmissionConsents(String reservationId) => '/api/v1/teams/submissions/$reservationId/consents';
+  static String abortTeamSubmission(String reservationId) => '/api/v1/teams/submissions/$reservationId/abort';
   static String competitionTeams(String compId) => '/api/v1/teams/competitions/$compId';
   static String joinTeam(String id) => '/api/v1/teams/$id/join';
   static String leaveTeam(String id) => '/api/v1/teams/$id/leave';

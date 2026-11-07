@@ -5,6 +5,9 @@ import 'core/constants/app_colors.dart';
 import 'core/constants/app_routes.dart';
 import 'core/database/room_database.dart';
 import 'core/di/service_locator.dart';
+import 'core/errors/failures.dart';
+import 'core/errors/result.dart';
+import 'core/storage/secure_storage_helper.dart';
 import 'core/network/session_events.dart';
 import 'core/theme/app_theme.dart';
 
@@ -19,6 +22,9 @@ import 'features/application/media_repository.dart';
 import 'features/application/my_applications_view.dart';
 import 'features/application/my_applications_viewmodel.dart';
 import 'features/application/submission_store.dart';
+import 'features/application/team_submission_repository.dart';
+import 'features/application/team_submission_view.dart';
+import 'features/application/team_submission_viewmodel.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/email_verification_view.dart';
 import 'features/auth/email_verification_viewmodel.dart';
@@ -43,6 +49,7 @@ import 'features/passport/passport_edit_view.dart';
 import 'features/passport/passport_view.dart';
 import 'features/passport/passport_viewmodel.dart';
 import 'features/team/team_list_view.dart';
+import 'features/team/team_model.dart';
 import 'features/team/team_viewmodel.dart';
 
 class ScholinkApp extends StatefulWidget {
@@ -133,7 +140,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _openOpportunityDetail(resumeApply);
-        _openApply(opportunityId: resumeApply.id, title: resumeApply.title);
+        _startApply(resumeApply);
       });
     }
   }
@@ -299,8 +306,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: sl<NotificationViewModel>(),
             );
           },
-          onApplyInApp: () =>
-              _isGuest ? _askLoginToApply(opp) : _openApply(opportunityId: opp.id, title: opp.title),
+          onApplyInApp: () => _isGuest ? _askLoginToApply(opp) : _startApply(opp),
         ),
       ),
     );
@@ -378,6 +384,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
         onResubmit: (ApplicationDetail d) =>
             _openApply(opportunityId: d.summary.opportunityId, title: d.summary.displayTitle, fromDetail: true),
         onOpenRevision: _openRevisionSnapshot,
+        onResubmitTeam: _resubmitTeam,
       ),
     );
     if (replace) {
@@ -385,6 +392,68 @@ class _ScholinkAppState extends State<ScholinkApp> {
     } else {
       _nav.push<void>(route);
     }
+  }
+
+  /// Individual opportunities use the F19 flow; TEAM competitions go through the team
+  /// submission flow of the student's own team (APP-05, F37).
+  void _startApply(OpportunityModel opp) {
+    if ((opp.competitionMode ?? '').toUpperCase() == 'TEAM') {
+      unawaited(_openTeamSubmissionForCompetition(opp));
+    } else {
+      _openApply(opportunityId: opp.id, title: opp.title);
+    }
+  }
+
+  Future<void> _openTeamSubmissionForCompetition(OpportunityModel opp) async {
+    final Result<List<TeamModel>, Failure> teams = await sl<TeamSubmissionRepository>().getCompetitionTeams(opp.id);
+    final String? me = await sl<SecureStorageHelper>().getUserId();
+    if (!mounted) return;
+    TeamModel? mine;
+    for (final TeamModel t in teams.dataOrNull ?? <TeamModel>[]) {
+      if (me != null && t.isMember(me)) mine = t;
+    }
+    if (mine == null) {
+      _showMessage(
+        teams.errorOrNull?.message ??
+            'Cuộc thi này nộp theo đội. Hãy tạo hoặc tham gia một đội ở tab Đội thi trước khi nộp.',
+      );
+      return;
+    }
+    _openTeamSubmission(teamId: mine.id, competitionTitle: opp.title);
+  }
+
+  void _openTeamSubmission({required String teamId, required String competitionTitle}) {
+    final TeamSubmissionViewModel vm = TeamSubmissionViewModel(
+      repository: sl<TeamSubmissionRepository>(),
+      store: sl<SubmissionStore>(),
+      currentUserId: sl<SecureStorageHelper>().getUserId,
+      teamId: teamId,
+      competitionTitle: competitionTitle,
+    );
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.teamSubmission),
+        builder: (_) => TeamSubmissionView(
+          viewModel: vm,
+          onOpenApplication: (String id, {required bool justSubmitted}) =>
+              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: true),
+        ),
+      ),
+    );
+  }
+
+  /// Q18: a withdrawn team application is reopened, then the leader runs the team flow again.
+  Future<void> _resubmitTeam(ApplicationDetail d) async {
+    final String? teamId = d.summary.teamId;
+    if (teamId == null) return;
+    final Failure? f = (await sl<TeamSubmissionRepository>().reopen(teamId)).errorOrNull;
+    if (!mounted) return;
+    // A team that is already open again answers with a state conflict: the flow still applies.
+    if (f != null && f.code != 'STATE_CONFLICT') {
+      _showMessage(f.message, color: AppColors.error);
+      return;
+    }
+    _openTeamSubmission(teamId: teamId, competitionTitle: d.summary.displayTitle);
   }
 
   void _openRevisionSnapshot(ApplicationDetail d, ApplicationRevision revision) {
@@ -436,7 +505,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
             onOpenNotificationInbox: () => _selectTab(AppTabs.notifications),
           ),
           // Account-only tabs are not built for guests, so they never fire authenticated calls.
-          if (_isGuest) const SizedBox.shrink() else TeamListView(viewModel: _tabs.team),
+          if (_isGuest)
+            const SizedBox.shrink()
+          else
+            TeamListView(
+              viewModel: _tabs.team,
+              onOpenTeamSubmission: (TeamModel team, String competitionTitle) =>
+                  _openTeamSubmission(teamId: team.id, competitionTitle: competitionTitle),
+            ),
           if (_isGuest) const SizedBox.shrink() else ChatView(viewModel: _tabs.chat),
           if (_isGuest) const SizedBox.shrink() else NotificationInboxView(viewModel: _tabs.notification),
           if (_isGuest)
