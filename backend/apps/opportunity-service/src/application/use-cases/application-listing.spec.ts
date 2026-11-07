@@ -17,11 +17,20 @@ describe('ApplicationUseCase listing (F19)', () => {
     screeningReasons: [],
     version: 1,
     props: { opportunityId, studentId: 'stu_1', status: 'SUBMITTED', submittedAt, revision: 1 },
+    isWithdrawable: () => true,
+    canResubmit: () => false,
   });
 
-  const opportunities: Record<string, { title: string; type: string }> = {
-    opp_a: { title: 'Học bổng A', type: 'SCHOLARSHIP' },
-    opp_b: { title: 'Cuộc thi B', type: 'COMPETITION' },
+  const fakeOpportunity = (title: string, type: string) => ({
+    title,
+    type,
+    registerDeadline: new Date('2099-01-01T00:00:00.000Z'),
+    isRegistrationOpen: () => true,
+  });
+
+  const opportunities: Record<string, ReturnType<typeof fakeOpportunity>> = {
+    opp_a: fakeOpportunity('Học bổng A', 'SCHOLARSHIP'),
+    opp_b: fakeOpportunity('Cuộc thi B', 'COMPETITION'),
   };
 
   const build = () => {
@@ -86,7 +95,14 @@ describe('ApplicationUseCase listing (F19)', () => {
       expect.arrayContaining(['opportunityTitle', 'opportunityType']),
     );
     expect(fieldNames('ApplicationDetailResponse')).toEqual(
-      expect.arrayContaining(['opportunityTitle', 'opportunityType']),
+      expect.arrayContaining([
+        'opportunityTitle',
+        'opportunityType',
+        'registrationDeadline',
+        'viewerIsOwner',
+        'canWithdraw',
+        'canResubmit',
+      ]),
     );
     expect(fieldNames('ApplicationEventMessage')).toContain('createdAt');
   });

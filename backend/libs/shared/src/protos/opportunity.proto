@@ -313,6 +313,10 @@ message ApplicationDetailResponse {
   repeated string memberIds = 21;
   string opportunityTitle = 22;
   string opportunityType = 23;
+  string registrationDeadline = 24;
+  bool viewerIsOwner = 25;
+  bool canWithdraw = 26;
+  bool canResubmit = 27;
 }
 
 message WithdrawApplicationRequest {
