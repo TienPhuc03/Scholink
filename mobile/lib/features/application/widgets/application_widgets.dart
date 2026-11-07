@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../passport/passport_model.dart';
 import '../application_model.dart';
 
 String formatDateTime(DateTime? d) {
@@ -146,6 +147,59 @@ class ReasonList extends StatelessWidget {
                 ),
               ))
           .toList(),
+    );
+  }
+}
+
+/// Label on the left, selectable value on the right.
+class KeyValueRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const KeyValueRow(this.label, this.value, {super.key});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SizedBox(
+              width: 110,
+              child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            Expanded(child: SelectableText(value, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
+          ],
+        ),
+      );
+}
+
+/// The Passport fields as they are shared with an organizer: used by the apply preview (F19)
+/// and by the submitted-snapshot screen (F28), so both show exactly the same content.
+class PassportSnapshotFields extends StatelessWidget {
+  final PassportModel passport;
+
+  const PassportSnapshotFields(this.passport, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final PassportModel s = passport;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        KeyValueRow('Họ và tên', s.fullName),
+        if (s.regionCode != null) KeyValueRow('Khu vực', s.regionCode!),
+        if (s.bio != null) KeyValueRow('Giới thiệu', s.bio!),
+        if (s.education != null)
+          KeyValueRow('Học vấn',
+              '${s.education!.institution} · ${s.education!.major} · ${s.education!.yearsDisplay} · GPA ${s.education!.gpaDisplay}'),
+        if (s.skills.isNotEmpty) KeyValueRow('Kỹ năng', s.skills.join(', ')),
+        if (s.achievements.isNotEmpty) KeyValueRow('Thành tích', s.achievements.join('; ')),
+        if (s.certificates.isNotEmpty)
+          KeyValueRow('Chứng chỉ',
+              s.certificates.map((CertificateModel c) => '${c.name}${c.score != null ? ' (${c.score})' : ''}').join(', ')),
+        KeyValueRow('Độ hoàn thiện', '${s.completionScore}%'),
+      ],
     );
   }
 }

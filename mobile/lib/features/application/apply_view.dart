@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../auth/widgets/auth_widgets.dart';
-import '../passport/passport_model.dart';
 import 'application_model.dart';
 import 'apply_viewmodel.dart';
 import 'attachment_model.dart';
@@ -97,6 +96,15 @@ class _ApplyViewState extends State<ApplyView> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: <Widget>[
+                      if (vm.resubmitRevision != null) ...<Widget>[
+                        AuthMessageBanner(
+                          key: const Key('apply_resubmit_banner'),
+                          message: 'Bạn đang nộp lại hồ sơ đã rút. Đây sẽ là lần nộp thứ ${vm.resubmitRevision}; '
+                              'các lần nộp trước vẫn được lưu nguyên.',
+                          tone: AuthBannerTone.info,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       if (vm.terminalError != null) ...<Widget>[
                         AuthMessageBanner(message: vm.terminalError!),
                         const SizedBox(height: 16),
@@ -365,7 +373,6 @@ class _ApplyViewState extends State<ApplyView> {
     }
     if (p == null) return out;
 
-    final PassportModel s = p.snapshot;
     out.addAll(<Widget>[
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -399,18 +406,7 @@ class _ApplyViewState extends State<ApplyView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _kv('Họ và tên', s.fullName),
-            if (s.regionCode != null) _kv('Khu vực', s.regionCode!),
-            if (s.bio != null) _kv('Giới thiệu', s.bio!),
-            if (s.education != null)
-              _kv('Học vấn',
-                  '${s.education!.institution} · ${s.education!.major} · ${s.education!.yearsDisplay} · GPA ${s.education!.gpaDisplay}'),
-            if (s.skills.isNotEmpty) _kv('Kỹ năng', s.skills.join(', ')),
-            if (s.achievements.isNotEmpty) _kv('Thành tích', s.achievements.join('; ')),
-            if (s.certificates.isNotEmpty)
-              _kv('Chứng chỉ',
-                  s.certificates.map((CertificateModel c) => '${c.name}${c.score != null ? ' (${c.score})' : ''}').join(', ')),
-            _kv('Độ hoàn thiện', '${s.completionScore}%'),
+            PassportSnapshotFields(p.snapshot),
             if (p.reasons.isNotEmpty) ...<Widget>[const SizedBox(height: 8), ReasonList(p.reasons)],
           ],
         ),
@@ -558,19 +554,7 @@ class _ApplyViewState extends State<ApplyView> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       );
 
-  Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            SizedBox(
-              width: 110,
-              child: Text(k, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            ),
-            Expanded(child: SelectableText(v, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
-          ],
-        ),
-      );
+  Widget _kv(String k, String v) => KeyValueRow(k, v);
 }
 
 class _StepHeader extends StatelessWidget {

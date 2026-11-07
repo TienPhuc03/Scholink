@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 // Core Infrastructure
 import '../database/local_cache_manager.dart';
 import '../database/room_database.dart';
+import '../network/session_events.dart';
 import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
 import '../storage/secure_storage_helper.dart';
@@ -56,7 +57,10 @@ Future<void> setupServiceLocator() async {
   final RoomDatabase roomDb = RoomDatabaseImpl(localCache);
   sl.registerSingleton<RoomDatabase>(roomDb);
 
-  final ApiClient apiClient = DioApiClient(secureStorage: secureStorage);
+  final SessionEvents sessionEvents = SessionEvents();
+  sl.registerSingleton<SessionEvents>(sessionEvents);
+
+  final ApiClient apiClient = DioApiClient(secureStorage: secureStorage, sessionEvents: sessionEvents);
   sl.registerSingleton<ApiClient>(apiClient);
 
   final MqttManager mqttManager = MqttManagerImpl();

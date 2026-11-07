@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_routes.dart';
 import 'core/di/service_locator.dart';
+import 'core/network/session_events.dart';
 import 'core/theme/app_theme.dart';
 
 // Flat Feature imports for MVVM + Repository Architecture
 import 'features/application/application_detail_view.dart';
+import 'features/application/application_model.dart';
 import 'features/application/application_repository.dart';
+import 'features/application/application_snapshot_view.dart';
 import 'features/application/apply_view.dart';
 import 'features/application/apply_viewmodel.dart';
 import 'features/application/media_repository.dart';
@@ -22,6 +27,7 @@ import 'features/auth/login_viewmodel.dart';
 import 'features/auth/password_reset_viewmodel.dart';
 import 'features/auth/register_view.dart';
 import 'features/auth/register_viewmodel.dart';
+import 'features/auth/widgets/login_required_sheet.dart';
 import 'features/auth/reset_password_view.dart';
 import 'features/chat/chat_view.dart';
 import 'features/chat/chat_viewmodel.dart';
@@ -63,6 +69,12 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// Tab a guest tried to open before being asked to log in; restored after login (F10).
   int? _pendingTabIndex;
 
+  /// AUTH-05 (F28, Q9): opportunity a guest wanted to apply to. After login the app reopens
+  /// it and its apply flow at the readiness step; nothing is sent without the user's review.
+  OpportunityModel? _pendingApply;
+
+  StreamSubscription<void>? _sessionExpiry;
+
   /// Tab view models live for one session. Views load data once in initState, so handing them
   /// a fresh factory instance on every rebuild (e.g. each tab switch) dropped their data.
   /// Reset on login/logout so one user's data never leaks into the next session.
@@ -77,6 +89,15 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void initState() {
     super.initState();
     _isAuthenticated = widget.initialIsAuthenticated;
+    if (sl.isRegistered<SessionEvents>()) {
+      _sessionExpiry = sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
+    }
+  }
+
+  @override
+  void dispose() {
+    _sessionExpiry?.cancel();
+    super.dispose();
   }
 
   NavigatorState get _nav => _navigatorKey.currentState!;
@@ -90,20 +111,46 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _onLoginSuccess() {
     _nav.popUntil((Route<dynamic> r) => r.isFirst);
     _resetTabViewModels();
+    final OpportunityModel? resumeApply = _pendingApply;
     setState(() {
       _isAuthenticated = true;
       _isGuest = false;
-      _currentTabIndex = _pendingTabIndex ?? _currentTabIndex;
+      _currentTabIndex = resumeApply != null ? AppTabs.opportunities : (_pendingTabIndex ?? _currentTabIndex);
       _pendingTabIndex = null;
+      _pendingApply = null;
     });
+    if (resumeApply != null) {
+      // Wait for the main shell to replace the login screen before pushing on top of it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _openOpportunityDetail(resumeApply);
+        _openApply(opportunityId: resumeApply.id, title: resumeApply.title);
+      });
+    }
   }
 
   void _onEnterGuestMode() {
     setState(() {
       _isGuest = true;
       _pendingTabIndex = null;
+      _pendingApply = null;
       _currentTabIndex = AppTabs.opportunities;
     });
+  }
+
+  /// Q10: the refresh token was rejected. Close every screen, drop this session's data and
+  /// show the login screen; after logging in again the user lands on the same tab.
+  void _onSessionExpired() {
+    if (!_isAuthenticated) return;
+    _nav.popUntil((Route<dynamic> r) => r.isFirst);
+    _resetTabViewModels();
+    setState(() {
+      _isAuthenticated = false;
+      _isGuest = false;
+      _pendingTabIndex = _currentTabIndex;
+      _pendingApply = null;
+    });
+    _showMessage('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', color: AppColors.error);
   }
 
   Future<void> _handleLogout() async {
@@ -115,6 +162,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _isAuthenticated = false;
       _isGuest = false;
       _pendingTabIndex = null;
+      _pendingApply = null;
       _currentTabIndex = AppTabs.opportunities;
     });
     _showMessage('Bạn đã đăng xuất.');
@@ -126,17 +174,36 @@ class _ScholinkAppState extends State<ScholinkApp> {
       setState(() => _currentTabIndex = index);
       return;
     }
-    final bool? goLogin = await showModalBottomSheet<bool>(
-      context: _navigatorKey.currentContext!,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-      builder: (BuildContext ctx) => _LoginRequiredSheet(featureName: AppTabs.label(index)),
+    final LoginChoice? choice = await LoginRequiredSheet.show(
+      _navigatorKey.currentContext!,
+      message: 'Đăng nhập để dùng mục ${AppTabs.label(index)}. '
+          'Sau khi đăng nhập, Scholink sẽ đưa bạn quay lại đúng chỗ này.',
     );
-    if (goLogin == true) {
-      setState(() {
-        _pendingTabIndex = index;
-        _isGuest = false;
-      });
+    if (choice == null || !mounted) return;
+    setState(() {
+      _pendingTabIndex = index;
+      _isGuest = false;
+    });
+    if (choice == LoginChoice.register) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openRegister());
+    }
+  }
+
+  /// AUTH-05: a guest tapped "Nộp hồ sơ". Remember the opportunity, then log in or register.
+  Future<void> _askLoginToApply(OpportunityModel opp) async {
+    final LoginChoice? choice = await LoginRequiredSheet.show(
+      _navigatorKey.currentContext!,
+      message: 'Đăng nhập tài khoản sinh viên để nộp hồ sơ cho "${opp.title}". '
+          'Sau khi đăng nhập, Scholink mở lại cơ hội này để bạn xem lại và xác nhận trước khi nộp.',
+    );
+    if (choice == null || !mounted) return;
+    _nav.popUntil((Route<dynamic> r) => r.isFirst);
+    setState(() {
+      _pendingApply = opp;
+      _isGuest = false;
+    });
+    if (choice == LoginChoice.register) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openRegister());
     }
   }
 
@@ -215,7 +282,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
         builder: (BuildContext ctx) => OpportunityDetailView(
           opportunity: opp,
           viewModel: sl<OpportunityViewModel>(),
-          isGuest: _isGuest,
+          // Guests are handled by onApplyInApp below (AUTH-05: log in, then come back here),
+          // so the detail screen's own "please log in" dialog is not used.
+          isGuest: false,
           onOpenReminderSettings: () {
             ReminderSettingsSheet.show(
               ctx,
@@ -223,7 +292,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: sl<NotificationViewModel>(),
             );
           },
-          onApplyInApp: () => _openApply(opp),
+          onApplyInApp: () =>
+              _isGuest ? _askLoginToApply(opp) : _openApply(opportunityId: opp.id, title: opp.title),
         ),
       ),
     );
@@ -231,14 +301,16 @@ class _ScholinkAppState extends State<ScholinkApp> {
 
   // ---------- Application flow (F19) ----------
 
-  void _openApply(OpportunityModel opp) {
+  /// [fromDetail]: resubmitting from an application detail (F28, Q4). The detail is already
+  /// below this screen and reloads itself, so the apply flow just closes when it is done.
+  void _openApply({required String opportunityId, required String title, bool fromDetail = false}) {
     final ApplyViewModel vm = ApplyViewModel(
       applications: sl<ApplicationRepository>(),
       media: sl<MediaRepository>(),
       store: sl<SubmissionStore>(),
       picker: sl<AttachmentPicker>(),
-      opportunityId: opp.id,
-      opportunityTitle: opp.title,
+      opportunityId: opportunityId,
+      opportunityTitle: title,
     );
     _nav.push<void>(
       MaterialPageRoute<void>(
@@ -246,8 +318,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
         builder: (BuildContext ctx) => ApplyView(
           viewModel: vm,
           onEditPassport: _editPassportFromApply,
-          onOpenApplication: (String id, {required bool justSubmitted}) =>
-              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: justSubmitted),
+          onOpenApplication: (String id, {required bool justSubmitted}) {
+            if (!fromDetail) {
+              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: justSubmitted);
+              return;
+            }
+            _nav.pop();
+            if (justSubmitted) _showMessage('Đã nộp lại hồ sơ thành công.', color: AppColors.success);
+          },
         ),
       ),
     );
@@ -290,6 +368,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
       builder: (_) => ApplicationDetailView(
         viewModel: ApplicationDetailViewModel(sl<ApplicationRepository>(), applicationId: id),
         justSubmitted: justSubmitted,
+        onResubmit: (ApplicationDetail d) =>
+            _openApply(opportunityId: d.summary.opportunityId, title: d.summary.displayTitle, fromDetail: true),
+        onOpenRevision: _openRevisionSnapshot,
       ),
     );
     if (replace) {
@@ -297,6 +378,19 @@ class _ScholinkAppState extends State<ScholinkApp> {
     } else {
       _nav.push<void>(route);
     }
+  }
+
+  void _openRevisionSnapshot(ApplicationDetail d, ApplicationRevision revision) {
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.applicationSnapshot),
+        builder: (_) => ApplicationSnapshotView(
+          opportunityTitle: d.summary.displayTitle,
+          revision: revision,
+          isCurrent: d.revisions.isNotEmpty && identical(d.revisions.first, revision),
+        ),
+      ),
+    );
   }
 
   @override
@@ -394,52 +488,3 @@ class _TabViewModels {
   late final PassportViewModel passport = sl<PassportViewModel>();
 }
 
-/// Shown when a guest taps an account-only tab. Pops `true` to go to login.
-class _LoginRequiredSheet extends StatelessWidget {
-  final String featureName;
-
-  const _LoginRequiredSheet({required this.featureName});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const Icon(Icons.lock_person_outlined, size: 40, color: AppColors.primary),
-            const SizedBox(height: 12),
-            const Text(
-              'Bạn cần đăng nhập',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Đăng nhập để dùng mục $featureName. Sau khi đăng nhập, Scholink sẽ đưa bạn quay lại đúng chỗ này.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              key: const Key('login_required_go'),
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-              child: const Text('Đăng nhập / Đăng ký'),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Để sau'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

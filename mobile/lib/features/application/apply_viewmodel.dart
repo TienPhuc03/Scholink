@@ -54,6 +54,10 @@ class ApplyViewModel extends BaseViewModel {
   ApplicationSummary? _existing;
   ApplicationSummary? get existingApplication => _existing;
 
+  /// Set when this flow resubmits a withdrawn application: the revision number it will become.
+  int? _resubmitRevision;
+  int? get resubmitRevision => _resubmitRevision;
+
   // ---- Step 1: readiness ----
   ReadinessResult? _readiness;
   ReadinessResult? get readiness => _readiness;
@@ -131,6 +135,7 @@ class ApplyViewModel extends BaseViewModel {
     setLoading();
     final Result<List<ApplicationSummary>, Failure> mine = await _applications.getMyApplications();
     _existing = _findActive(mine.dataOrNull);
+    _resubmitRevision = _findResubmitRevision(mine.dataOrNull);
     _pending = await _store.load(opportunityId);
     setIdle();
     if (_existing == null) await checkReadiness();
@@ -140,6 +145,16 @@ class ApplyViewModel extends BaseViewModel {
     if (items == null) return null;
     for (final ApplicationSummary a in items) {
       if (a.opportunityId == opportunityId && !a.isTeam && a.status.isActive) return a;
+    }
+    return null;
+  }
+
+  /// F28 (Q4): the backend keeps one application per opportunity, so submitting after a
+  /// withdrawal becomes the next revision of that same application.
+  int? _findResubmitRevision(List<ApplicationSummary>? items) {
+    if (items == null) return null;
+    for (final ApplicationSummary a in items) {
+      if (a.opportunityId == opportunityId && !a.isTeam && !a.status.isActive) return a.revision + 1;
     }
     return null;
   }

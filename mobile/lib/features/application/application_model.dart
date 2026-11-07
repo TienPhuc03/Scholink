@@ -325,7 +325,165 @@ class ApplicationEvent {
         reason: _strOrNull(json['reason']),
         createdAt: _date(json['createdAt']),
       );
+
+  /// Submissions create a new revision whose snapshot can be opened from the timeline.
+  bool get isSubmission => switch (reason) {
+        'INITIAL_SUBMISSION' || 'STUDENT_RESUBMITTED' || 'TEAM_INITIAL_SUBMISSION' || 'TEAM_RESUBMITTED' => true,
+        _ => false,
+      };
+
+  /// Vietnamese text for the backend reason code; an organizer's free-text note is shown as is.
+  String? get reasonLabel => switch (reason) {
+        null => null,
+        'INITIAL_SUBMISSION' => 'Nộp lần đầu',
+        'STUDENT_RESUBMITTED' => 'Nộp lại',
+        'STUDENT_WITHDRAWN' => 'Bạn đã rút hồ sơ',
+        'TEAM_INITIAL_SUBMISSION' => 'Đội nộp lần đầu',
+        'TEAM_RESUBMITTED' => 'Đội nộp lại',
+        'TEAM_LEADER_WITHDRAWN' => 'Trưởng đội đã rút hồ sơ',
+        'ORGANIZER_STATUS_UPDATE' => 'Ban tổ chức cập nhật trạng thái',
+        final String note => 'Ghi chú: $note',
+      };
 }
+
+/// One member's Passport inside a team revision.
+class TeamMemberSnapshot {
+  final String studentId;
+  final int profileVersion;
+  final PassportModel passport;
+  final List<String> attachmentIds;
+
+  /// Name as submitted, or the student id when the snapshot has none.
+  final String displayName;
+
+  const TeamMemberSnapshot({
+    required this.studentId,
+    required this.profileVersion,
+    required this.passport,
+    required this.displayName,
+    this.attachmentIds = const <String>[],
+  });
+}
+
+/// One immutable submitted revision (ApplicationRevisionMessage): exactly what the
+/// organizer received for that submission (FR-APP-07/08). Never edited afterwards.
+class ApplicationRevision {
+  final int revision;
+  final DateTime? submittedAt;
+  final String snapshotId;
+  final int profileVersion;
+  final int ruleVersion;
+  final String payloadHash;
+  final String consentId;
+  final Screening screening;
+  final List<ScreeningReason> reasons;
+
+  /// Removed by the retention policy: the content is no longer available.
+  final bool isRedacted;
+
+  /// Individual revision: the shared Passport and the attached asset ids.
+  final PassportModel? passport;
+  final List<String> attachmentIds;
+
+  /// Team revision: roster version, leader and one Passport per member.
+  final int rosterVersion;
+  final String? leaderId;
+  final List<TeamMemberSnapshot> members;
+
+  const ApplicationRevision({
+    required this.revision,
+    required this.submittedAt,
+    required this.snapshotId,
+    required this.profileVersion,
+    required this.ruleVersion,
+    required this.payloadHash,
+    required this.consentId,
+    required this.screening,
+    this.reasons = const <ScreeningReason>[],
+    this.isRedacted = false,
+    this.passport,
+    this.attachmentIds = const <String>[],
+    this.rosterVersion = 0,
+    this.leaderId,
+    this.members = const <TeamMemberSnapshot>[],
+  });
+
+  bool get isTeam => members.isNotEmpty;
+
+  int get attachmentCount =>
+      isTeam ? members.fold<int>(0, (int n, TeamMemberSnapshot m) => n + m.attachmentIds.length) : attachmentIds.length;
+
+  factory ApplicationRevision.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> snapshot = _decodeMap(json['snapshotJson']);
+    final dynamic manifest = _decodeJson(json['manifestJson']);
+    final bool redacted = snapshot['redacted'] == true;
+    final dynamic rawMembers = snapshot['members'];
+    final bool team = !redacted && rawMembers is List;
+
+    List<TeamMemberSnapshot> members = <TeamMemberSnapshot>[];
+    if (team) {
+      final Map<String, List<String>> memberFiles = <String, List<String>>{};
+      if (manifest is List) {
+        for (final dynamic entry in manifest) {
+          if (entry is Map<String, dynamic>) {
+            memberFiles[_str(entry['studentId'])] = _assetIds(entry['manifest']);
+          }
+        }
+      }
+      members = rawMembers.whereType<Map<String, dynamic>>().map((Map<String, dynamic> m) {
+        final Map<String, dynamic> passport =
+            m['snapshot'] is Map<String, dynamic> ? m['snapshot'] as Map<String, dynamic> : <String, dynamic>{};
+        final String studentId = _str(m['studentId']);
+        return TeamMemberSnapshot(
+          studentId: studentId,
+          profileVersion: _int(m['profileVersion']),
+          passport: PassportModel.fromJson(passport),
+          displayName: _strOrNull(passport['fullName']) ?? studentId,
+          attachmentIds: memberFiles[studentId] ?? const <String>[],
+        );
+      }).toList();
+    }
+
+    return ApplicationRevision(
+      revision: _int(json['revision']),
+      submittedAt: _date(json['submittedAt']),
+      snapshotId: _str(json['snapshotId']),
+      profileVersion: _int(json['profileVersion']),
+      ruleVersion: _int(json['ruleVersion']),
+      payloadHash: _str(json['payloadHash']),
+      consentId: _str(json['consentId']),
+      screening: Screening.parse(json['screening']),
+      reasons: ScreeningReason.listFrom(json['screeningReasons']),
+      isRedacted: redacted,
+      passport: redacted || team ? null : PassportModel.fromJson(snapshot),
+      attachmentIds: redacted || team ? const <String>[] : _assetIds(manifest),
+      rosterVersion: team ? _int(snapshot['rosterVersion']) : _int(json['rosterVersion']),
+      leaderId: team ? _strOrNull(snapshot['leaderId']) : null,
+      members: members,
+    );
+  }
+}
+
+dynamic _decodeJson(dynamic raw) {
+  try {
+    return jsonDecode(_str(raw));
+  } catch (_) {
+    return null;
+  }
+}
+
+Map<String, dynamic> _decodeMap(dynamic raw) {
+  final dynamic decoded = _decodeJson(raw);
+  return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+}
+
+List<String> _assetIds(dynamic manifest) => manifest is List
+    ? manifest
+        .whereType<Map<String, dynamic>>()
+        .map((Map<String, dynamic> item) => _str(item['assetId']))
+        .where((String id) => id.isNotEmpty)
+        .toList()
+    : <String>[];
 
 /// `GET /api/v1/applications/:id` (ApplicationDetailResponse).
 class ApplicationDetail {
@@ -341,6 +499,15 @@ class ApplicationDetail {
   /// Oldest first.
   final List<ApplicationEvent> events;
 
+  /// Newest first.
+  final List<ApplicationRevision> revisions;
+
+  /// F28 (Q12): decided by the backend; the app only shows or hides the actions.
+  final DateTime? registrationDeadline;
+  final bool viewerIsOwner;
+  final bool canWithdraw;
+  final bool canResubmit;
+
   const ApplicationDetail({
     required this.summary,
     required this.profileVersion,
@@ -351,7 +518,25 @@ class ApplicationDetail {
     required this.consentId,
     this.reasons = const <ScreeningReason>[],
     this.events = const <ApplicationEvent>[],
+    this.revisions = const <ApplicationRevision>[],
+    this.registrationDeadline,
+    this.viewerIsOwner = false,
+    this.canWithdraw = false,
+    this.canResubmit = false,
   });
+
+  ApplicationRevision? revisionNumber(int n) {
+    for (final ApplicationRevision r in revisions) {
+      if (r.revision == n) return r;
+    }
+    return null;
+  }
+
+  bool get isClosedOutcome => <ApplicationStatus>{
+        ApplicationStatus.accepted,
+        ApplicationStatus.rejected,
+        ApplicationStatus.cancelled,
+      }.contains(summary.status);
 
   factory ApplicationDetail.fromJson(Map<String, dynamic> json) {
     final List<ApplicationEvent> events = json['events'] is List
@@ -366,6 +551,13 @@ class ApplicationDetail {
         ? (List<ApplicationEvent>.of(events)
           ..sort((ApplicationEvent a, ApplicationEvent b) => a.createdAt!.compareTo(b.createdAt!)))
         : events.reversed.toList();
+    final List<ApplicationRevision> revisions = json['revisions'] is List
+        ? ((json['revisions'] as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .map(ApplicationRevision.fromJson)
+            .toList()
+          ..sort((ApplicationRevision a, ApplicationRevision b) => b.revision.compareTo(a.revision)))
+        : <ApplicationRevision>[];
     return ApplicationDetail(
       summary: ApplicationSummary.fromJson(json),
       profileVersion: _int(json['profileVersion']),
@@ -376,6 +568,11 @@ class ApplicationDetail {
       consentId: _str(json['consentId']),
       reasons: ScreeningReason.listFrom(json['screeningReasons']),
       events: ordered,
+      revisions: revisions,
+      registrationDeadline: _date(json['registrationDeadline']),
+      viewerIsOwner: json['viewerIsOwner'] == true,
+      canWithdraw: json['canWithdraw'] == true,
+      canResubmit: json['canResubmit'] == true,
     );
   }
 }

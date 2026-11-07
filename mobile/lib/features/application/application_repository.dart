@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
@@ -13,12 +14,23 @@ class ConsentReceipt {
   const ConsentReceipt({required this.consentId, required this.previewId});
 }
 
+class _ChangeSignal extends ChangeNotifier {
+  void fire() => notifyListeners();
+}
+
 /// Individual application flow (F19) against the gateway:
-/// readiness → preview → consent → submit, plus "Hồ sơ của tôi".
+/// readiness → preview → consent → submit, plus "Hồ sơ của tôi" and withdraw (F28).
 class ApplicationRepository {
   final ApiClient _api;
+  final _ChangeSignal _changes = _ChangeSignal();
 
   ApplicationRepository(this._api);
+
+  /// Fires after a submit or withdraw succeeds, so cached screens such as
+  /// "Hồ sơ của tôi" reload instead of showing a stale status (F28, Q11).
+  Listenable get changes => _changes;
+
+  void _notifyChanged() => _changes.fire();
 
   Future<Result<ReadinessResult, Failure>> checkReadiness(String opportunityId) => _guard(() async {
         final Response<dynamic> r = await _api.get<dynamic>(
@@ -96,7 +108,18 @@ class ApplicationRepository {
           data: body,
           options: Options(headers: <String, dynamic>{'Idempotency-Key': idempotencyKey}),
         );
-        return SubmitResult.fromJson(unwrapData(r.data));
+        final SubmitResult result = SubmitResult.fromJson(unwrapData(r.data));
+        _notifyChanged();
+        return result;
+      });
+
+  /// `POST /applications/:id/withdraw` (FR-APP-07). Not idempotent on the backend: a second
+  /// call answers 409 STATE_CONFLICT, which [ApplicationDetailViewModel] treats as done.
+  Future<Result<ApplicationStatus, Failure>> withdraw(String applicationId) => _guard(() async {
+        final Response<dynamic> r = await _api.post<dynamic>(ApiEndpoints.withdrawApplication(applicationId));
+        final ApplicationStatus status = ApplicationStatus.parse(unwrapData(r.data)['status']);
+        _notifyChanged();
+        return status;
       });
 
   Future<Result<List<ApplicationSummary>, Failure>> getMyApplications() => _guard(() async {

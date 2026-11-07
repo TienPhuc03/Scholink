@@ -29,6 +29,7 @@ abstract final class ApiEndpoints {
   static const String applications = '/api/v1/applications';
   static const String myApplications = '/api/v1/applications/me';
   static String applicationDetail(String id) => '/api/v1/applications/$id';
+  static String withdrawApplication(String id) => '/api/v1/applications/$id/withdraw';
 
   // Opportunity Service routes
   static const String opportunities = '/api/v1/opportunities';
