@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_routes.dart';
+import 'core/database/room_database.dart';
 import 'core/di/service_locator.dart';
 import 'core/network/session_events.dart';
 import 'core/theme/app_theme.dart';
@@ -85,6 +86,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _tabViewModels = null;
   }
 
+  /// F37 (Q2, Q3): when an account's session ends, no screen of it stays on the stack
+  /// (Passport, applications, snapshots) and its cached data is dropped from the device.
+  void _closeAccountScreensAndData() {
+    _nav.popUntil((Route<dynamic> r) => r.isFirst);
+    _resetTabViewModels();
+    if (sl.isRegistered<RoomDatabase>()) unawaited(sl<RoomDatabase>().clearUserData());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -142,8 +151,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// show the login screen; after logging in again the user lands on the same tab.
   void _onSessionExpired() {
     if (!_isAuthenticated) return;
-    _nav.popUntil((Route<dynamic> r) => r.isFirst);
-    _resetTabViewModels();
+    _closeAccountScreensAndData();
     setState(() {
       _isAuthenticated = false;
       _isGuest = false;
@@ -156,8 +164,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _handleLogout() async {
     await sl<AuthRepository>().logout();
     if (!mounted) return;
-    _nav.popUntil((Route<dynamic> r) => r.isFirst);
-    _resetTabViewModels();
+    _closeAccountScreensAndData();
     setState(() {
       _isAuthenticated = false;
       _isGuest = false;

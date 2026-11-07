@@ -568,21 +568,24 @@ class _StepHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderLight))),
+      // F37 (Q7): each step takes a third of the width and its label wraps, so large
+      // system text never pushes the header off screen.
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: List<Widget>.generate(labels.length * 2 - 1, (int i) {
           if (i.isOdd) {
-            return Expanded(
-              child: Container(
-                height: 2,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                color: i ~/ 2 < step.index ? AppColors.primary : AppColors.border,
-              ),
+            return Container(
+              width: 16,
+              height: 2,
+              margin: const EdgeInsets.only(top: 12),
+              color: i ~/ 2 < step.index ? AppColors.primary : AppColors.border,
             );
           }
           final int idx = i ~/ 2;
           final bool done = idx < step.index;
           final bool current = idx == step.index;
-          return Column(
+          return Expanded(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               CircleAvatar(
@@ -598,11 +601,13 @@ class _StepHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(labels[idx],
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: current ? FontWeight.w600 : FontWeight.w400,
                       color: current ? AppColors.primary : AppColors.textSecondary)),
             ],
+            ),
           );
         }),
       ),

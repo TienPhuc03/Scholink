@@ -63,19 +63,35 @@ class PendingSubmission {
   }
 }
 
-/// Persists [PendingSubmission]s in the local cache, one per opportunity.
+/// Persists [PendingSubmission]s in the local cache, one per signed-in account and opportunity.
+///
+/// F37 (Q1): entries are keyed by user id, so on a shared device another account never sees,
+/// or resends, someone else's unconfirmed attempt. An account's own entry survives logout so it
+/// can still confirm that attempt after logging back in.
 class SubmissionStore {
   final LocalCacheManager _cache;
   final DateTime Function() _clock;
+  final Future<String?> Function() _currentUserId;
 
-  SubmissionStore(this._cache, {DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  SubmissionStore(this._cache, {DateTime Function()? clock, Future<String?> Function()? currentUserId})
+      : _clock = clock ?? DateTime.now,
+        _currentUserId = currentUserId ?? _noUser;
 
-  static String _key(String opportunityId) => 'apply.pending.$opportunityId';
+  static Future<String?> _noUser() async => null;
 
-  /// Returns the live attempt for this opportunity; expired ones are dropped.
+  static String _legacyKey(String opportunityId) => 'apply.pending.$opportunityId';
+
+  Future<String> _key(String opportunityId) async {
+    final String? uid = await _currentUserId();
+    return 'apply.pending.${(uid == null || uid.isEmpty) ? '_' : uid}.$opportunityId';
+  }
+
+  /// Returns the live attempt of the current account for this opportunity; expired ones are dropped.
   Future<PendingSubmission?> load(String opportunityId) async {
     try {
-      final PendingSubmission? p = PendingSubmission.fromJson(await _cache.getJson(_key(opportunityId)));
+      // Entries written before F37 have no owner: drop them instead of guessing.
+      await _cache.remove(_legacyKey(opportunityId));
+      final PendingSubmission? p = PendingSubmission.fromJson(await _cache.getJson(await _key(opportunityId)));
       if (p == null) return null;
       if (p.isExpired(_clock())) {
         await clear(opportunityId);
@@ -87,7 +103,7 @@ class SubmissionStore {
     }
   }
 
-  Future<void> save(PendingSubmission p) => _cache.saveJson(_key(p.opportunityId), p.toJson());
+  Future<void> save(PendingSubmission p) async => _cache.saveJson(await _key(p.opportunityId), p.toJson());
 
-  Future<void> clear(String opportunityId) => _cache.remove(_key(opportunityId));
+  Future<void> clear(String opportunityId) async => _cache.remove(await _key(opportunityId));
 }

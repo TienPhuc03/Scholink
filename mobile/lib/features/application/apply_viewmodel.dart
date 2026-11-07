@@ -186,7 +186,17 @@ class ApplyViewModel extends BaseViewModel {
 
   Future<void> pickAttachment() async {
     _attachmentError = null;
-    final PickedAttachment? file = await _picker.pick();
+    PickedAttachment? file;
+    try {
+      file = await _picker.pick();
+    } catch (_) {
+      // F37 (Q7): storage permission denied or the picker failed. Attachments are optional,
+      // so explain and let the user continue without files.
+      _attachmentError = 'Không mở được trình chọn tệp (có thể do chưa cấp quyền truy cập tệp). '
+          'Bạn vẫn có thể nộp hồ sơ không kèm tệp.';
+      notifyListeners();
+      return;
+    }
     if (file == null) {
       notifyListeners();
       return;

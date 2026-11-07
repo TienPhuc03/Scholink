@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/refresh_error_banner.dart';
 import 'application_model.dart';
 import 'my_applications_viewmodel.dart';
 import 'widgets/application_widgets.dart';
@@ -62,14 +63,16 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
               ),
             );
           }
+          final bool stale = vm.hasError;
           return RefreshIndicator(
             onRefresh: vm.load,
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: vm.items.length,
+              itemCount: vm.items.length + (stale ? 1 : 0),
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (BuildContext context, int i) {
-                final ApplicationSummary a = vm.items[i];
+              itemBuilder: (BuildContext context, int index) {
+                if (stale && index == 0) return RefreshErrorBanner(message: vm.errorMessage, onRetry: vm.load);
+                final ApplicationSummary a = vm.items[index - (stale ? 1 : 0)];
                 return Material(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(8),

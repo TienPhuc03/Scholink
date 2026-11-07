@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/refresh_error_banner.dart';
 import '../auth/widgets/auth_widgets.dart';
 import 'application_model.dart';
 import 'my_applications_viewmodel.dart';
@@ -120,6 +121,10 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
+          if (vm.hasError) ...<Widget>[
+            RefreshErrorBanner(message: vm.errorMessage, onRetry: vm.load),
+            const SizedBox(height: 12),
+          ],
           if (widget.justSubmitted) ...<Widget>[
             const AuthMessageBanner(
               message: 'Nộp hồ sơ thành công! Bạn có thể theo dõi trạng thái tại đây '

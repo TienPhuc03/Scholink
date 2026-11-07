@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/widgets/refresh_error_banner.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
@@ -119,6 +120,10 @@ class _PassportViewState extends State<PassportView> {
             child: ListView(
               padding: const EdgeInsets.all(16.0),
               children: <Widget>[
+                if (vm.hasError) ...<Widget>[
+                  RefreshErrorBanner(message: vm.errorMessage, onRetry: () => vm.loadPassport()),
+                  const SizedBox(height: 12),
+                ],
                 _buildCompletionCard(passport),
                 if (widget.onOpenMyApplications != null) ...<Widget>[
                   const SizedBox(height: 12),

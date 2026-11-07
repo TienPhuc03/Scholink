@@ -46,24 +46,38 @@ final GetIt sl = GetIt.instance;
 
 /// Centralized Dependency Injection setup for MVVM + Repository pattern.
 Future<void> setupServiceLocator() async {
-  // 1. Core Infrastructure Singletons
   final SecureStorageHelper secureStorage = SecureStorageHelperImpl();
-  sl.registerSingleton<SecureStorageHelper>(secureStorage);
+  final SessionEvents sessionEvents = SessionEvents();
+  registerDependencies(
+    secureStorage: secureStorage,
+    localCache: await SharedPreferencesCacheManager.create(),
+    sessionEvents: sessionEvents,
+    apiClient: DioApiClient(secureStorage: secureStorage, sessionEvents: sessionEvents),
+    mqttManager: MqttManagerImpl(),
+    attachmentPicker: FileAttachmentPicker(),
+  );
+}
 
-  final LocalCacheManager localCache = await SharedPreferencesCacheManager.create();
+/// Registers every dependency from the given infrastructure. Widget tests of the whole app
+/// call this with in-memory fakes (F37 multi-account checks).
+void registerDependencies({
+  required SecureStorageHelper secureStorage,
+  required LocalCacheManager localCache,
+  required SessionEvents sessionEvents,
+  required ApiClient apiClient,
+  required MqttManager mqttManager,
+  required AttachmentPicker attachmentPicker,
+}) {
+  // 1. Core Infrastructure Singletons
+  sl.registerSingleton<SecureStorageHelper>(secureStorage);
   sl.registerSingleton<LocalCacheManager>(localCache);
 
   // Room Database for structured table schemas and offline caching
   final RoomDatabase roomDb = RoomDatabaseImpl(localCache);
   sl.registerSingleton<RoomDatabase>(roomDb);
 
-  final SessionEvents sessionEvents = SessionEvents();
   sl.registerSingleton<SessionEvents>(sessionEvents);
-
-  final ApiClient apiClient = DioApiClient(secureStorage: secureStorage, sessionEvents: sessionEvents);
   sl.registerSingleton<ApiClient>(apiClient);
-
-  final MqttManager mqttManager = MqttManagerImpl();
   sl.registerSingleton<MqttManager>(mqttManager);
 
   // 2. Feature Repositories (Lazy Singletons)
@@ -111,12 +125,10 @@ Future<void> setupServiceLocator() async {
   );
 
   sl.registerLazySingleton<SubmissionStore>(
-    () => SubmissionStore(sl<LocalCacheManager>()),
+    () => SubmissionStore(sl<LocalCacheManager>(), currentUserId: sl<SecureStorageHelper>().getUserId),
   );
 
-  sl.registerLazySingleton<AttachmentPicker>(
-    () => FileAttachmentPicker(),
-  );
+  sl.registerSingleton<AttachmentPicker>(attachmentPicker);
 
   // 3. Feature ViewModels (Factory instances for Views)
   sl.registerFactory<LoginViewModel>(
