@@ -17,6 +17,8 @@ import { NOTIFICATION_REPOSITORY } from "./domain/ports/notification.repository.
 import { MongooseNotificationRepository } from "./infrastructure/persistence/notification.repository";
 import { NotificationUseCase } from "./application/use-cases/notification.use-case";
 import { NotificationController } from "./presentation/notification.controller";
+import { NotificationPreferenceController } from "./presentation/notification-preference.controller";
+import { NotificationPreferenceUseCase } from "./application/use-cases/notification-preference.use-case";
 
 // Module F23
 import { QuietHoursService } from "./application/use-cases/services/quiet-hours.service";
@@ -65,9 +67,12 @@ import { ReminderWorker } from "./application/use-cases/workers/reminder.worker"
       },
     }),
   ],
-  controllers: [NotificationController],
+  // NotificationPreferenceController first: its static "preferences" path must win over
+  // NotificationController's ":id" routes.
+  controllers: [NotificationPreferenceController, NotificationController],
   providers: [
     NotificationUseCase,
+    NotificationPreferenceUseCase,
     {
       provide: NOTIFICATION_REPOSITORY,
       useClass: MongooseNotificationRepository,

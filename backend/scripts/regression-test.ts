@@ -3,6 +3,9 @@
  * Đảm bảo các quy tắc nghiệp vụ cốt lõi (Core Invariants) và trạng thái không bị phá vỡ sau mỗi đợt release.
  */
 
+// Module scope: keeps BASE_URL/helpers from clashing with the other scripts under tsc.
+export {};
+
 const BASE_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
 
 async function call(path: string, options: RequestInit = {}) {

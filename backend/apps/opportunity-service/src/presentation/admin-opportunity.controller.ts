@@ -286,7 +286,12 @@ export class AdminOpportunityController {
     if (!opp.title?.trim()) missing.push('title');
     if (!opp.description?.trim()) missing.push('description');
     if (!opp.organizerName?.trim()) missing.push('organizerName');
-    if (!opp.registerDeadline || isNaN(new Date(opp.registerDeadline).getTime())) missing.push('registerDeadline');
+    if (!opp.registerDeadline || isNaN(new Date(opp.registerDeadline).getTime())) {
+      missing.push('registerDeadline');
+    } else if (new Date(opp.registerDeadline).getTime() <= Date.now()) {
+      // BR11: an opportunity already closed must not appear as newly published.
+      missing.push('registerDeadline (đã qua hạn đăng ký)');
+    }
     if (!opp.timezone?.trim()) missing.push('timezone');
     if (opp.applyMode === 'EXTERNAL' && !opp.sourceUrl?.trim()) missing.push('sourceUrl');
 
@@ -353,7 +358,7 @@ export class AdminOpportunityController {
     };
     this.eventEmitter.emit('opportunity.published', eventPayload);
     await this.dispatchNotificationEvent('/api/v1/notifications/events/opportunity-published', eventPayload);
-    await this.crawlerUseCase.recordPublishedItem(opp.sourceUrl);
+    await this.crawlerUseCase.recordPublishedItem((opp as any).crawlerSourceId);
 
     return opp;
   }
@@ -397,7 +402,7 @@ export class AdminOpportunityController {
       reason: body.reason,
     });
     await revision.save();
-    await this.crawlerUseCase.recordRejectedItem(opp.sourceUrl);
+    await this.crawlerUseCase.recordRejectedItem((opp as any).crawlerSourceId);
 
     return {
       success: true,
@@ -488,6 +493,9 @@ export class AdminOpportunityController {
     if (!opp) throw new NotFoundException(`Không tìm thấy cơ hội ID: ${id}`);
 
     const newDate = new Date(body.newDeadline);
+    if (!opp.registerDeadline) {
+      throw new BadRequestException('Cơ hội chưa có hạn đăng ký: hãy cập nhật hạn trong hàng chờ duyệt.');
+    }
     if (isNaN(newDate.getTime()) || newDate.getTime() <= opp.registerDeadline.getTime()) {
       throw new BadRequestException('Hạn đăng ký mới phải hợp lệ và sau hạn đăng ký hiện tại');
     }
@@ -523,6 +531,7 @@ export class AdminOpportunityController {
       newDeadline: newDate,
       version: opp.version,
       timezone: opp.timezone,
+      title: opp.title,
     };
     this.eventEmitter.emit('opportunity.updated', eventPayload);
     await this.dispatchNotificationEvent('/api/v1/notifications/events/opportunity-updated', eventPayload);

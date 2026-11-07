@@ -97,6 +97,11 @@ export const QueryOpportunityDtoSchema = z.object({
   fundingLevel: z.enum(['FULL', 'PARTIAL', 'OTHER', 'FREE_ENTRY']).optional(),
   keyword: z.string().trim().max(100).optional(),
   applyMode: z.enum(['IN_APP', 'EXTERNAL']).optional(),
+  /** BR11: the catalog hides closed opportunities unless asked (bookmarks open them by id). */
+  includeClosed: z
+    .union([z.string(), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === 'true'),
   minGpa: z
     .union([z.string(), z.number()])
     .optional()

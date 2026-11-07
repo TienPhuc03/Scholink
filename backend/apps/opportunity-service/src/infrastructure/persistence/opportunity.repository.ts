@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { PaginationHelper } from '@shared';
 import {
   IOpportunityRepository,
+  OpportunityCursor,
   OpportunityFilter,
 } from '../../domain/ports/opportunity.repository.port';
 import {
@@ -32,19 +34,38 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
   }
 
   async findMany(filter: OpportunityFilter): Promise<Opportunity[]> {
-    const query: Record<string, unknown> = {};
-    if (filter.type) query.type = { $eq: String(filter.type) };
-    if (filter.status) query.status = { $eq: String(filter.status) };
-    if (filter.applyMode) query.applyMode = { $eq: String(filter.applyMode) };
-    if (filter.organizationId) query.organizationId = { $eq: String(filter.organizationId) };
+    const and: Record<string, unknown>[] = [];
+    if (filter.type) and.push({ type: { $eq: String(filter.type) } });
+    if (filter.status) and.push({ status: { $eq: String(filter.status) } });
+    if (filter.applyMode) and.push({ applyMode: { $eq: String(filter.applyMode) } });
+    if (filter.fundingLevel) and.push({ fundingLevel: { $eq: String(filter.fundingLevel) } });
+    if (filter.organizationId) and.push({ organizationId: { $eq: String(filter.organizationId) } });
     if (filter.keyword && filter.keyword.trim()) {
-      query.title = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
+      const re = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
+      and.push({ $or: [{ title: re }, { organizerName: re }, { tags: re }] });
+    }
+    // BR11: closed at the deadline instant, so "open" means strictly after now.
+    if (filter.openOnly) and.push({ registerDeadline: { $gt: filter.now ?? new Date() } });
+
+    // Keyset pagination on (registerDeadline, id): the next page starts right after the cursor.
+    const cursor = PaginationHelper.decodeCursor<OpportunityCursor>(filter.cursor);
+    if (cursor?.d && cursor?.id) {
+      const after = new Date(cursor.d);
+      if (!isNaN(after.getTime())) {
+        and.push({
+          $or: [
+            { registerDeadline: { $gt: after } },
+            { registerDeadline: after, id: { $gt: String(cursor.id) } },
+          ],
+        });
+      }
     }
 
-    const limit = Math.min(Math.max(filter.limit || 10, 1), 51);
+    const query = and.length > 0 ? { $and: and } : {};
+    const limit = Math.min(Math.max(filter.limit || 10, 1), 101);
     const docs = await this.model
       .find(query)
-      .sort({ registerDeadline: 1, _id: 1 })
+      .sort({ registerDeadline: 1, id: 1 })
       .limit(limit)
       .lean()
       .exec();

@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 // Core Infrastructure
 import '../database/local_cache_manager.dart';
 import '../database/room_database.dart';
+import '../device/device_services.dart';
 import '../network/session_events.dart';
 import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
@@ -68,7 +69,13 @@ void registerDependencies({
   required ApiClient apiClient,
   required MqttManager mqttManager,
   required AttachmentPicker attachmentPicker,
+  // F29: device calendar + Android notification permission (fakes in tests).
+  DeviceCalendar deviceCalendar = const MethodChannelDeviceServices(),
+  NotificationPermission notificationPermission = const MethodChannelDeviceServices(),
 }) {
+  sl.registerSingleton<DeviceCalendar>(deviceCalendar);
+  sl.registerSingleton<NotificationPermission>(notificationPermission);
+
   // 1. Core Infrastructure Singletons
   sl.registerSingleton<SecureStorageHelper>(secureStorage);
   sl.registerSingleton<LocalCacheManager>(localCache);
@@ -94,6 +101,8 @@ void registerDependencies({
       apiClient: sl<ApiClient>(),
       roomDb: sl<RoomDatabase>(),
       localCache: sl<LocalCacheManager>(),
+      // Guests browse without calling account APIs (bookmark sync, external marks).
+      isSignedIn: () async => (await sl<SecureStorageHelper>().getAccessToken())?.isNotEmpty ?? false,
     ),
   );
 
@@ -113,6 +122,8 @@ void registerDependencies({
     () => NotificationRepository(
       apiClient: sl<ApiClient>(),
       roomDb: sl<RoomDatabase>(),
+      calendar: sl<DeviceCalendar>(),
+      notificationPermission: sl<NotificationPermission>(),
     ),
   );
 

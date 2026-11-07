@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import Parser = require('rss-parser');
+import moment = require('moment-timezone');
 import { OpportunityType, ApplyMode, FundingLevel } from '../../domain/opportunity.entity';
 import {
   OpportunityDocument,
@@ -73,6 +74,40 @@ export function calculateSimilarity(str1: string, str2: string): number {
   const union = new Set([...words1, ...words2]);
   if (union.size === 0) return 0;
   return intersection.size / union.size;
+}
+
+/**
+ * BR10 / CRAWL-03: reads a deadline published by a source.
+ * - Full timestamp ("2026-12-31T17:00:00Z", "2026-12-31 17:00") -> that instant, interpreted in the
+ *   source timezone when it carries no offset.
+ * - Date only ("2026-12-31") -> 23:59:59 of that day IN THE SOURCE TIMEZONE.
+ * - Missing / unreadable -> null (never guessed).
+ */
+export function parseSourceDeadline(
+  raw: string | Date | undefined | null,
+  timezone: string,
+): { date: Date | null; isExplicitTime: boolean } {
+  if (raw === undefined || raw === null || raw === '') return { date: null, isExplicitTime: false };
+  if (raw instanceof Date) {
+    return isNaN(raw.getTime()) ? { date: null, isExplicitTime: false } : { date: raw, isExplicitTime: true };
+  }
+  const value = String(raw).trim();
+  const tz = moment.tz.zone(timezone) ? timezone : 'Asia/Ho_Chi_Minh';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const m = moment.tz(value, 'YYYY-MM-DD', true, tz);
+    return m.isValid() ? { date: m.endOf('day').toDate(), isExplicitTime: false } : { date: null, isExplicitTime: false };
+  }
+
+  const hasOffset = /(Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !hasOffset) {
+    const m = moment.tz(value.replace(' ', 'T'), moment.ISO_8601, tz);
+    return m.isValid() ? { date: m.toDate(), isExplicitTime: true } : { date: null, isExplicitTime: false };
+  }
+
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return { date: null, isExplicitTime: false };
+  return { date: parsed, isExplicitTime: /\d{1,2}:\d{2}/.test(value) };
 }
 
 @Injectable()
@@ -297,26 +332,12 @@ export class CrawlerUseCase {
     const organizerName = (raw.organizerName || raw.creator || raw.author || 'Nguồn Crawl Bên Ngoài').trim();
     const description = (raw.description || raw.contentSnippet || raw.content || '').trim() || 'Chưa có mô tả chi tiết từ nguồn.';
 
-    // Phân tích deadline và timezone (BR10)
-    const rawDeadline = raw.registerDeadline || raw.deadline || raw.isoDate || raw.pubDate;
-    let registerDeadline: Date | null = null;
-    let isExplicitTime = false;
-
-    if (rawDeadline) {
-      const parsed = new Date(rawDeadline);
-      if (!isNaN(parsed.getTime())) {
-        registerDeadline = parsed;
-        // Kiểm tra xem chuỗi có định dạng giờ phút cụ thể hay không (e.g. "T15:30" or " 18:00")
-        if (typeof rawDeadline === 'string' && (rawDeadline.includes('T') || rawDeadline.includes(':'))) {
-          isExplicitTime = true;
-        } else {
-          // Ngày không có giờ được hiểu là 23:59:59 tại múi giờ nguồn (BR10)
-          registerDeadline.setHours(23, 59, 59, 999);
-        }
-      }
-    }
-
     const timezone = (raw.timezone || sourceConfig?.defaultTimezone || 'Asia/Ho_Chi_Minh').trim();
+
+    // Phân tích deadline (BR10, CRAWL-03 "thiếu ngày không đoán").
+    // Chỉ dùng trường hạn đăng ký thật; isoDate/pubDate của RSS là NGÀY ĐĂNG BÀI, không phải hạn.
+    const rawDeadline = raw.registerDeadline || raw.deadline;
+    const { date: registerDeadline, isExplicitTime } = parseSourceDeadline(rawDeadline, timezone);
 
     // Chuẩn hóa schema riêng từng loại (trường không chắc để trống - CRAWL-03)
     let fundingLevel: FundingLevel | undefined = undefined;
@@ -395,8 +416,12 @@ export class CrawlerUseCase {
       description,
       benefits: raw.benefits || undefined,
       requirements: raw.requirements || undefined,
-      registerDeadline: registerDeadline || new Date(Date.now() + 30 * 86400000), // Fallback mốc tạm nếu thiếu
-      submitDeadline: raw.submitDeadline ? new Date(raw.submitDeadline) : undefined,
+      // Thiếu hạn thì để trống: Admin phải nhập trước khi công bố (approve chặn), không đoán mốc tạm.
+      registerDeadline: registerDeadline ?? undefined,
+      submitDeadline: parseSourceDeadline(raw.submitDeadline, timezone).date ?? undefined,
+      reviewReason: registerDeadline
+        ? undefined
+        : 'Nguồn không ghi hạn đăng ký: Admin cần nhập hạn trước khi công bố (không tự đoán).',
       timezone,
       fundingLevel,
       minGpa,
@@ -464,6 +489,8 @@ export class CrawlerUseCase {
       trustLevel?: number;
       defaultTimezone?: string;
       isTrusted?: boolean;
+      /** Crawler source the items came from (CRAWL-08 per-source counters). */
+      sourceId?: string;
     },
   ) {
     let added = 0;
@@ -494,11 +521,16 @@ export class CrawlerUseCase {
       }
 
       const id = `opp_crawl_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const reasons = [
+        parsed.reviewReason,
+        fuzzyIds.length > 0 ? `Phát hiện ${fuzzyIds.length} cơ hội tương đồng mờ (BR14)` : undefined,
+      ].filter(Boolean);
       const doc = new this.opportunityModel({
         ...parsed,
         id,
+        crawlerSourceId: sourceConfig?.sourceId,
         candidateMergeIds: fuzzyIds,
-        reviewReason: fuzzyIds.length > 0 ? `Phát hiện ${fuzzyIds.length} cơ hội tương đồng mờ (BR14)` : undefined,
+        reviewReason: reasons.length > 0 ? reasons.join(' | ') : undefined,
       });
 
       await doc.save();
@@ -817,6 +849,7 @@ export class CrawlerUseCase {
 
     if (itemsToIngest.length > 0) {
       ingestResult = await this.ingestItems(itemsToIngest, source.type, {
+        sourceId,
         sourceUrl: source.url,
         trustLevel: source.trustLevel,
         defaultTimezone: source.defaultTimezone,
@@ -864,32 +897,26 @@ export class CrawlerUseCase {
    * CRAWL-08: Ghi nhận số lượng cơ hội bị Admin Reject trong hàng chờ
    */
   async recordRejectedItem(sourceId?: string): Promise<void> {
-    if (sourceId && this.memorySources.has(sourceId)) {
-      const src = this.memorySources.get(sourceId);
-      src.totalRejected = (src.totalRejected || 0) + 1;
-      this.memorySources.set(sourceId, src);
-      if (this.crawlerSourceModel) {
-        try {
-          await this.crawlerSourceModel.updateOne({ id: sourceId }, { $inc: { totalRejected: 1 } });
-        } catch {}
-      }
+    await this.bumpSourceCounter(sourceId, 'totalRejected');
+  }
+
+  /** Counts on the DB record (sources may have been registered by another instance) and memory. */
+  private async bumpSourceCounter(sourceId: string | undefined, field: 'totalRejected' | 'totalPublished') {
+    if (!sourceId) return;
+    if (this.crawlerSourceModel) {
+      try {
+        await this.crawlerSourceModel.updateOne({ id: sourceId }, { $inc: { [field]: 1 } });
+      } catch {}
     }
+    const src = this.memorySources.get(sourceId);
+    if (src) src[field] = (src[field] || 0) + 1;
   }
 
   /**
    * CRAWL-08: Ghi nhận số lượng cơ hội được Admin Duyệt và Công bố (Publish)
    */
   async recordPublishedItem(sourceId?: string): Promise<void> {
-    if (sourceId && this.memorySources.has(sourceId)) {
-      const src = this.memorySources.get(sourceId);
-      src.totalPublished = (src.totalPublished || 0) + 1;
-      this.memorySources.set(sourceId, src);
-      if (this.crawlerSourceModel) {
-        try {
-          await this.crawlerSourceModel.updateOne({ id: sourceId }, { $inc: { totalPublished: 1 } });
-        } catch {}
-      }
-    }
+    await this.bumpSourceCounter(sourceId, 'totalPublished');
   }
 
   /**

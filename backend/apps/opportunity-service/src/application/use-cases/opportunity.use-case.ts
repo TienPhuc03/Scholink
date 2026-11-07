@@ -86,15 +86,18 @@ export class OpportunityUseCase {
       type: query.type,
       keyword: query.keyword,
       applyMode: query.applyMode,
+      fundingLevel: query.fundingLevel,
       status: 'PUBLISHED',
+      openOnly: !query.includeClosed,
       limit: limit + 1,
       cursor: query.cursor,
     });
 
+    // The cursor must describe the sort order of findMany (registerDeadline, id).
     return PaginationHelper.createPaginatedResponse(
       opportunities.map((o) => this.toResponse(o) as any),
       limit,
-      (item) => ({ id: item.id as string, createdAt: item.createdAt as string }),
+      (item) => ({ d: item.registerDeadline as string, id: item.id as string }),
     );
   }
 
@@ -118,6 +121,17 @@ export class OpportunityUseCase {
       throw DomainException.notFound('Cơ hội');
     }
     return this.toResponse(opportunity);
+  }
+
+  /**
+   * gRPC (gateway) shape: proto3 cannot carry the free-form eligibility rule objects, so they
+   * travel as JSON text and the gateway turns them back into `eligibilityRules`.
+   */
+  static toGrpcMessage(item: Record<string, any>): Record<string, any> {
+    return {
+      ...item,
+      eligibilityRulesJson: JSON.stringify(item.eligibilityRules ?? []),
+    };
   }
 
   private toResponse(opportunity: Opportunity): OpportunityDetailResponseDto {

@@ -50,12 +50,25 @@ export class OpportunityController {
   // ================= gRPC Handlers =================
   @GrpcMethod("OpportunityGrpcService", "ListOpportunities")
   async listGrpc(query: QueryOpportunityDto) {
-    return this.opportunityUseCase.list(query);
+    // proto3 sends "" / 0 / false for unset fields: normalise to "not set".
+    const res = await this.opportunityUseCase.list({
+      ...query,
+      type: (query.type as string) ? query.type : undefined,
+      keyword: query.keyword || undefined,
+      applyMode: (query.applyMode as string) ? query.applyMode : undefined,
+      fundingLevel: (query.fundingLevel as string) ? query.fundingLevel : undefined,
+      cursor: query.cursor || undefined,
+      limit: query.limit || 10,
+      includeClosed: Boolean(query.includeClosed),
+    } as QueryOpportunityDto);
+    return { ...res, items: res.items.map((i) => OpportunityUseCase.toGrpcMessage(i)) };
   }
 
   @GrpcMethod("OpportunityGrpcService", "GetOpportunityById")
   async getByIdGrpc(data: { id: string }) {
-    return this.opportunityUseCase.getById(data.id);
+    return OpportunityUseCase.toGrpcMessage(
+      (await this.opportunityUseCase.getById(data.id)) as Record<string, any>,
+    );
   }
 
   @GrpcMethod("OpportunityGrpcService", "CreateOpportunity")
@@ -90,6 +103,17 @@ export class OpportunityController {
   @ApiResponse({ status: 200, description: 'Danh sách cơ hội của đơn vị' })
   async listMyOpportunities(@Req() req: { user: AuthenticatedUser }) {
     return this.opportunityUseCase.listMyOpportunities(req.user);
+  }
+
+  @Get("bookmarks/me")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Danh sách cơ hội đã lưu của tôi (OPP-06, đồng bộ bookmark giữa các thiết bị)",
+  })
+  @ApiResponse({ status: 200, description: "Danh sách opportunityId đã lưu" })
+  async listMyBookmarks(@Req() req: { user: AuthenticatedUser }) {
+    return this.bookmarkUseCase.listMyBookmarks(req.user.userId);
   }
 
   @Public()
@@ -134,7 +158,9 @@ export class OpportunityController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Lưu hoặc bỏ lưu (Bookmark) một học bổng/cuộc thi",
-    description: "Idempotent API: Gọi lần 1 để lưu, gọi lần 2 để bỏ lưu.",
+    description:
+      "Gửi body { bookmarked: true|false } để đặt trạng thái đích (idempotent, an toàn khi retry). " +
+      "Không gửi body: đảo trạng thái hiện tại (tương thích cũ).",
   })
   @ApiParam({ name: "id", description: "ID định danh cơ hội cần lưu (UUID)" })
   @ApiResponse({
@@ -148,8 +174,10 @@ export class OpportunityController {
   async toggleBookmark(
     @Req() req: { user: AuthenticatedUser },
     @Param("id") opportunityId: string,
+    @Body() body?: { bookmarked?: boolean },
   ) {
-    return this.bookmarkUseCase.toggleBookmark(req.user.userId, opportunityId);
+    const target = typeof body?.bookmarked === "boolean" ? body.bookmarked : undefined;
+    return this.bookmarkUseCase.toggleBookmark(req.user.userId, opportunityId, target);
   }
 
   // ================= WF05 & APP-04: External Registration Marking =================

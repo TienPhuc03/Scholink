@@ -21,7 +21,8 @@ docs/
 │   └── HUONG_DAN_KIEM_THU_TOAN_DIEN.md    # 7 Kim tự tháp kiểm thử (Unit, Integration, Smoke, E2E, Load)
 │
 └── 📦 BÀN GIAO & NGHIỆM THU
-    └── BAN_GIAO_HE_THONG_VA_NGHIEM_THU.md # Biên bản bàn giao, checklist nghiệm thu, Git Tag & OpenAPI
+    ├── BAN_GIAO_HE_THONG_VA_NGHIEM_THU.md # Biên bản bàn giao, checklist nghiệm thu, Git Tag & OpenAPI
+    └── TV2_BAO_CAO_F29_F38_F44_UAT.md     # TV2: rà soát 5 tuần, F29/F38, UAT 3 vai trò, checklist thiết bị
 ```
 
 ---

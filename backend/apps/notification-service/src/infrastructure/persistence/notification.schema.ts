@@ -92,6 +92,23 @@ export class ReminderModel {
 
   @Prop({ required: true })
   reason: string;
+
+  /** Deadline the offsets are counted from; kept so reminders can be re-planned when the
+   * user changes timezone (NOTI-03) without asking the Opportunity Service again. */
+  @Prop()
+  deadlineAt?: Date;
+
+  /** Opportunity title shown in the inbox message. */
+  @Prop()
+  title?: string;
+
+  /** Timezone the quiet hours were applied in. */
+  @Prop()
+  timezone?: string;
+
+  /** Push outcome, kept apart from the inbox one (F26): PENDING, PENDING_RETRY, SENT, FAILED, SKIPPED. */
+  @Prop()
+  pushStatus?: string;
 }
 
 export const ReminderSchema = SchemaFactory.createForClass(ReminderModel);
