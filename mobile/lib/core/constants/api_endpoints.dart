@@ -17,6 +17,12 @@ abstract final class ApiEndpoints {
 
   // Passport lives under the profiles routes of the gateway (GET/PUT /api/v1/profiles/me).
   static const String passport = '/api/v1/profiles/me';
+  // FR-PROF-05: field visibility and profile views
+  static const String passportPrivacy = '/api/v1/profiles/me/privacy';
+  static const String passportView = '/api/v1/profiles/me/view';
+  static String publicProfile(String studentId) => '/api/v1/profiles/$studentId';
+  static String teammateProfile(String teamId, String studentId) =>
+      '/api/v1/teams/$teamId/members/$studentId/profile';
   static const String readiness = '/api/v1/profiles/me/readiness';
   static const String consents = '/api/v1/profiles/me/consents';
 

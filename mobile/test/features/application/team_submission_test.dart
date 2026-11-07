@@ -267,6 +267,27 @@ void main() {
       expect(find.byKey(const Key('team_cancel')), findsOneWidget);
     });
 
+    testWidgets('tapping a teammate opens their profile, but not for yourself (FR-PROF-05)', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.5;
+      addTearDown(tester.view.reset);
+      final TeamHarness h = TeamHarness();
+      h.api.reply(ApiEndpoints.teamSubmission(teamId), statusJson());
+      final List<String> opened = <String>[];
+      await tester.pumpWidget(MaterialApp(
+        home: TeamSubmissionView(
+          viewModel: h.build(),
+          onOpenApplication: (String id, {required bool justSubmitted}) {},
+          onOpenMemberProfile: opened.add,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('team_member_$leader')));
+      await tester.tap(find.byKey(const Key('team_member_$member')));
+      expect(opened, <String>[member]);
+    });
+
     testWidgets('a member waits for the leader before a session exists', (WidgetTester tester) async {
       await pumpView(tester, TeamHarness()..userId = member);
 

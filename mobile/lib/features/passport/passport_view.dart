@@ -16,11 +16,15 @@ class PassportView extends StatefulWidget {
   /// Opens "Hồ sơ ứng tuyển của tôi" (F19).
   final VoidCallback? onOpenMyApplications;
 
+  /// FR-PROF-05: shows the Passport as other people see it.
+  final VoidCallback? onPreviewProfile;
+
   const PassportView({
     super.key,
     required this.viewModel,
     required this.onLogout,
     this.onOpenMyApplications,
+    this.onPreviewProfile,
   });
 
   @override
@@ -128,6 +132,15 @@ class _PassportViewState extends State<PassportView> {
                 if (widget.onOpenMyApplications != null) ...<Widget>[
                   const SizedBox(height: 12),
                   _buildMyApplicationsEntry(),
+                ],
+                if (widget.onPreviewProfile != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('passport_preview_profile'),
+                    onPressed: widget.onPreviewProfile,
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    label: const Text('Xem hồ sơ như người khác thấy'),
+                  ),
                 ],
                 const SizedBox(height: 16),
                 _buildIdentityCard(passport),
@@ -390,6 +403,11 @@ class _PassportViewState extends State<PassportView> {
               ),
             ],
           ),
+          if (passport.email != null || passport.phone != null) ...<Widget>[
+            const SizedBox(height: 12),
+            if (passport.email != null) _contactRow(Icons.mail_outline_rounded, passport.email!, passport.visibilityOf('email')),
+            if (passport.phone != null) _contactRow(Icons.phone_outlined, passport.phone!, passport.visibilityOf('phone')),
+          ],
           const Divider(height: 24, color: AppColors.borderLight),
           Text(
             passport.bio ?? 'Chưa có phần giới thiệu. Thêm vài dòng để nhà tài trợ hiểu bạn hơn.',
@@ -403,6 +421,19 @@ class _PassportViewState extends State<PassportView> {
       ),
     );
   }
+
+  /// Contact detail with who can see it (FR-PROF-05).
+  Widget _contactRow(IconData icon, String value, FieldVisibility visibility) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: <Widget>[
+            Icon(icon, size: 16, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(child: Text(value, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
+            Text(visibility.label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          ],
+        ),
+      );
 
   Widget _buildEducationCard(PassportModel passport) {
     final EducationModel? edu = passport.education;

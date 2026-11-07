@@ -13,7 +13,15 @@ class TeamSubmissionView extends StatefulWidget {
   /// Opens the team Application detail (F28) once the team has submitted.
   final void Function(String applicationId, {required bool justSubmitted}) onOpenApplication;
 
-  const TeamSubmissionView({super.key, required this.viewModel, required this.onOpenApplication});
+  /// FR-PROF-05: opens a teammate's profile (PUBLIC + TEAMMATES fields).
+  final void Function(String studentId)? onOpenMemberProfile;
+
+  const TeamSubmissionView({
+    super.key,
+    required this.viewModel,
+    required this.onOpenApplication,
+    this.onOpenMemberProfile,
+  });
 
   @override
   State<TeamSubmissionView> createState() => _TeamSubmissionViewState();
@@ -272,8 +280,10 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       child: Column(
         children: <Widget>[
           for (final String m in s.members)
-            Padding(
+            InkWell(
               key: Key('team_member_$m'),
+              onTap: m == vm.userId || widget.onOpenMemberProfile == null ? null : () => widget.onOpenMemberProfile!(m),
+              child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: <Widget>[
@@ -289,6 +299,7 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                   ),
                   _consentPill(s.stateOf(m, now)),
                 ],
+              ),
               ),
             ),
         ],

@@ -15,6 +15,13 @@ abstract final class PassportValidators {
 
   static String? regionCode(String v) => v.trim().length > 20 ? 'Mã khu vực tối đa 20 ký tự.' : null;
 
+  /// Optional; same rule as the server: digits with spaces, dots or dashes, optional leading +.
+  static String? phone(String v) {
+    final String t = v.trim();
+    if (t.isEmpty) return null;
+    return RegExp(r'^\+?[0-9][0-9 .-]{7,18}[0-9]$').hasMatch(t) ? null : 'Số điện thoại không hợp lệ.';
+  }
+
   /// Education is optional, but once started it needs institution, major and a valid start year.
   static ({String? institution, String? major, String? startYear, String? endYear, String? gpa}) education({
     required String institution,

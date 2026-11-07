@@ -46,8 +46,10 @@ import 'features/opportunity/opportunity_list_view.dart';
 import 'features/opportunity/opportunity_model.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
 import 'features/passport/passport_edit_view.dart';
+import 'features/passport/passport_repository.dart';
 import 'features/passport/passport_view.dart';
 import 'features/passport/passport_viewmodel.dart';
+import 'features/passport/profile_view_screen.dart';
 import 'features/team/team_list_view.dart';
 import 'features/team/team_model.dart';
 import 'features/team/team_viewmodel.dart';
@@ -437,6 +439,42 @@ class _ScholinkAppState extends State<ScholinkApp> {
           viewModel: vm,
           onOpenApplication: (String id, {required bool justSubmitted}) =>
               _openApplicationDetail(id, justSubmitted: justSubmitted, replace: true),
+          onOpenMemberProfile: (String studentId) => _openTeammateProfile(teamId: teamId, studentId: studentId),
+        ),
+      ),
+    );
+  }
+
+  // ---------- Profile views (FR-PROF-05) ----------
+
+  void _openMyProfilePreview() {
+    final PassportRepository repo = sl<PassportRepository>();
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.profilePreview),
+        builder: (_) => ProfileViewScreen(
+          title: 'Hồ sơ như người khác thấy',
+          note: 'Chọn đối tượng để xem các trường họ thấy. Đổi quyền hiển thị trong "Chỉnh sửa Passport".',
+          viewModel: ProfileViewViewModel(
+            repo.previewMyProfile,
+            audiences: const <ProfileAudience>[ProfileAudience.public, ProfileAudience.teammates],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openTeammateProfile({required String teamId, required String studentId}) {
+    final PassportRepository repo = sl<PassportRepository>();
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.teammateProfile),
+        builder: (_) => ProfileViewScreen(
+          title: 'Hồ sơ đồng đội',
+          viewModel: ProfileViewViewModel(
+            (_) => repo.getTeammateProfile(teamId: teamId, studentId: studentId),
+            audiences: const <ProfileAudience>[ProfileAudience.teammates],
+          ),
         ),
       ),
     );
@@ -522,6 +560,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: _tabs.passport,
               onLogout: _handleLogout,
               onOpenMyApplications: _openMyApplications,
+              onPreviewProfile: _openMyProfilePreview,
             ),
         ],
       ),
