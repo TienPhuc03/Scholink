@@ -54,6 +54,10 @@ export const SubmitTeamConsentDtoSchema = z.object({
   payloadHash: z.string().min(64),
   profileVersion: z.number().int().min(1).default(1),
   rosterVersion: z.number().int().min(1),
+  // F37: kept with the consent so the leader can pass each member's preview + Identity consent
+  // to POST /applications (TEAM). Optional only for older clients; the commit fails without them.
+  previewId: z.string().trim().min(1).optional(),
+  identityConsentId: z.string().trim().min(1).optional(),
 });
 
 export type SubmitTeamConsentDto = z.infer<typeof SubmitTeamConsentDtoSchema>;

@@ -187,6 +187,17 @@ export class GatewayTeamController {
     });
   }
 
+  @Get(':id/submission')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Xem phiên nộp hồ sơ đội đang mở: ai đã đồng ý, hạn khoá đội (F37)' })
+  @ApiResponse({ status: 200, description: 'Trạng thái phiên nộp' })
+  async getActiveSubmission(@Param('id') teamId: string, @Headers('authorization') auth: string) {
+    return forwardCollab(`/api/v1/teams/${teamId}/submission`, {
+      method: 'GET',
+      headers: { Authorization: auth },
+    });
+  }
+
   @Post(':id/consents')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Thành viên ký Consent đồng thuận nộp hồ sơ đội qua teamId' })

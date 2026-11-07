@@ -160,6 +160,14 @@ export class TeamController {
     return this.teamUseCase.submitTeamConsentByTeamId(teamId, req.user.userId, dto);
   }
 
+  @Get(':id/submission')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Xem phiên nộp hồ sơ đội đang mở: ai đã đồng ý, hạn khoá đội (F37)' })
+  @ApiResponse({ status: 200, description: 'Trạng thái phiên nộp' })
+  async getActiveSubmission(@Req() req: { user: AuthenticatedUser }, @Param('id') teamId: string) {
+    return this.teamUseCase.getActiveSubmission(teamId, req.user.userId);
+  }
+
   @Post('submissions/:reservationId/consents')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Thành viên gửi Consent xác nhận nộp hồ sơ đội với roster hiện tại' })
