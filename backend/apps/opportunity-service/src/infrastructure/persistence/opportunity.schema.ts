@@ -66,8 +66,14 @@ export class OpportunityModel {
   })
   status: OpportunityStatus;
 
-  @Prop({ required: true, index: true })
+  // Not required: a crawled item whose source gives no deadline waits in PENDING_REVIEW until an
+  // Admin enters one (CRAWL-03, never guessed); approve refuses to publish without it.
+  @Prop({ index: true })
   registerDeadline: Date;
+
+  /** CRAWL-08: crawler source that produced this item (per-source published/rejected counters). */
+  @Prop({ index: true })
+  crawlerSourceId?: string;
 
   @Prop()
   submitDeadline?: Date;

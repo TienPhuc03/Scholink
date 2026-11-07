@@ -1,164 +1,148 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scholink_mobile/core/database/local_cache_manager.dart';
+import 'package:scholink_mobile/core/constants/api_endpoints.dart';
 import 'package:scholink_mobile/core/database/room_database.dart';
 import 'package:scholink_mobile/core/errors/failures.dart';
 import 'package:scholink_mobile/core/errors/result.dart';
-import 'package:scholink_mobile/core/network/api_client.dart';
 import 'package:scholink_mobile/features/opportunity/opportunity_model.dart';
 import 'package:scholink_mobile/features/opportunity/opportunity_repository.dart';
 
-class MockApiClient implements ApiClient {
-  @override
-  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters, Options? options}) async {
-    throw DioException(
-      requestOptions: RequestOptions(path: path),
-      type: DioExceptionType.connectionError,
-    );
-  }
-
-  @override
-  Future<Response<T>> post<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options}) async {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<Response<T>> put<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options}) async {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<Response<T>> patch<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options}) async {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<Response<T>> delete<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options}) async {
-    throw UnimplementedError();
-  }
-}
-
-class InMemoryCacheManager implements LocalCacheManager {
-  final Map<String, dynamic> _store = <String, dynamic>{};
-
-  @override
-  Future<void> clear() async => _store.clear();
-
-  @override
-  Future<dynamic> getJson(String key) async => _store[key];
-
-  @override
-  Future<String?> getString(String key) async => _store[key] as String?;
-
-  @override
-  Future<void> remove(String key) async => _store.remove(key);
-
-  @override
-  Future<void> saveJson(String key, dynamic data) async => _store[key] = data;
-
-  @override
-  Future<void> saveString(String key, String value) async => _store[key] = value;
-}
+import '../tv2_test_support.dart';
 
 void main() {
-  group('Tuần 2 (F11) - OpportunityRepository Filter, Cache & APP-04 Tests', () {
-    late OpportunityRepository repository;
-    late RoomDatabase roomDb;
-    late InMemoryCacheManager cache;
+  late ScriptedApiClient api;
+  late RoomDatabase db;
+  late bool signedIn;
+  late OpportunityRepository repo;
 
-    setUp(() {
-      cache = InMemoryCacheManager();
-      roomDb = RoomDatabaseImpl(cache);
-      repository = OpportunityRepository(
-        apiClient: MockApiClient(),
-        roomDb: roomDb,
-        localCache: cache,
-      );
+  setUp(() {
+    api = ScriptedApiClient();
+    db = RoomDatabaseImpl(InMemoryCacheManager());
+    signedIn = true;
+    repo = OpportunityRepository(apiClient: api, roomDb: db, isSignedIn: () async => signedIn);
+  });
+
+  group('F29 catalog (OPP-01/02/06, UX-02)', () {
+    test('sends the filters the API understands and reads the cursor page', () async {
+      api.reply(ApiEndpoints.opportunities, <String, dynamic>{
+        'items': <dynamic>[oppJson('o1'), oppJson('o2', type: 'COMPETITION')],
+        'nextCursor': 'cur_2',
+        'hasMore': true,
+      });
+
+      final OpportunityPage page = (await repo.fetchPage(
+        const OpportunityQuery(type: 'SCHOLARSHIP', keyword: ' AI ', applyMode: 'EXTERNAL'),
+      ))
+          .dataOrNull!;
+
+      final Map<String, dynamic> q = api.callsTo(ApiEndpoints.opportunities).single.query!;
+      expect(q['keyword'], 'AI', reason: 'backend reads "keyword", not "q"');
+      expect(q['type'], 'SCHOLARSHIP');
+      expect(q['applyMode'], 'EXTERNAL');
+      expect(q.containsKey('q'), isFalse);
+      expect(page.items.map((OpportunityModel o) => o.id), <String>['o1', 'o2']);
+      expect(page.hasMore, isTrue);
+      expect(page.nextCursor, 'cur_2');
+      expect(page.fromCache, isFalse);
+      expect(await db.opportunityDao.findById('o1'), isNotNull, reason: 'cached for offline use');
     });
 
-    test('OPP-01 & OPP-02: Guest & Student can view both types and filter separately', () async {
-      // 1. Fetch All
-      final Result<List<OpportunityModel>, Failure> allRes =
-          await repository.getOpportunities(type: 'ALL');
-      expect(allRes.isSuccess, isTrue);
-      final List<OpportunityModel> allItems = allRes.dataOrNull!;
-      expect(allItems.any((OpportunityModel m) => m.isScholarship), isTrue);
-      expect(allItems.any((OpportunityModel m) => m.isCompetition), isTrue);
+    test('"Đã lưu" is resolved on the device and never sent as a catalog type', () async {
+      api.reply(ApiEndpoints.myBookmarks, <String, dynamic>{
+        'opportunityIds': <String>['o9'],
+      });
+      api.reply(ApiEndpoints.opportunityDetail('o9'), oppJson('o9'));
 
-      // 2. Filter Scholarships only
-      final Result<List<OpportunityModel>, Failure> scholRes =
-          await repository.getOpportunities(type: 'SCHOLARSHIP');
-      expect(scholRes.isSuccess, isTrue);
-      for (final OpportunityModel item in scholRes.dataOrNull!) {
-        expect(item.isScholarship, isTrue);
-      }
+      final OpportunityPage page =
+          (await repo.fetchPage(const OpportunityQuery(bookmarkedOnly: true))).dataOrNull!;
 
-      // 3. Filter Competitions only
-      final Result<List<OpportunityModel>, Failure> compRes =
-          await repository.getOpportunities(type: 'COMPETITION');
-      expect(compRes.isSuccess, isTrue);
-      for (final OpportunityModel item in compRes.dataOrNull!) {
-        expect(item.isCompetition, isTrue);
-      }
+      expect(api.callsTo(ApiEndpoints.opportunities), isEmpty);
+      expect(page.items.single.id, 'o9');
+      expect(page.items.single.isBookmarked, isTrue);
+      expect(await db.opportunityDao.getAllBookmarkedIds(), <String>['o9'], reason: 'server list replaces local');
     });
 
-    test('OPP-02: Search by normalized title/keyword', () async {
-      final Result<List<OpportunityModel>, Failure> searchRes =
-          await repository.getOpportunities(searchQuery: 'Hackathon');
-      expect(searchRes.isSuccess, isTrue);
-      final List<OpportunityModel> items = searchRes.dataOrNull!;
-      expect(items.isNotEmpty, isTrue);
-      expect(items.first.title, contains('Hackathon'));
+    test('offline: shows the cached copy with its time and why it is not fresh', () async {
+      await db.opportunityDao.insertAll(<Map<String, dynamic>>[
+        oppJson('o1'),
+        oppJson('o2', type: 'COMPETITION'),
+      ]);
+      api.reply(ApiEndpoints.opportunities, const NetworkFailure());
+
+      final OpportunityPage page =
+          (await repo.fetchPage(const OpportunityQuery(type: 'COMPETITION'))).dataOrNull!;
+
+      expect(page.fromCache, isTrue);
+      expect(page.cachedAt, isNotNull);
+      expect(page.refreshFailure, isA<NetworkFailure>());
+      expect(page.items.map((OpportunityModel o) => o.id), <String>['o2'], reason: 'filter still applied');
     });
 
-    test('OPP-04 & APP-04: Filter by applyMode (IN_APP vs EXTERNAL)', () async {
-      final Result<List<OpportunityModel>, Failure> inAppRes =
-          await repository.getOpportunities(applyMode: 'IN_APP');
-      expect(inAppRes.isSuccess, isTrue);
-      for (final OpportunityModel item in inAppRes.dataOrNull!) {
-        expect(item.isInApp, isTrue);
-      }
+    test('offline with nothing cached returns the real error, never sample data', () async {
+      api.reply(ApiEndpoints.opportunities, const NetworkFailure());
 
-      final Result<List<OpportunityModel>, Failure> extRes =
-          await repository.getOpportunities(applyMode: 'EXTERNAL');
-      expect(extRes.isSuccess, isTrue);
-      for (final OpportunityModel item in extRes.dataOrNull!) {
-        expect(item.isExternal, isTrue);
-      }
+      final Result<OpportunityPage, Failure> res = await repo.fetchPage(const OpportunityQuery());
+
+      expect(res.isFailure, isTrue);
+      expect(res.errorOrNull, isA<NetworkFailure>());
     });
 
-    test('OPP-06: Idempotent Bookmark toggle and fetch bookmarked filter', () async {
-      final Result<List<OpportunityModel>, Failure> initRes =
-          await repository.getOpportunities(type: 'ALL');
-      final OpportunityModel first = initRes.dataOrNull!.first;
+    test('next page needs the server: no cache fallback for a cursor', () async {
+      await db.opportunityDao.insertAll(<Map<String, dynamic>>[oppJson('o1')]);
+      api.reply(ApiEndpoints.opportunities, const NetworkFailure());
 
-      // Toggle Bookmark
-      final bool state1 = await repository.toggleBookmark(first.id);
-      expect(state1, isTrue);
-
-      final Result<List<OpportunityModel>, Failure> bookmarkedList =
-          await repository.getOpportunities(type: 'BOOKMARKED');
-      expect(bookmarkedList.dataOrNull!.any((OpportunityModel m) => m.id == first.id), isTrue);
-
-      // Untoggle Bookmark
-      final bool state2 = await repository.toggleBookmark(first.id);
-      expect(state2, isFalse);
-
-      final Result<List<OpportunityModel>, Failure> afterRemove =
-          await repository.getOpportunities(type: 'BOOKMARKED');
-      expect(afterRemove.dataOrNull!.any((OpportunityModel m) => m.id == first.id), isFalse);
+      expect((await repo.fetchPage(const OpportunityQuery(), cursor: 'c2')).isFailure, isTrue);
     });
 
-    test('APP-04: Self-mark External Registration (EXTERNAL_MARKED)', () async {
-      const String oppId = 'opp-schol-002';
-      final bool mark1 = await repository.toggleExternalMark(oppId);
-      expect(mark1, isTrue);
+    test('detail falls back to the cached copy and says so', () async {
+      await db.opportunityDao.insertAll(<Map<String, dynamic>>[oppJson('o1')]);
+      api.reply(ApiEndpoints.opportunityDetail('o1'), const NetworkFailure());
 
-      final Result<OpportunityModel, Failure> oppRes = await repository.getOpportunityById(oppId);
-      expect(oppRes.dataOrNull!.isExternalMarked, isTrue);
+      final OpportunityDetail d = (await repo.getDetail('o1')).dataOrNull!;
+      expect(d.fromCache, isTrue);
+      expect(d.item.id, 'o1');
+    });
+  });
 
-      final bool mark2 = await repository.toggleExternalMark(oppId);
-      expect(mark2, isFalse);
+  group('F29 bookmark & external mark sync (OPP-06, APP-04)', () {
+    test('bookmark sends the target state and is saved locally only after the server agrees', () async {
+      api.reply(ApiEndpoints.opportunityBookmark('o1'), <String, dynamic>{'bookmarked': true});
+
+      final Result<bool, Failure> res = await repo.setBookmark('o1', true);
+
+      expect(res.dataOrNull, isTrue);
+      expect(api.callsTo(ApiEndpoints.opportunityBookmark('o1')).single.data, <String, dynamic>{'bookmarked': true});
+      expect(await db.opportunityDao.isBookmarked('o1'), isTrue);
+    });
+
+    test('a failed bookmark changes nothing on the device', () async {
+      api.reply(ApiEndpoints.opportunityBookmark('o1'), const NetworkFailure());
+
+      expect((await repo.setBookmark('o1', true)).isFailure, isTrue);
+      expect(await db.opportunityDao.isBookmarked('o1'), isFalse);
+    });
+
+    test('guests get a login failure and no account API is called', () async {
+      signedIn = false;
+
+      final Result<bool, Failure> res = await repo.setBookmark('o1', true);
+
+      expect(res.errorOrNull, isA<UnauthorizedFailure>());
+      expect(api.calls, isEmpty);
+    });
+
+    test('external mark is sent with an explicit value', () async {
+      api.reply(ApiEndpoints.opportunityExternalMark('o1'), <String, dynamic>{'isExternalMarked': true});
+
+      expect((await repo.setExternalMark('o1', true)).dataOrNull, isTrue);
+      expect(api.callsTo(ApiEndpoints.opportunityExternalMark('o1')).single.data, <String, dynamic>{'marked': true});
+      expect(await db.opportunityDao.isExternalMarked('o1'), isTrue);
+    });
+
+    test('per-user flags are never stored inside the shared catalog cache', () async {
+      await db.opportunityDao.insertAll(<Map<String, dynamic>>[
+        <String, dynamic>{...oppJson('o1'), 'isBookmarked': true},
+      ]);
+      expect((await db.opportunityDao.findById('o1'))!.containsKey('isBookmarked'), isFalse);
     });
   });
 }

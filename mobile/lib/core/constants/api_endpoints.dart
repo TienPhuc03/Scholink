@@ -40,6 +40,16 @@ abstract final class ApiEndpoints {
   // Opportunity Service routes
   static const String opportunities = '/api/v1/opportunities';
   static String opportunityDetail(String id) => '/api/v1/opportunities/$id';
+  // F14/F29: bookmark sync (body {bookmarked: bool} is idempotent) and APP-04 external mark.
+  static const String myBookmarks = '/api/v1/opportunities/bookmarks/me';
+  static String opportunityBookmark(String id) => '/api/v1/opportunities/$id/bookmark';
+  static String opportunityExternalMark(String id) => '/api/v1/opportunities/$id/external-mark';
+
+  // Notification Service routes (F20/F29)
+  static const String notifications = '/api/v1/notifications';
+  static const String notificationsReadAll = '/api/v1/notifications/read-all';
+  static String notificationRead(String id) => '/api/v1/notifications/$id/read';
+  static const String notificationPreferences = '/api/v1/notifications/preferences';
 
   // Collaboration Service routes
   static const String teams = '/api/v1/teams';

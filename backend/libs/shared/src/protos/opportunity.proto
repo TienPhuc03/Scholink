@@ -29,6 +29,8 @@ message ListOpportunitiesRequest {
   string applyMode = 3;
   int32 limit = 4;
   string cursor = 5;
+  bool includeClosed = 6;
+  string fundingLevel = 7;
 }
 
 message OpportunityMessage {
@@ -52,6 +54,16 @@ message OpportunityMessage {
   int32 ruleVersion = 18;
   int32 version = 19;
   repeated string requiredFields = 20;
+  // F29: fields the mobile detail needs (eligibility as JSON text: free-form rule objects).
+  string createdAt = 21;
+  string updatedAt = 22;
+  string benefits = 23;
+  string requirements = 24;
+  double minGpa = 25;
+  double requiredIelts = 26;
+  string eligibilityRulesJson = 27;
+  bool isPromoted = 28;
+  string coverImageUrl = 29;
 }
 
 message ListOpportunitiesResponse {

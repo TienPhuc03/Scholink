@@ -5,6 +5,9 @@
  * SCHOL-14 Tenant Isolation & Admin Boundary Protection.
  */
 
+// Module scope: keeps BASE_URL/helpers from clashing with the other scripts under tsc.
+export {};
+
 const BASE_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
 
 async function req(path: string, options: RequestInit = {}) {

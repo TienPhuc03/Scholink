@@ -39,11 +39,14 @@ import 'features/auth/reset_password_view.dart';
 import 'features/chat/chat_view.dart';
 import 'features/chat/chat_viewmodel.dart';
 import 'features/notification/notification_inbox_view.dart';
+import 'features/notification/notification_model.dart';
+import 'features/notification/notification_settings_view.dart';
 import 'features/notification/notification_viewmodel.dart';
 import 'features/notification/reminder_settings_sheet.dart';
 import 'features/opportunity/opportunity_detail_view.dart';
 import 'features/opportunity/opportunity_list_view.dart';
 import 'features/opportunity/opportunity_model.dart';
+import 'features/opportunity/opportunity_repository.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
 import 'features/passport/passport_edit_view.dart';
 import 'features/passport/passport_repository.dart';
@@ -83,6 +86,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// it and its apply flow at the readiness step; nothing is sent without the user's review.
   OpportunityModel? _pendingApply;
 
+  /// F10/F29: opportunity a guest tried to bookmark. Saving a bookmark is safe to repeat, so
+  /// after login it is saved for them (unlike apply, which is never replayed on its own).
+  OpportunityModel? _pendingBookmark;
+
   StreamSubscription<void>? _sessionExpiry;
 
   /// Tab view models live for one session. Views load data once in initState, so handing them
@@ -110,10 +117,19 @@ class _ScholinkAppState extends State<ScholinkApp> {
     if (sl.isRegistered<SessionEvents>()) {
       _sessionExpiry = sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
     }
+    _lifecycle = AppLifecycleListener(onResume: _onAppResumed);
+  }
+
+  late final AppLifecycleListener _lifecycle;
+
+  /// F29: back from the background (e.g. after a reminder time passed), fetch new notifications.
+  void _onAppResumed() {
+    if (_isAuthenticated && !_isGuest) unawaited(_tabs.notification.loadNotifications());
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _sessionExpiry?.cancel();
     super.dispose();
   }
@@ -130,13 +146,18 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _nav.popUntil((Route<dynamic> r) => r.isFirst);
     _resetTabViewModels();
     final OpportunityModel? resumeApply = _pendingApply;
+    final OpportunityModel? resumeBookmark = _pendingBookmark;
     setState(() {
       _isAuthenticated = true;
       _isGuest = false;
-      _currentTabIndex = resumeApply != null ? AppTabs.opportunities : (_pendingTabIndex ?? _currentTabIndex);
+      _currentTabIndex = resumeApply != null || resumeBookmark != null
+          ? AppTabs.opportunities
+          : (_pendingTabIndex ?? _currentTabIndex);
       _pendingTabIndex = null;
       _pendingApply = null;
+      _pendingBookmark = null;
     });
+    if (resumeBookmark != null) unawaited(_completePendingBookmark(resumeBookmark));
     if (resumeApply != null) {
       // Wait for the main shell to replace the login screen before pushing on top of it.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -152,6 +173,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _isGuest = true;
       _pendingTabIndex = null;
       _pendingApply = null;
+      _pendingBookmark = null;
       _currentTabIndex = AppTabs.opportunities;
     });
   }
@@ -166,6 +188,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _isGuest = false;
       _pendingTabIndex = _currentTabIndex;
       _pendingApply = null;
+      _pendingBookmark = null;
     });
     _showMessage('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', color: AppColors.error);
   }
@@ -179,6 +202,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _isGuest = false;
       _pendingTabIndex = null;
       _pendingApply = null;
+      _pendingBookmark = null;
       _currentTabIndex = AppTabs.opportunities;
     });
     _showMessage('Bạn đã đăng xuất.');
@@ -187,6 +211,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// Guests are asked to log in before opening account-only tabs.
   Future<void> _selectTab(int index) async {
     if (!_isGuest || !AppTabs.requiresAccount(index)) {
+      // The inbox tab is built once per session; refresh it each time it is opened again.
+      if (!_isGuest && index == AppTabs.notifications && _currentTabIndex != index) {
+        unawaited(_tabs.notification.loadNotifications());
+      }
       setState(() => _currentTabIndex = index);
       return;
     }
@@ -221,6 +249,71 @@ class _ScholinkAppState extends State<ScholinkApp> {
     if (choice == LoginChoice.register) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openRegister());
     }
+  }
+
+  /// F10/F29: a guest tapped "Lưu". Remember the opportunity, log in, then save it.
+  Future<void> _askLoginToBookmark(OpportunityModel opp) async {
+    final LoginChoice? choice = await LoginRequiredSheet.show(
+      _navigatorKey.currentContext!,
+      message: 'Đăng nhập để lưu "${opp.title}" và nhận nhắc hạn 7, 3, 1 ngày trước khi đóng đăng ký. '
+          'Sau khi đăng nhập, Scholink sẽ lưu cơ hội này giúp bạn.',
+    );
+    if (choice == null || !mounted) return;
+    _nav.popUntil((Route<dynamic> r) => r.isFirst);
+    setState(() {
+      _pendingBookmark = opp;
+      _isGuest = false;
+    });
+    if (choice == LoginChoice.register) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openRegister());
+    }
+  }
+
+  Future<void> _completePendingBookmark(OpportunityModel opp) async {
+    final Failure? failure = await _tabs.opportunity.setBookmark(opp, true);
+    if (!mounted) return;
+    if (failure == null) {
+      _showMessage('Đã lưu "${opp.title}". Bạn sẽ nhận nhắc hạn trong Hộp thư.', color: AppColors.success);
+    } else {
+      _showMessage('Chưa lưu được "${opp.title}": ${failure.message}', color: AppColors.error);
+    }
+  }
+
+  // ---------- Notifications (F29) ----------
+
+  void _openNotificationSettings() {
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.notificationSettings),
+        builder: (_) => NotificationSettingsView(viewModel: _tabs.notification),
+      ),
+    );
+  }
+
+  /// A reminder opens its opportunity, an application update opens TV1's application detail,
+  /// a team notification opens the Teams tab.
+  Future<void> _openNotificationTarget(NotificationModel noti) async {
+    final String? applicationId = noti.applicationId;
+    if (applicationId != null) {
+      _openApplicationDetail(applicationId);
+      return;
+    }
+    final String? opportunityId = noti.targetOpportunityId;
+    if (opportunityId != null) {
+      final OpportunityModel? known = _tabs.opportunity.findById(opportunityId);
+      if (known != null) {
+        _openOpportunityDetail(known);
+        return;
+      }
+      final Result<OpportunityDetail, Failure> res = await _tabs.opportunity.refreshDetail(opportunityId);
+      if (!mounted) return;
+      res.fold(
+        onSuccess: (OpportunityDetail d) => _openOpportunityDetail(d.item),
+        onFailure: (Failure f) => _showMessage('Không mở được cơ hội: ${f.message}', color: AppColors.error),
+      );
+      return;
+    }
+    if (noti.teamId != null) setState(() => _currentTabIndex = AppTabs.teams);
   }
 
   // ---------- Auth flows (F10) ----------
@@ -297,18 +390,19 @@ class _ScholinkAppState extends State<ScholinkApp> {
         settings: const RouteSettings(name: AppRoutes.opportunityDetail),
         builder: (BuildContext ctx) => OpportunityDetailView(
           opportunity: opp,
-          viewModel: sl<OpportunityViewModel>(),
-          // Guests are handled by onApplyInApp below (AUTH-05: log in, then come back here),
-          // so the detail screen's own "please log in" dialog is not used.
-          isGuest: false,
+          // Same view model as the list: a bookmark changed here shows there too (F29).
+          viewModel: _tabs.opportunity,
+          // Apply for guests is handled by onApplyInApp (AUTH-05: log in, then come back here).
+          isGuest: _isGuest,
           onOpenReminderSettings: () {
             ReminderSettingsSheet.show(
               ctx,
-              opportunity: opp,
-              viewModel: sl<NotificationViewModel>(),
+              opportunity: _tabs.opportunity.findById(opp.id) ?? opp,
+              viewModel: _tabs.notification,
             );
           },
           onApplyInApp: () => _isGuest ? _askLoginToApply(opp) : _startApply(opp),
+          onBookmarkNeedsLogin: _askLoginToBookmark,
         ),
       ),
     );
@@ -541,6 +635,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
             isGuest: _isGuest,
             onOpportunityTap: _openOpportunityDetail,
             onOpenNotificationInbox: () => _selectTab(AppTabs.notifications),
+            onBookmarkNeedsLogin: _askLoginToBookmark,
           ),
           // Account-only tabs are not built for guests, so they never fire authenticated calls.
           if (_isGuest)
@@ -552,7 +647,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
                   _openTeamSubmission(teamId: team.id, competitionTitle: competitionTitle),
             ),
           if (_isGuest) const SizedBox.shrink() else ChatView(viewModel: _tabs.chat),
-          if (_isGuest) const SizedBox.shrink() else NotificationInboxView(viewModel: _tabs.notification),
+          if (_isGuest)
+            const SizedBox.shrink()
+          else
+            NotificationInboxView(
+              viewModel: _tabs.notification,
+              onOpenTarget: _openNotificationTarget,
+              onOpenSettings: _openNotificationSettings,
+            ),
           if (_isGuest)
             const SizedBox.shrink()
           else
@@ -567,34 +669,66 @@ class _ScholinkAppState extends State<ScholinkApp> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTabIndex,
         onDestinationSelected: _selectTab,
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
+        destinations: <NavigationDestination>[
+          const NavigationDestination(
             icon: Icon(Icons.search_rounded),
             selectedIcon: Icon(Icons.search_rounded, color: AppColors.primary),
             label: 'Cơ hội',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.group_outlined),
             selectedIcon: Icon(Icons.group_rounded, color: AppColors.primary),
             label: 'Đội thi',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline_rounded),
             selectedIcon: Icon(Icons.chat_bubble_rounded, color: AppColors.primary),
             label: 'Chat',
           ),
+          // F29: unread count on the tab, so reminders are seen without opening the inbox.
           NavigationDestination(
-            icon: Icon(Icons.notifications_none_rounded),
-            selectedIcon: Icon(Icons.notifications_rounded, color: AppColors.primary),
+            icon: _UnreadBadge(
+              viewModel: _isGuest ? null : _tabs.notification,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+            selectedIcon: _UnreadBadge(
+              viewModel: _isGuest ? null : _tabs.notification,
+              child: const Icon(Icons.notifications_rounded, color: AppColors.primary),
+            ),
             label: 'Thông báo',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
             selectedIcon: Icon(Icons.account_circle_rounded, color: AppColors.primary),
             label: 'Passport',
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Unread count on the "Thông báo" tab icon; plain icon for guests.
+class _UnreadBadge extends StatelessWidget {
+  final NotificationViewModel? viewModel;
+  final Widget child;
+
+  const _UnreadBadge({required this.viewModel, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final NotificationViewModel? vm = viewModel;
+    if (vm == null) return child;
+    return ListenableBuilder(
+      listenable: vm,
+      builder: (BuildContext context, Widget? _) {
+        final int n = vm.unreadCount;
+        return Badge(
+          isLabelVisible: n > 0,
+          label: Text(n > 99 ? '99+' : '$n', semanticsLabel: '$n thông báo chưa đọc'),
+          child: child,
+        );
+      },
     );
   }
 }
