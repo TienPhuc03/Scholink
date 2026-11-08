@@ -56,6 +56,7 @@ export class AdminOpportunityController {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10_000),
       }).catch(() => {});
     } catch {
       // Failover safe in local/offline test environment

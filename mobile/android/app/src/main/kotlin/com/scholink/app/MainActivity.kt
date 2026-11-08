@@ -1,12 +1,17 @@
 package com.scholink.app
 
 import android.Manifest
+import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
@@ -32,9 +37,85 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /** refUrl of the push the user tapped (e.g. /opportunities/<id>); Dart takes it once. */
+    private var pendingRefUrl: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        captureRefUrl(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureRefUrl(intent)
+    }
+
+    private fun captureRefUrl(source: Intent?) {
+        val ref = source?.getStringExtra(EXTRA_REF_URL) ?: return
+        pendingRefUrl = ref
+        source.removeExtra(EXTRA_REF_URL)
+    }
+
     override fun onDestroy() {
         io.shutdown()
         super.onDestroy()
+    }
+
+    // ---------------- Push notifications (MQTT -> system notification) ----------------
+
+    /** Posts a system notification; false when the user has not allowed notifications. */
+    private fun showNotification(call: MethodCall): Boolean {
+        if (!notificationsAllowed()) return false
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (manager.getNotificationChannel(PUSH_CHANNEL_ID) == null) {
+            val channel = NotificationChannel(PUSH_CHANNEL_ID, "Nhắc hạn và cập nhật", NotificationManager.IMPORTANCE_HIGH)
+            channel.description = "Nhắc hạn đăng ký 7/3/1 ngày và cập nhật hồ sơ từ Scholink"
+            manager.createNotificationChannel(channel)
+        }
+        val key = call.argument<String>("id") ?: System.currentTimeMillis().toString()
+        val title = call.argument<String>("title") ?: "Scholink"
+        val body = call.argument<String>("body") ?: ""
+        val refUrl = call.argument<String>("refUrl")
+        val requestCode = key.hashCode()
+
+        val notification = Notification.Builder(this, PUSH_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setGroup(PUSH_GROUP)
+            .setContentIntent(openIntent(requestCode, refUrl))
+            .build()
+        manager.notify(requestCode, notification)
+
+        // Own group summary: when Android stacks several Scholink notifications, tapping the stack
+        // opens the inbox (the system's automatic summary would only launch the app).
+        val summary = Notification.Builder(this, PUSH_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Scholink")
+            .setContentText("Bạn có nhắc hạn mới trong Hộp thư")
+            .setGroup(PUSH_GROUP)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setContentIntent(openIntent(SUMMARY_ID, INBOX_REF_URL))
+            .build()
+        manager.notify(SUMMARY_ID, summary)
+        return true
+    }
+
+    private fun openIntent(requestCode: Int, refUrl: String?): PendingIntent {
+        val open = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (refUrl != null) putExtra(EXTRA_REF_URL, refUrl)
+        }
+        return PendingIntent.getActivity(
+            this,
+            requestCode,
+            open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun handle(call: MethodCall, result: MethodChannel.Result) {
@@ -51,6 +132,12 @@ class MainActivity : FlutterActivity() {
                 } else {
                     askPermissions(REQ_NOTIFICATIONS, arrayOf(Manifest.permission.POST_NOTIFICATIONS), result)
                 }
+            }
+            "showNotification" -> result.success(showNotification(call))
+            "takeLaunchRefUrl" -> {
+                val ref = pendingRefUrl
+                pendingRefUrl = null
+                result.success(ref)
             }
             "upsertCalendarEvent" -> withCalendar(result) { upsertEvent(call) }
             "calendarEventExists" -> withCalendar(result) { eventExists(call.longArg("eventId")) }
@@ -197,6 +284,11 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL = "com.scholink.app/device"
+        private const val PUSH_CHANNEL_ID = "scholink_reminders"
+        private const val PUSH_GROUP = "scholink_reminders_group"
+        private const val SUMMARY_ID = 4200
+        private const val INBOX_REF_URL = "/notifications"
+        private const val EXTRA_REF_URL = "scholink_ref_url"
         private const val REQ_CALENDAR = 4101
         private const val REQ_NOTIFICATIONS = 4102
     }

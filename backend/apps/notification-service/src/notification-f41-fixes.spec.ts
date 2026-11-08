@@ -388,6 +388,15 @@ describe('F41 fixes - Notification reminders, inbox dedup and preferences (NOTI-
     expect(Array.from(reminders.values()).some((r) => r.deadlineVersion === 2)).toBe(false);
   });
 
+  it('a leftover job without its reminder record sends nothing', async () => {
+    await worker.processJob({
+      id: 'rem_ghost_opp_x_7d_v1',
+      data: { userId: 'ghost', opportunityId: 'opp_x', version: 1, offsetLabel: '7d', reason: 'NORMAL', plannedSendAt: new Date() },
+    } as any);
+    expect(notifications).toHaveLength(0);
+    expect(pushes).toHaveLength(0);
+  });
+
   it('a deadline extension re-plans reminders only for users who still keep the bookmark', async () => {
     const deadline = moment().add(20, 'days').toDate();
     await listener.handleBookmarkCreated({ userId: 'keep', opportunityId: 'opp_7', deadline, version: 1 });

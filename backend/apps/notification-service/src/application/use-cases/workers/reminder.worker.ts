@@ -12,6 +12,7 @@ import {
   NotificationPreferenceDocument,
 } from '../../../infrastructure/persistence/notification.schema';
 import { BookmarkListener } from '../listeners/bookmark.listener';
+import { MqttPushPublisher, PushMessage } from '../../../infrastructure/push/mqtt-push.publisher';
 
 @Injectable()
 export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
@@ -29,6 +30,8 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     private readonly preferenceModel?: Model<NotificationPreferenceDocument>,
     @Optional()
     private readonly bookmarkListener?: BookmarkListener,
+    @Optional()
+    private readonly pushPublisher?: MqttPushPublisher,
   ) {}
 
   onModuleInit() {
@@ -80,6 +83,13 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     };
     if (offset) reminderQuery.offset = offset;
     const reminder = await this.reminderModel.findOne(reminderQuery);
+
+    // Every job is created together with its reminder record; a job without one is left over
+    // (record deleted, other database, stale queue) and must not message the user.
+    if (!reminder) {
+      this.logger.warn(`[ReminderWorker] Bỏ qua job ${job.id}: không có bản ghi nhắc tương ứng.`);
+      return;
+    }
 
     if (reminder && reminder.status === 'CANCELLED') {
       this.logger.log(`[ReminderWorker] Bỏ qua gửi nhắc nhở ${job.id} do reminder đã bị hủy (${reminder.reason}).`);
@@ -171,7 +181,20 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     // 6. Đẩy Push Notification nếu ngoài giờ yên lặng và người dùng bật kênh push
     if (!pushWanted || reminder?.pushStatus === 'SENT' || reminder?.pushStatus === 'SKIPPED') return;
     try {
-      await this.sendPushNotification(userId, opportunityId);
+      const content = ReminderWorker.reminderContent({
+        opportunityId,
+        version,
+        offset: offset || 'deadline',
+        title: job.data.title,
+      });
+      await this.sendPushNotification(userId, {
+        kind: 'notification',
+        notificationKey: content.businessKey,
+        title: content.title,
+        body: content.body,
+        refUrl: content.refUrl,
+        sentAt: new Date().toISOString(),
+      });
       if (reminder) {
         reminder.pushStatus = 'SENT';
         await reminder.save();
@@ -207,7 +230,9 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     opportunityId: string,
   ): Promise<{ status: string; version: number; deadline: Date } | null> {
     const oppUrl = process.env.OPPORTUNITY_SERVICE_URL || 'http://localhost:3002';
-    const res = await fetch(`${oppUrl}/api/v1/opportunities/${encodeURIComponent(opportunityId)}`);
+    const res = await fetch(`${oppUrl}/api/v1/opportunities/${encodeURIComponent(opportunityId)}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Opportunity Service trả ${res.status} khi kiểm tra ${opportunityId}`);
     const data = await res.json();
@@ -235,6 +260,29 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
    *
    * Returns false when the message already existed (job retried), so push is not sent twice.
    */
+  /** Same text for the inbox message and its push, so a push retried later says the same thing. */
+  static reminderContent(input: { opportunityId: string; version: number; offset: string; title?: string }): {
+    businessKey: string;
+    title: string;
+    body: string;
+    refUrl: string;
+  } {
+    const days = parseInt(input.offset, 10);
+    const when = Number.isFinite(days)
+      ? days <= 1
+        ? 'còn khoảng 24 giờ'
+        : `còn ${days} ngày`
+      : 'sắp đến hạn';
+    const name = input.title && input.title !== 'Nhắc nhở hạn chót' ? `"${input.title}"` : 'Cơ hội bạn đã lưu';
+    return {
+      businessKey: `reminder:${input.opportunityId}:${input.offset}:v${input.version || 1}`,
+      // The milestone is in the title so stacked notifications (7d / 3d / 1d) are told apart.
+      title: `Nhắc hạn (${when}): ${input.title && input.title !== 'Nhắc nhở hạn chót' ? input.title : 'cơ hội bạn đã lưu'}`,
+      body: `${name} ${when} là đóng đăng ký. Hãy hoàn thành hồ sơ trước hạn!`,
+      refUrl: `/opportunities/${input.opportunityId}`,
+    };
+  }
+
   private async createInboxMessage(input: {
     userId: string;
     opportunityId: string;
@@ -244,14 +292,8 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     title?: string;
     deadline?: Date;
   }): Promise<boolean> {
-    const businessKey = `reminder:${input.opportunityId}:${input.offset}:v${input.version || 1}`;
-    const days = parseInt(input.offset, 10);
-    const when = Number.isFinite(days)
-      ? days <= 1
-        ? 'còn khoảng 24 giờ'
-        : `còn ${days} ngày`
-      : 'sắp đến hạn';
-    const name = input.title && input.title !== 'Nhắc nhở hạn chót' ? `"${input.title}"` : 'Cơ hội bạn đã lưu';
+    const content = ReminderWorker.reminderContent(input);
+    const businessKey = content.businessKey;
 
     try {
       await this.notificationModel.create({
@@ -259,9 +301,9 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
         type: 'DEADLINE_REMINDER',
         userId: input.userId,
         businessKey,
-        title: `Nhắc hạn: ${input.title || 'cơ hội bạn đã lưu'}`,
-        body: `${name} ${when} là đóng đăng ký. Hãy hoàn thành hồ sơ trước hạn!`,
-        refUrl: `/opportunities/${input.opportunityId}`,
+        title: content.title,
+        body: content.body,
+        refUrl: content.refUrl,
         reason: input.reason,
         isRead: false,
       });
@@ -276,10 +318,15 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     return true;
   }
 
-  private async sendPushNotification(
-    userId: string,
-    opportunityId: string,
-  ): Promise<void> {
-    this.logger.log(`[Push] Đã đẩy thông báo Push cho User ${userId} (Opportunity: ${opportunityId})`);
+  /**
+   * Push over MQTT (EMQX). Throws when the broker cannot take it, so the job is retried.
+   * Without a publisher (unit tests, broker not configured) nothing is sent: logged only.
+   */
+  private async sendPushNotification(userId: string, message: PushMessage): Promise<void> {
+    if (!this.pushPublisher) {
+      this.logger.log(`[Push] Chưa cấu hình broker, bỏ qua push ${message.notificationKey} cho User ${userId}`);
+      return;
+    }
+    await this.pushPublisher.publishToUser(userId, message);
   }
 }

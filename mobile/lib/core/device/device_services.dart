@@ -61,9 +61,18 @@ abstract interface class NotificationPermission {
   Future<bool> request();
 }
 
+/// System notifications for pushes received over MQTT, and the push the user tapped to open the app.
+abstract interface class LocalNotifier {
+  /// Returns false when notifications are not allowed (nothing is shown).
+  Future<bool> show({required String id, required String title, required String body, String? refUrl});
+
+  /// refUrl of the notification that opened the app, once (then null).
+  Future<String?> takeLaunchRefUrl();
+}
+
 /// Android implementation backed by the `com.scholink.app/device` method channel
 /// (MainActivity.kt, CalendarContract).
-class MethodChannelDeviceServices implements DeviceCalendar, NotificationPermission {
+class MethodChannelDeviceServices implements DeviceCalendar, NotificationPermission, LocalNotifier {
   static const MethodChannel _channel = MethodChannel('com.scholink.app/device');
 
   const MethodChannelDeviceServices();
@@ -128,4 +137,28 @@ class MethodChannelDeviceServices implements DeviceCalendar, NotificationPermiss
 
   @override
   Future<bool> request() async => await _invoke<bool>('requestNotificationPermission') ?? false;
+
+  @override
+  Future<bool> show({required String id, required String title, required String body, String? refUrl}) async {
+    try {
+      return await _invoke<bool>('showNotification', <String, Object?>{
+            'id': id,
+            'title': title,
+            'body': body,
+            'refUrl': refUrl,
+          }) ??
+          false;
+    } on DeviceServiceException {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> takeLaunchRefUrl() async {
+    try {
+      return await _invoke<String>('takeLaunchRefUrl');
+    } on DeviceServiceException {
+      return null;
+    }
+  }
 }
