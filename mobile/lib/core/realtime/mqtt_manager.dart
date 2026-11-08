@@ -35,8 +35,27 @@ class MqttManagerImpl implements MqttManager {
   @override
   Stream<Map<String, String>> get messageStream => _messageController.stream;
 
+  String? _userId;
+  Future<bool>? _pending;
+
+  /// Chat and the push listener both connect at startup: one connection per user, the second
+  /// caller waits for the first instead of opening (and leaking) another socket.
   @override
-  Future<bool> connect(String userId) async {
+  Future<bool> connect(String userId) {
+    if (_userId == userId && isConnected) return Future<bool>.value(true);
+    final Future<bool>? pending = _pending;
+    if (_userId == userId && pending != null) return pending;
+    if (_client != null) _client!.disconnect();
+    _userId = userId;
+    final Future<bool> attempt = _connect(userId);
+    _pending = attempt;
+    attempt.whenComplete(() {
+      if (identical(_pending, attempt)) _pending = null;
+    });
+    return attempt;
+  }
+
+  Future<bool> _connect(String userId) async {
     final String clientId = 'scholink_flutter_${userId}_${DateTime.now().millisecondsSinceEpoch}';
     final MqttServerClient client = MqttServerClient.withPort(_server, clientId, _port);
     _client = client;
@@ -102,5 +121,8 @@ class MqttManagerImpl implements MqttManager {
   @override
   void disconnect() {
     _client?.disconnect();
+    _client = null;
+    _userId = null;
+    _pending = null;
   }
 }

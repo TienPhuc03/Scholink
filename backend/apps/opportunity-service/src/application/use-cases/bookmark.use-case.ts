@@ -29,6 +29,7 @@ export class BookmarkUseCase {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10_000),
       }).catch((err: Error) => {
         // The bookmark itself is saved; reminders are recalculated on the next bookmark event.
         this.logger.warn(`Không gửi được sự kiện ${endpoint} tới Notification Service: ${err.message}`);

@@ -88,3 +88,6 @@ captures/
 # Backups
 backups/
 **/backups/
+
+# TV2 E2E run output (node backend/scripts/e2e-tv2.js)
+e2e-tv2-results.json

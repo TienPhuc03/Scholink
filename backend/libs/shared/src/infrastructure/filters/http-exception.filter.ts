@@ -63,7 +63,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const statusCode = exception.getStatus();
       const res = exception.getResponse();
       if (typeof res === 'object' && res !== null) {
-        const anyRes = res as Record<string, unknown>;
+        let anyRes = res as Record<string, unknown>;
+        // Gateway forwards a downstream service's own error body ({ error: { code, message } });
+        // keep its code and message instead of the generic "Http Exception".
+        if (anyRes.error && typeof anyRes.error === 'object' && !Array.isArray(anyRes.error)) {
+          anyRes = anyRes.error as Record<string, unknown>;
+        }
         return {
           statusCode,
           code: (anyRes.code as string) || this.mapStatusToCode(statusCode),

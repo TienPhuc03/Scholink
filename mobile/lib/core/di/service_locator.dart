@@ -43,6 +43,7 @@ import '../../features/passport/passport_viewmodel.dart';
 // Feature 6: Notification & Calendar Sync (Tuần 3 - F20)
 import '../../features/notification/notification_repository.dart';
 import '../../features/notification/notification_viewmodel.dart';
+import '../../features/notification/push_listener.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -72,9 +73,11 @@ void registerDependencies({
   // F29: device calendar + Android notification permission (fakes in tests).
   DeviceCalendar deviceCalendar = const MethodChannelDeviceServices(),
   NotificationPermission notificationPermission = const MethodChannelDeviceServices(),
+  LocalNotifier localNotifier = const MethodChannelDeviceServices(),
 }) {
   sl.registerSingleton<DeviceCalendar>(deviceCalendar);
   sl.registerSingleton<NotificationPermission>(notificationPermission);
+  sl.registerSingleton<LocalNotifier>(localNotifier);
 
   // 1. Core Infrastructure Singletons
   sl.registerSingleton<SecureStorageHelper>(secureStorage);
@@ -125,6 +128,11 @@ void registerDependencies({
       calendar: sl<DeviceCalendar>(),
       notificationPermission: sl<NotificationPermission>(),
     ),
+  );
+
+  // F29: push over MQTT (one listener for the signed-in account)
+  sl.registerLazySingleton<PushListener>(
+    () => PushListener(mqtt: sl<MqttManager>(), notifier: sl<LocalNotifier>()),
   );
 
   // F19: individual application flow (view models are built per screen in app.dart)

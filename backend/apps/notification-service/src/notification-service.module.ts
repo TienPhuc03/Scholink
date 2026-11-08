@@ -24,6 +24,7 @@ import { NotificationPreferenceUseCase } from "./application/use-cases/notificat
 import { QuietHoursService } from "./application/use-cases/services/quiet-hours.service";
 import { BookmarkListener } from "./application/use-cases/listeners/bookmark.listener";
 import { ReminderWorker } from "./application/use-cases/workers/reminder.worker";
+import { MqttPushPublisher } from "./infrastructure/push/mqtt-push.publisher";
 
 @Module({
   imports: [
@@ -80,6 +81,12 @@ import { ReminderWorker } from "./application/use-cases/workers/reminder.worker"
     QuietHoursService,
     BookmarkListener,
     ReminderWorker,
+    // Push channel over EMQX (MQTT_BROKER_URL, MQTT_USERNAME, MQTT_PASSWORD). MQTT_PUSH_ENABLED=false
+    // turns it off: reminders then go to the inbox only.
+    {
+      provide: MqttPushPublisher,
+      useFactory: () => (process.env.MQTT_PUSH_ENABLED === 'false' ? null : new MqttPushPublisher()),
+    },
   ],
   exports: [NotificationUseCase, NOTIFICATION_REPOSITORY, BullModule],
 })

@@ -42,6 +42,8 @@ import 'features/notification/notification_inbox_view.dart';
 import 'features/notification/notification_model.dart';
 import 'features/notification/notification_settings_view.dart';
 import 'features/notification/notification_viewmodel.dart';
+import 'features/notification/push_listener.dart';
+import 'core/device/device_services.dart';
 import 'features/notification/reminder_settings_sheet.dart';
 import 'features/opportunity/opportunity_detail_view.dart';
 import 'features/opportunity/opportunity_list_view.dart';
@@ -107,6 +109,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _closeAccountScreensAndData() {
     _nav.popUntil((Route<dynamic> r) => r.isFirst);
     _resetTabViewModels();
+    // F29: the next account on this device must not receive this account's pushes.
+    if (sl.isRegistered<PushListener>()) unawaited(sl<PushListener>().stop());
     if (sl.isRegistered<RoomDatabase>()) unawaited(sl<RoomDatabase>().clearUserData());
   }
 
@@ -118,13 +122,58 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _sessionExpiry = sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
     }
     _lifecycle = AppLifecycleListener(onResume: _onAppResumed);
+    if (_isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_startPush());
+        unawaited(_openLaunchTarget());
+      });
+    }
   }
 
   late final AppLifecycleListener _lifecycle;
 
-  /// F29: back from the background (e.g. after a reminder time passed), fetch new notifications.
+  /// F29: back from the background (e.g. after a reminder time passed), fetch new notifications
+  /// and open what a tapped push points to.
   void _onAppResumed() {
-    if (_isAuthenticated && !_isGuest) unawaited(_tabs.notification.loadNotifications());
+    if (_isAuthenticated && !_isGuest) {
+      unawaited(_tabs.notification.loadNotifications());
+      unawaited(_openLaunchTarget());
+    }
+  }
+
+  /// F29: pushes over MQTT for the signed-in account; each one also reloads the inbox.
+  Future<void> _startPush() async {
+    if (!sl.isRegistered<PushListener>()) return;
+    final String? userId = await sl<SecureStorageHelper>().getUserId();
+    if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated) return;
+    await sl<PushListener>().start(
+      userId,
+      onReceived: () {
+        if (mounted && _isAuthenticated && !_isGuest) unawaited(_tabs.notification.loadNotifications());
+      },
+    );
+  }
+
+  /// The user tapped a push notification: open its opportunity / application.
+  Future<void> _openLaunchTarget() async {
+    if (!sl.isRegistered<LocalNotifier>()) return;
+    final String? refUrl = await sl<LocalNotifier>().takeLaunchRefUrl();
+    if (refUrl == null || refUrl.isEmpty || !mounted || !_isAuthenticated || _isGuest) return;
+    if (refUrl == '/notifications') {
+      // The user tapped a stack of notifications: show the inbox.
+      _nav.popUntil((Route<dynamic> r) => r.isFirst);
+      setState(() => _currentTabIndex = AppTabs.notifications);
+      unawaited(_tabs.notification.loadNotifications());
+      return;
+    }
+    await _openNotificationTarget(NotificationModel(
+      notificationId: 'push',
+      type: NotificationType.system,
+      title: '',
+      body: '',
+      refUrl: refUrl,
+      createdAt: DateTime.now(),
+    ));
   }
 
   @override
@@ -157,6 +206,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _pendingApply = null;
       _pendingBookmark = null;
     });
+    unawaited(_startPush());
     if (resumeBookmark != null) unawaited(_completePendingBookmark(resumeBookmark));
     if (resumeApply != null) {
       // Wait for the main shell to replace the login screen before pushing on top of it.

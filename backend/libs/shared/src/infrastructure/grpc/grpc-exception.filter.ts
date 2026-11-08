@@ -1,7 +1,8 @@
 import { Catch, RpcExceptionFilter, ArgumentsHost, Logger } from '@nestjs/common';
-import { Observable, throwError } from 'rxjs';
+import { EMPTY, Observable, throwError } from 'rxjs';
 import { RpcException } from '@nestjs/microservices';
 import { DomainException, ErrorCode } from '../../domain/domain.exception';
+import { GlobalExceptionFilter } from '../filters/http-exception.filter';
 
 export interface SerializedRpcError {
   readonly isDomainException: true;
@@ -14,8 +15,20 @@ export interface SerializedRpcError {
 @Catch()
 export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
   private readonly logger = new Logger(GrpcExceptionFilter.name);
+  private readonly httpFilter = new GlobalExceptionFilter();
 
-  catch(exception: unknown, _host: ArgumentsHost): Observable<never> {
+  /**
+   * This filter is put on controllers that serve BOTH gRPC methods and HTTP routes. On an HTTP
+   * request an Observable error is never turned into a response, so the client hung until its
+   * timeout (e.g. 409/404 from POST /opportunities/:id/external-mark). HTTP errors therefore go
+   * through the normal HTTP error mapping; gRPC keeps the serialized RpcException.
+   */
+  catch(exception: unknown, host: ArgumentsHost): Observable<never> {
+    if (host.getType() === 'http') {
+      this.httpFilter.catch(exception, host);
+      return EMPTY as Observable<never>;
+    }
+
     if (exception instanceof DomainException) {
       const payload: SerializedRpcError = {
         isDomainException: true,
