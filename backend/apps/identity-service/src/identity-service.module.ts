@@ -10,6 +10,7 @@ import {
   ProcessedEventSchema,
   IdempotencyKeyModel,
   IdempotencyKeySchema,
+  validateEnv,
 } from '@shared';
 import {
   UserModel,
@@ -50,6 +51,7 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     DatabaseModule.forService('IDENTITY_DB_NAME', 'scholink_identity'),
     SharedModule,

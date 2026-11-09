@@ -24,9 +24,18 @@ export const EnvSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   ENCRYPTION_KEY: secretStringSchema('ENCRYPTION_KEY'),
-});
+}).passthrough(); // Giữ các biến riêng của từng service (DB name, URL nội bộ...).
 
 export type ValidatedEnv = z.infer<typeof EnvSchema>;
+
+/** Mọi service ký/kiểm JWT đều dừng khởi động nếu thiếu secret hợp lệ, không có giá trị mặc định. */
+export function requireJwtSecret(value: string | undefined): string {
+  const parsed = secretStringSchema('JWT_SECRET').safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`Khởi động thất bại: ${parsed.error.errors[0].message}`);
+  }
+  return parsed.data;
+}
 
 export function validateEnv(config: Record<string, unknown>): ValidatedEnv {
   const parsed = EnvSchema.safeParse(config);
