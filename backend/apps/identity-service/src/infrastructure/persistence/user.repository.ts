@@ -155,9 +155,10 @@ export class MongooseUserRepository implements IUserRepository {
       )
       .exec();
 
-    // SCHOL-14: Invalidate token instantly in Redis cache if available (7 days TTL)
+    // SCHOL-14: reject tokens issued before now, without blocking the next login (7 days TTL)
     if (this.redisService?.isAvailable) {
-      await this.redisService.set(`revoked_user:${userId}`, String(reason), 7 * 24 * 3600);
+      const revokedAtSeconds = Math.floor(Date.now() / 1000);
+      await this.redisService.set(`revoked_before:${userId}`, String(revokedAtSeconds), 7 * 24 * 3600);
     }
   }
 

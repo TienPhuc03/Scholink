@@ -66,6 +66,7 @@ export class JwtAuthGuard implements CanActivate {
         role: 'STUDENT' | 'ORGANIZER' | 'ADMIN';
         sessionId?: string;
         organizationId?: string;
+        iat?: number;
       }>(token);
 
       const authenticatedUser: AuthenticatedUser = Object.freeze({
@@ -93,8 +94,10 @@ export class JwtAuthGuard implements CanActivate {
           }
         }
         if (authenticatedUser.userId) {
-          const isUserRevoked = await this.redisService.get(`revoked_user:${authenticatedUser.userId}`);
-          if (isUserRevoked) {
+          // Only tokens issued before the revocation are rejected, so logging in again still works.
+          // iat has 1 s precision: a login in the same second as the revocation stays valid.
+          const revokedBefore = await this.redisService.get(`revoked_before:${authenticatedUser.userId}`);
+          if (revokedBefore && !(Number(payload.iat) >= Number(revokedBefore))) {
             throw new DomainException(
               ErrorCode.UNAUTHENTICATED,
               'Quyền hoặc thành viên của tài khoản đã bị thu hồi, vui lòng đăng nhập lại',
