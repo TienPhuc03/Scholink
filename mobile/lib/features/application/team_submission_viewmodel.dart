@@ -359,7 +359,7 @@ class TeamSubmissionViewModel extends BaseViewModel {
 
   String _messageFor(Failure f) => switch (f.code) {
         'HOLD_EXPIRED' => 'Phiên nộp đã hết hạn. Trưởng đội cần bắt đầu lại và mọi người đồng ý lại.',
-        'PREVIEW_EXPIRED' || 'CONSENT_MISMATCH' =>
+        'PREVIEW_EXPIRED' || 'CONSENT_MISMATCH' || 'SNAPSHOT_STALE' =>
           'Đồng ý của một thành viên không còn hiệu lực. Thành viên đó cần đồng ý lại trước khi nộp.',
         'VERSION_MISMATCH' => 'Đội hình hoặc điều kiện cuộc thi đã thay đổi. Hãy bắt đầu lại phiên nộp.',
         'PROFILE_INCOMPLETE' => 'Passport của một thành viên còn thiếu trường bắt buộc: ${f.message}',

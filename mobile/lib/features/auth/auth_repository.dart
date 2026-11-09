@@ -61,6 +61,11 @@ class AuthRepository {
 
       final UserModel user = UserModel.fromJson(userMap);
 
+      // FR-AUTH-02: no session is kept on the device until the email is verified.
+      if (user.isPendingVerification) {
+        return SuccessResult<UserModel, Failure>(user);
+      }
+
       await _secureStorage.saveTokens(
         accessToken: accessToken,
         refreshToken: refreshToken ?? '',

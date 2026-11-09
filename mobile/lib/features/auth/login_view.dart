@@ -7,6 +7,9 @@ import 'login_viewmodel.dart';
 class LoginView extends StatefulWidget {
   final LoginViewModel viewModel;
   final VoidCallback onLoginSuccess;
+
+  /// Correct credentials on an account whose email is not verified yet (FR-AUTH-02).
+  final void Function(String email, String password) onEmailNotVerified;
   final VoidCallback? onNavigateToRegister;
   final VoidCallback? onNavigateToGuest;
   final VoidCallback? onForgotPassword;
@@ -15,6 +18,7 @@ class LoginView extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.onLoginSuccess,
+    required this.onEmailNotVerified,
     this.onNavigateToRegister,
     this.onNavigateToGuest,
     this.onForgotPassword,
@@ -63,7 +67,10 @@ class _LoginViewState extends State<LoginView> {
     }
 
     final bool success = await widget.viewModel.login(email, password);
-    if (success && mounted) {
+    if (!success || !mounted) return;
+    if (widget.viewModel.currentUser?.isPendingVerification == true) {
+      widget.onEmailNotVerified(email, password);
+    } else {
       widget.onLoginSuccess();
     }
   }

@@ -227,6 +227,38 @@ void main() {
       vm.dispose();
     });
 
+    test('SNAPSHOT_STALE when consenting asks for a new preview instead of resubmitting', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(
+          ApiEndpoints.consents,
+          const ServerFailure(message: 'Hồ sơ Passport đã thay đổi', code: 'SNAPSHOT_STALE', statusCode: 409),
+        );
+      final ApplyViewModel vm = await toReview(h);
+      vm.setConsent(true);
+      await vm.submit();
+      expect(vm.previewStale, isTrue);
+      expect(vm.needsNewPreview, isTrue);
+      expect(vm.canSubmit, isFalse);
+      expect(vm.submitError, 'Hồ sơ Passport đã thay đổi');
+      vm.dispose();
+    });
+
+    test('ASSET_NOT_AVAILABLE returns to the attachments step', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(
+          ApiEndpoints.applications,
+          const ServerFailure(message: 'Tệp không còn sẵn sàng', code: 'ASSET_NOT_AVAILABLE', statusCode: 409),
+        );
+      final ApplyViewModel vm = await toReview(h);
+      vm.setConsent(true);
+      await vm.submit();
+      expect(vm.step, ApplyStep.attachments);
+      expect(vm.attachmentError, 'Tệp không còn sẵn sàng');
+      expect(vm.preview, isNull);
+      expect(vm.canRetrySubmit, isFalse);
+      vm.dispose();
+    });
+
     test('ALREADY_APPLIED shows the existing application instead of retrying', () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(

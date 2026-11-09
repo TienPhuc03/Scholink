@@ -412,6 +412,17 @@ class ApplyViewModel extends BaseViewModel {
         _previewStale = true;
         _consentAccepted = false;
         _submitError = '${f.message} Hãy tạo lại bản xem trước và xác nhận lại.';
+      case 'SNAPSHOT_STALE':
+      case 'CONSENT_REQUIRED':
+        // These messages already tell the user what to do.
+        _previewStale = true;
+        _consentAccepted = false;
+        _submitError = f.message;
+      case 'ASSET_NOT_AVAILABLE':
+        // An attached file is no longer usable: back to the files so it can be removed.
+        _invalidatePreview();
+        _step = ApplyStep.attachments;
+        _attachmentError = f.message;
       case 'PROFILE_INCOMPLETE':
         _invalidatePreview();
         _step = ApplyStep.readiness;

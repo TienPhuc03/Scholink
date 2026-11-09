@@ -25,6 +25,7 @@ import 'features/application/submission_store.dart';
 import 'features/application/team_submission_repository.dart';
 import 'features/application/team_submission_view.dart';
 import 'features/application/team_submission_viewmodel.dart';
+import 'features/auth/auth_model.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/email_verification_view.dart';
 import 'features/auth/email_verification_viewmodel.dart';
@@ -405,6 +406,18 @@ class _ScholinkAppState extends State<ScholinkApp> {
     );
   }
 
+  /// FR-AUTH-02: a student who left the OTP screen earlier verifies now, before getting a session.
+  Future<void> _verifyEmailAfterLogin(String email, String password) async {
+    final Result<OtpTicket, Failure> otp = await sl<AuthRepository>().sendOtp(email: email);
+    if (!mounted) return;
+    _openEmailVerification(RegisterOutcome(
+      email: email,
+      password: password,
+      ticket: otp.dataOrNull,
+      otpError: otp.errorOrNull?.message,
+    ));
+  }
+
   void _openForgotPassword() {
     final PasswordResetViewModel vm = sl<PasswordResetViewModel>();
     _nav.push<void>(
@@ -669,6 +682,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
     return LoginView(
       viewModel: sl<LoginViewModel>(),
       onLoginSuccess: _onLoginSuccess,
+      onEmailNotVerified: _verifyEmailAfterLogin,
       onNavigateToGuest: _onEnterGuestMode,
       onNavigateToRegister: _openRegister,
       onForgotPassword: _openForgotPassword,
