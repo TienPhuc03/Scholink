@@ -34,8 +34,8 @@ export class AuthController {
   }
 
   @GrpcMethod('IdentityGrpcService', 'Logout')
-  async logout(data: { userId: string; sessionId?: string }) {
-    return this.authUseCase.logout(data.userId, data.sessionId);
+  async logout(data: { userId: string; sessionId?: string; familyId?: string }) {
+    return this.authUseCase.logout(data.userId, data.sessionId, data.familyId);
   }
 
   @GrpcMethod('IdentityGrpcService', 'SendOtp')

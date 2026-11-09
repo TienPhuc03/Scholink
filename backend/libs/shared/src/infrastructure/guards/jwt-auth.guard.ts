@@ -19,6 +19,7 @@ export interface AuthenticatedUser {
   readonly email: string;
   readonly role: 'STUDENT' | 'ORGANIZER' | 'ADMIN';
   readonly sessionId?: string;
+  readonly familyId?: string;
   readonly organizationId?: string;
 }
 
@@ -65,8 +66,10 @@ export class JwtAuthGuard implements CanActivate {
         email: string;
         role: 'STUDENT' | 'ORGANIZER' | 'ADMIN';
         sessionId?: string;
+        familyId?: string;
         organizationId?: string;
         iat?: number;
+        typ?: string;
       }>(token);
 
       const authenticatedUser: AuthenticatedUser = Object.freeze({
@@ -74,17 +77,18 @@ export class JwtAuthGuard implements CanActivate {
         email: payload.email,
         role: payload.role,
         sessionId: payload.sessionId,
+        familyId: payload.familyId,
         organizationId: payload.organizationId,
       });
 
-      if (!authenticatedUser.userId || !authenticatedUser.role) {
+      if (!authenticatedUser.userId || !authenticatedUser.role || payload.typ !== 'access') {
         throw new Error('Invalid token claims');
       }
 
       // SCHOL-14: Kiểm tra trạng thái thu hồi phiên hoặc quyền tài khoản từ Redis nếu khả dụng
       if (this.redisService?.isAvailable) {
-        if (authenticatedUser.sessionId) {
-          const isRevoked = await this.redisService.get(`revoked_session:${authenticatedUser.sessionId}`);
+        if (authenticatedUser.familyId) {
+          const isRevoked = await this.redisService.get(`revoked_family:${authenticatedUser.familyId}`);
           if (isRevoked) {
             throw new DomainException(
               ErrorCode.UNAUTHENTICATED,

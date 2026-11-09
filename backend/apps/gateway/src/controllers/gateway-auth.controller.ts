@@ -213,6 +213,7 @@ export class GatewayAuthController implements OnModuleInit {
       this.identityService.logout({
         userId: req.user.userId,
         sessionId: req.user.sessionId || '',
+        familyId: req.user.familyId || '',
       }),
     );
   }

@@ -2,6 +2,8 @@ import { Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
+  DomainException,
+  ErrorCode,
   OtpPurpose,
   OutboxDocument,
   OutboxModel,
@@ -27,6 +29,8 @@ import {
   DataDeletionTrackingModel,
   DataDeletionTrackingDocument,
 } from './user.schema';
+
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class MongooseUserRepository implements IUserRepository {
@@ -69,18 +73,26 @@ export class MongooseUserRepository implements IUserRepository {
   }
 
   async save(user: User): Promise<void> {
-    await this.userModel.create({
-      id: user.id,
-      email: user.email,
-      normalizedEmail: user.normalizedEmail,
-      passwordHash: user.passwordHash,
-      fullName: user.fullName,
-      role: user.role,
-      status: user.status,
-      sessionVersion: user.sessionVersion,
-      deletedAt: user.props.deletedAt,
-      version: user.version,
-    });
+    try {
+      await this.userModel.create({
+        id: user.id,
+        email: user.email,
+        normalizedEmail: user.normalizedEmail,
+        passwordHash: user.passwordHash,
+        fullName: user.fullName,
+        role: user.role,
+        status: user.status,
+        sessionVersion: user.sessionVersion,
+        deletedAt: user.props.deletedAt,
+        version: user.version,
+      });
+    } catch (err: unknown) {
+      // Hai request đăng ký cùng email: index unique chặn request đến sau
+      if ((err as { code?: number })?.code === 11000) {
+        throw DomainException.conflict(ErrorCode.EMAIL_ALREADY_EXISTS, 'Email đã được sử dụng');
+      }
+      throw err;
+    }
   }
 
   async update(user: User): Promise<void> {
@@ -132,10 +144,14 @@ export class MongooseUserRepository implements IUserRepository {
     });
   }
 
-  async markSessionUsed(sessionId: string): Promise<void> {
-    await this.sessionModel
-      .updateOne({ id: { $eq: String(sessionId) } }, { $set: { isUsed: true } })
+  async markSessionUsed(sessionId: string): Promise<boolean> {
+    const result = await this.sessionModel
+      .updateOne(
+        { id: { $eq: String(sessionId) }, isUsed: { $eq: false }, isRevoked: { $eq: false } },
+        { $set: { isUsed: true } },
+      )
       .exec();
+    return result.modifiedCount === 1;
   }
 
   async revokeSessionFamily(familyId: string, reason: string): Promise<void> {
@@ -145,6 +161,11 @@ export class MongooseUserRepository implements IUserRepository {
         { $set: { isRevoked: true, revokedReason: String(reason) } },
       )
       .exec();
+
+    // FR-AUTH-04: access tokens already issued stop working now, not when they expire.
+    if (this.redisService?.isAvailable) {
+      await this.redisService.set(`revoked_family:${familyId}`, String(reason), ACCESS_TOKEN_TTL_SECONDS);
+    }
   }
 
   async revokeAllUserSessions(userId: string, reason: string): Promise<void> {
