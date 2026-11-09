@@ -68,7 +68,8 @@ export class AuthUseCase {
       passwordHash,
       fullName: dto.fullName.trim(),
       role: 'STUDENT',
-      status: 'ACTIVE',
+      // FR-AUTH-02: chỉ chuyển sang ACTIVE sau khi xác minh OTP email
+      status: 'PENDING_VERIFICATION',
     });
 
     await this.userRepo.save(user);
@@ -125,6 +126,7 @@ export class AuthUseCase {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        status: user.status,
         ...(organizationId ? { organizationId } : {}),
       },
     });
@@ -165,14 +167,29 @@ export class AuthUseCase {
       );
     }
 
-    // Đánh dấu session cũ đã dùng và xoay vòng Refresh Token mới
-    await this.userRepo.markSessionUsed(session.id);
+    // Hai request cùng dùng một token: chỉ một bên giành được, bên còn lại là replay
+    const claimed = await this.userRepo.markSessionUsed(session.id);
+    if (claimed === false) {
+      await this.userRepo.revokeSessionFamily(session.familyId, 'REFRESH_TOKEN_REPLAY_OR_REVOKED');
+      throw new DomainException(
+        ErrorCode.UNAUTHENTICATED,
+        'Phát hiện phiên không hợp lệ hoặc đã được sử dụng lại, vui lòng đăng nhập lại',
+        401,
+      );
+    }
+
     const newTokens = await this.issueTokenPair(user, session.familyId);
 
     return Object.freeze(newTokens);
   }
 
-  async logout(userIdOrRefreshToken: string, sessionId?: string) {
+  async logout(userIdOrRefreshToken: string, sessionId?: string, familyId?: string) {
+    // FR-AUTH-04: đăng xuất thu hồi cả chuỗi token của thiết bị, không chỉ phiên mới nhất
+    if (familyId) {
+      await this.userRepo.revokeSessionFamily(familyId, 'USER_LOGOUT');
+      return Object.freeze({ revoked: true, userId: userIdOrRefreshToken });
+    }
+
     if (sessionId) {
       await this.userRepo.markSessionUsed(sessionId);
       return Object.freeze({ revoked: true, userId: userIdOrRefreshToken });
@@ -199,38 +216,13 @@ export class AuthUseCase {
    */
   async sendOtp(dto: SendOtpDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const now = new Date();
-
-    const existingRecord = await this.userRepo.findOtpRecord(normalizedEmail, dto.purpose);
-    if (existingRecord) {
-      existingRecord.assertCanResend(now);
-    }
-
-    const rawOtp = String(crypto.randomInt(100000, 1000000));
-    const otpHash = this.cryptoService.sha256(`${normalizedEmail}:${dto.purpose}:${rawOtp}`);
-
-    const newRecord = OtpRecord.issueNew({
-      email: normalizedEmail,
-      purpose: dto.purpose,
-      otpHash,
-      now,
-    });
-    await this.userRepo.saveOtpRecord(newRecord);
-
-    const isDevOrTest = process.env.NODE_ENV !== 'production';
-    if (isDevOrTest) {
-      this.logger.log(`[OTP-${dto.purpose}] Email=${normalizedEmail} OTP=${rawOtp} (TTL=300s)`);
-    }
-
-    return Object.freeze({
-      sent: true,
-      email: normalizedEmail,
-      purpose: dto.purpose,
-      expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
-      cooldownSeconds: Math.floor(OTP_COOLDOWN_MS / 1000),
-      message: 'Mã OTP đã được phát hành và gửi tới email của bạn',
-      devOtpPreview: isDevOrTest ? rawOtp : '',
-    });
+    const rawOtp = await this.issueOtp(normalizedEmail, dto.purpose);
+    return this.otpSentResponse(
+      normalizedEmail,
+      dto.purpose,
+      rawOtp,
+      'Mã OTP đã được phát hành và gửi tới email của bạn',
+    );
   }
 
   /**
@@ -264,29 +256,25 @@ export class AuthUseCase {
 
   /**
    * FR-AUTH-03: Yêu cầu đặt lại mật khẩu (Chống dò email / Anti-Enumeration).
-   * Nếu email không tồn tại, vẫn trả về thông báo thành công đồng nhất để không lộ danh sách tài khoản.
+   * Email không tồn tại vẫn đi qua cùng luồng phát OTP (mã không gửi cho ai), nên phản hồi và cooldown
+   * giống hệt email có thật, không lộ danh sách tài khoản.
    */
   async forgotPassword(dto: ForgotPasswordDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const user = await this.userRepo.findByEmail(normalizedEmail);
+    const canReceiveOtp = !!user && user.status !== 'DELETED';
 
-    if (!user || user.status === 'DELETED') {
+    const rawOtp = await this.issueOtp(normalizedEmail, 'RESET_PASSWORD');
+    if (!canReceiveOtp) {
       this.logger.warn(`[ForgotPassword] Yêu cầu từ email không tồn tại hoặc đã xóa: ${normalizedEmail}`);
-      return Object.freeze({
-        sent: true,
-        email: normalizedEmail,
-        purpose: 'RESET_PASSWORD',
-        expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
-        cooldownSeconds: Math.floor(OTP_COOLDOWN_MS / 1000),
-        message: 'Nếu email tồn tại trong hệ thống, mã OTP đặt lại mật khẩu đã được gửi',
-        devOtpPreview: '',
-      });
     }
 
-    return this.sendOtp({
-      email: normalizedEmail,
-      purpose: 'RESET_PASSWORD',
-    });
+    return this.otpSentResponse(
+      normalizedEmail,
+      'RESET_PASSWORD',
+      canReceiveOtp ? rawOtp : null,
+      'Nếu email tồn tại trong hệ thống, mã OTP đặt lại mật khẩu đã được gửi',
+    );
   }
 
   /**
@@ -295,15 +283,17 @@ export class AuthUseCase {
    */
   async resetPassword(dto: ResetPasswordDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
+
+    // FR-AUTH-03: kiểm tra OTP trước, để email không có tài khoản nhận đúng lỗi như email có thật
+    await this.verifyAndConsumeOtp(normalizedEmail, 'RESET_PASSWORD', dto.otpCode);
+
     const user = await this.userRepo.findByEmail(normalizedEmail);
-    if (!user) {
-      throw DomainException.notFound('Tài khoản người dùng');
+    if (!user || user.status === 'DELETED') {
+      throw new DomainException(ErrorCode.OTP_INVALID, 'Mã OTP không tồn tại hoặc đã được sử dụng', 400);
     }
-    if (user.status === 'DELETED' || user.status === 'BLOCKED') {
+    if (user.status === 'BLOCKED') {
       throw DomainException.forbidden('Tài khoản đã bị xóa hoặc khóa, không thể đặt lại mật khẩu');
     }
-
-    await this.verifyAndConsumeOtp(normalizedEmail, 'RESET_PASSWORD', dto.otpCode);
 
     const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
     const updatedUser = user.withPasswordReset(newPasswordHash);
@@ -515,6 +505,47 @@ export class AuthUseCase {
     });
   }
 
+  /** Áp cooldown/khóa rồi lưu OTP mới (chỉ lưu bản băm). Trả về mã gốc. */
+  private async issueOtp(normalizedEmail: string, purpose: SendOtpDto['purpose']): Promise<string> {
+    const now = new Date();
+
+    const existingRecord = await this.userRepo.findOtpRecord(normalizedEmail, purpose);
+    if (existingRecord) {
+      existingRecord.assertCanResend(now);
+    }
+
+    const rawOtp = String(crypto.randomInt(100000, 1000000));
+    const otpHash = this.cryptoService.sha256(`${normalizedEmail}:${purpose}:${rawOtp}`);
+
+    await this.userRepo.saveOtpRecord(
+      OtpRecord.issueNew({ email: normalizedEmail, purpose, otpHash, now }),
+    );
+    return rawOtp;
+  }
+
+  /** [rawOtp] là null khi không có ai nhận mã, nên không hiện gợi ý ở môi trường dev. */
+  private otpSentResponse(
+    normalizedEmail: string,
+    purpose: SendOtpDto['purpose'],
+    rawOtp: string | null,
+    message: string,
+  ) {
+    const isDevOrTest = process.env.NODE_ENV !== 'production';
+    if (isDevOrTest && rawOtp) {
+      this.logger.log(`[OTP-${purpose}] Email=${normalizedEmail} OTP=${rawOtp} (TTL=300s)`);
+    }
+
+    return Object.freeze({
+      sent: true,
+      email: normalizedEmail,
+      purpose,
+      expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
+      cooldownSeconds: Math.floor(OTP_COOLDOWN_MS / 1000),
+      message,
+      devOtpPreview: isDevOrTest && rawOtp ? rawOtp : '',
+    });
+  }
+
   private async verifyAndConsumeOtp(
     normalizedEmail: string,
     purpose: 'VERIFY_EMAIL' | 'RESET_PASSWORD',
@@ -578,8 +609,9 @@ export class AuthUseCase {
       payload.organizationId = organizationId;
     }
 
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' } as any);
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' } as any);
+    // FR-AUTH-04: JwtAuthGuard chỉ nhận typ=access, nên refresh token không gọi được API
+    const accessToken = this.jwtService.sign({ ...payload, typ: 'access' }, { expiresIn: '15m' } as any);
+    const refreshToken = this.jwtService.sign({ ...payload, typ: 'refresh' }, { expiresIn: '7d' } as any);
     const tokenHash = this.cryptoService.sha256(refreshToken);
 
     await this.userRepo.saveSession({

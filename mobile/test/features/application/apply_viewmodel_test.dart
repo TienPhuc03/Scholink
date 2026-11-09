@@ -62,6 +62,17 @@ void main() {
       vm.dispose();
     });
 
+    test('a cancelled application stops the flow, as the backend refuses to resubmit it', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
+          <String, dynamic>{'id': 'app_old', 'opportunityId': oppId, 'status': 'CANCELLED', 'submissionType': 'INDIVIDUAL'},
+        ]);
+      final ApplyViewModel vm = h.build();
+      await vm.start();
+      expect(vm.existingApplication?.id, 'app_old');
+      vm.dispose();
+    });
+
     test('a withdrawn application does not block a new one', () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
@@ -83,7 +94,11 @@ void main() {
 
       h.picker.queue.add(PickedAttachment(name: 'notes.docx', bytes: Uint8List.fromList(<int>[1, 2, 3, 4])));
       await vm.pickAttachment();
-      expect(vm.attachmentError, contains('PDF, JPG, PNG'));
+      expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
+
+      h.picker.queue.add(PickedAttachment(name: 'photo.jpg', bytes: Uint8List.fromList(<int>[0xFF, 0xD8, 0xFF, 0])));
+      await vm.pickAttachment();
+      expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
 
       h.picker.queue.add(pdf('big.pdf', size: AttachmentRules.maxBytes + 1));
       await vm.pickAttachment();
@@ -223,6 +238,38 @@ void main() {
       await vm.submit();
       expect(vm.previewStale, isTrue);
       expect(vm.needsNewPreview, isTrue);
+      expect(vm.canRetrySubmit, isFalse);
+      vm.dispose();
+    });
+
+    test('SNAPSHOT_STALE when consenting asks for a new preview instead of resubmitting', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(
+          ApiEndpoints.consents,
+          const ServerFailure(message: 'Hồ sơ Passport đã thay đổi', code: 'SNAPSHOT_STALE', statusCode: 409),
+        );
+      final ApplyViewModel vm = await toReview(h);
+      vm.setConsent(true);
+      await vm.submit();
+      expect(vm.previewStale, isTrue);
+      expect(vm.needsNewPreview, isTrue);
+      expect(vm.canSubmit, isFalse);
+      expect(vm.submitError, 'Hồ sơ Passport đã thay đổi');
+      vm.dispose();
+    });
+
+    test('ASSET_NOT_AVAILABLE returns to the attachments step', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(
+          ApiEndpoints.applications,
+          const ServerFailure(message: 'Tệp không còn sẵn sàng', code: 'ASSET_NOT_AVAILABLE', statusCode: 409),
+        );
+      final ApplyViewModel vm = await toReview(h);
+      vm.setConsent(true);
+      await vm.submit();
+      expect(vm.step, ApplyStep.attachments);
+      expect(vm.attachmentError, 'Tệp không còn sẵn sàng');
+      expect(vm.preview, isNull);
       expect(vm.canRetrySubmit, isFalse);
       vm.dispose();
     });

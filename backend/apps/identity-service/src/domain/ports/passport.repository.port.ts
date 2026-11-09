@@ -7,7 +7,8 @@ export const PASSPORT_REPOSITORY = Symbol('PASSPORT_REPOSITORY');
 export interface IPassportRepository {
   findByStudentId(studentId: string): Promise<Passport | null>;
   save(passport: Passport): Promise<void>;
-  update(passport: Passport): Promise<void>;
+  /** With [expectedVersion]: fails with VERSION_MISMATCH if the stored version has moved on. */
+  update(passport: Passport, expectedVersion?: number): Promise<void>;
   saveConsent(consent: Consent): Promise<void>;
   findConsentById(consentId: string): Promise<Consent | null>;
   saveMediaAsset(asset: MediaAsset): Promise<void>;

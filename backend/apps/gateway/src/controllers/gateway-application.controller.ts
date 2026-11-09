@@ -152,7 +152,8 @@ export class GatewayApplicationController implements OnModuleInit {
     return firstValueFrom(
       this.opportunityService.abortSubmissionIntent({
         submissionId,
-        actorId: req.user.userId,
+        // Admin bỏ qua kiểm tra trưởng đội ở Opportunity Service
+        actorId: req.user.role === 'ADMIN' ? undefined : req.user.userId,
         opportunityId: dto.opportunityId,
         teamId: dto.teamId,
         reason: dto.reason,
@@ -161,22 +162,16 @@ export class GatewayApplicationController implements OnModuleInit {
   }
 
   @Post('retention-decision')
-  @Roles('STUDENT', 'ADMIN')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'F40: Thực thi quyết định giữ hoặc xóa/ẩn danh Snapshot ứng tuyển khi xóa tài khoản (D06 / Mục 29)',
   })
   @ApiResponse({ status: 200, description: 'Kết quả giữ/xóa Snapshot ứng tuyển' })
   async applySnapshotRetentionDecision(
-    @Req() req: { user: AuthenticatedUser },
     @Body(new ZodValidationPipe(ApplySnapshotRetentionDtoSchema)) dto: ApplySnapshotRetentionDto,
   ) {
-    return firstValueFrom(
-      this.opportunityService.applySnapshotRetentionDecision({
-        ...dto,
-        studentId: req.user.role === 'ADMIN' ? dto.studentId : req.user.userId,
-      }),
-    );
+    return firstValueFrom(this.opportunityService.applySnapshotRetentionDecision(dto));
   }
 
   @Post('test-results/evaluate')

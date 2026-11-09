@@ -116,9 +116,8 @@ export const CompleteUploadDtoSchema = z.object({
   fileHeaderHex: z
     .string()
     .trim()
-    .regex(/^[a-fA-F0-9]{8,64}$/, 'fileHeaderHex phải là chuỗi hex hợp lệ (tối thiểu 4 byte đầu)')
-    .optional(),
-  sampleContent: z.string().max(4096).optional(),
+    .regex(/^[a-fA-F0-9]{8,64}$/, 'fileHeaderHex phải là chuỗi hex hợp lệ (tối thiểu 4 byte đầu)'),
+  sampleContent: z.string().max(4096),
   actualSizeBytes: z.number().int().positive().optional(),
 });
 

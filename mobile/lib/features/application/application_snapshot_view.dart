@@ -105,39 +105,50 @@ class ApplicationSnapshotView extends StatelessWidget {
             children: <Widget>[
               if (r.reasons.isNotEmpty) ...<Widget>[ReasonList(r.reasons), const SizedBox(height: 8)],
               for (final TeamMemberSnapshot m in r.members)
-                // The card paints its own background, so the tile needs a Material to draw on.
-                Material(
-                  type: MaterialType.transparency,
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      key: Key('snapshot_member_${m.studentId}'),
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(bottom: 8),
-                      title: Row(
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(m.displayName,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          if (m.studentId == r.leaderId) ...<Widget>[
-                            const SizedBox(width: 6),
-                            const Pill(text: 'Trưởng đội', color: AppColors.primary),
-                          ],
-                        ],
+                if (m.isRestricted)
+                  ListTile(
+                    key: Key('snapshot_member_${m.studentId}'),
+                    contentPadding: EdgeInsets.zero,
+                    title: _memberName(m, r),
+                    subtitle: const Text('Hồ sơ riêng của thành viên',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  )
+                else
+                  // The card paints its own background, so the tile needs a Material to draw on.
+                  Material(
+                    type: MaterialType.transparency,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        key: Key('snapshot_member_${m.studentId}'),
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: const EdgeInsets.only(bottom: 8),
+                        title: _memberName(m, r),
+                        subtitle: Text('Hồ sơ v${m.profileVersion} · ${m.attachmentIds.length} tệp đính kèm',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[PassportSnapshotFields(m.passport)],
                       ),
-                      subtitle: Text('Hồ sơ v${m.profileVersion} · ${m.attachmentIds.length} tệp đính kèm',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[PassportSnapshotFields(m.passport)],
                     ),
                   ),
-                ),
             ],
           ),
         ),
       ];
+
+  Widget _memberName(TeamMemberSnapshot m, ApplicationRevision r) => Row(
+        children: <Widget>[
+          Flexible(
+            child: Text(m.displayName,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis),
+          ),
+          if (m.studentId == r.leaderId) ...<Widget>[
+            const SizedBox(width: 6),
+            const Pill(text: 'Trưởng đội', color: AppColors.primary),
+          ],
+        ],
+      );
 }
 
 /// Q6: the manifest only carries asset ids and media storage is simulated, so files are listed

@@ -44,6 +44,11 @@ export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
       return throwError(() => exception);
     }
 
+    const forwarded = this.domainErrorFromDownstream(exception);
+    if (forwarded) {
+      return throwError(() => new RpcException(forwarded));
+    }
+
     const internalMessage =
       exception instanceof Error ? exception.message : 'Unknown gRPC service error';
     const internalStack = exception instanceof Error ? exception.stack : undefined;
@@ -56,5 +61,20 @@ export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
       statusCode: 500,
     };
     return throwError(() => new RpcException(JSON.stringify(scrubbedPayload)));
+  }
+
+  /**
+   * A service calling another service over gRPC receives the callee's serialized DomainException
+   * in `details`. Returns that payload so its code and status reach the original caller.
+   */
+  private domainErrorFromDownstream(exception: unknown): string | null {
+    const details = (exception as { details?: unknown } | null | undefined)?.details;
+    if (typeof details !== 'string') return null;
+    try {
+      const parsed = JSON.parse(details) as Partial<SerializedRpcError>;
+      return parsed?.isDomainException && parsed.code && parsed.message ? details : null;
+    } catch {
+      return null;
+    }
   }
 }

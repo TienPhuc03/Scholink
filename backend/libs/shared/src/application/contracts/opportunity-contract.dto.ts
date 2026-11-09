@@ -220,6 +220,28 @@ export const SubmitApplicationDtoSchema = z
           message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có submissionId',
         });
       }
+      // FR-APP-05: không có phiên giữ chỗ còn hiệu lực thì không được nộp đội
+      if (!data.reservationId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['reservationId'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có reservationId',
+        });
+      }
+      if (data.fencingToken === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['fencingToken'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có fencingToken',
+        });
+      }
+      if (data.rosterVersion === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rosterVersion'],
+          message: 'Nộp hồ sơ theo đội (TEAM) bắt buộc phải có rosterVersion',
+        });
+      }
       if (!data.memberConsents || data.memberConsents.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

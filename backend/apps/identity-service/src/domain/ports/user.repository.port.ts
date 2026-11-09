@@ -47,7 +47,8 @@ export interface IUserRepository {
   update(user: User): Promise<void>;
   saveSession(session: SessionRecord): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
-  markSessionUsed(sessionId: string): Promise<void>;
+  /** Atomic. Resolves false when the session was already used or revoked (a concurrent refresh won). */
+  markSessionUsed(sessionId: string): Promise<boolean | void>;
   revokeSessionFamily(familyId: string, reason: string): Promise<void>;
   revokeAllUserSessions(userId: string, reason: string): Promise<void>;
   findOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<OtpRecord | null>;

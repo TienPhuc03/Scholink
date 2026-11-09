@@ -4,13 +4,18 @@ class UserModel {
   final String email;
   final String fullName;
   final String role;
+  final String status;
 
   const UserModel({
     required this.id,
     required this.email,
     required this.fullName,
     required this.role,
+    this.status = 'ACTIVE',
   });
+
+  /// FR-AUTH-02: registered but the email OTP has not been confirmed yet.
+  bool get isPendingVerification => status.toUpperCase() == 'PENDING_VERIFICATION';
 
   bool get isStudent => role.toUpperCase() == 'STUDENT';
   bool get isOrganizer => role.toUpperCase() == 'ORGANIZER';
@@ -22,6 +27,7 @@ class UserModel {
       email: (json['email'] ?? '') as String,
       fullName: (json['fullName'] ?? json['name'] ?? '') as String,
       role: (json['role'] ?? 'STUDENT') as String,
+      status: (json['status'] ?? 'ACTIVE') as String,
     );
   }
 
@@ -30,6 +36,7 @@ class UserModel {
         'email': email,
         'fullName': fullName,
         'role': role,
+        'status': status,
       };
 
   @override

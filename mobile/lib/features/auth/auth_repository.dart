@@ -61,6 +61,11 @@ class AuthRepository {
 
       final UserModel user = UserModel.fromJson(userMap);
 
+      // FR-AUTH-02: no session is kept on the device until the email is verified.
+      if (user.isPendingVerification) {
+        return SuccessResult<UserModel, Failure>(user);
+      }
+
       await _secureStorage.saveTokens(
         accessToken: accessToken,
         refreshToken: refreshToken ?? '',
@@ -68,6 +73,11 @@ class AuthRepository {
       );
 
       return SuccessResult<UserModel, Failure>(user);
+    } on UnauthorizedFailure {
+      // A 401 from login means wrong credentials; the client maps every 401 to "session expired".
+      return const FailureResult<UserModel, Failure>(
+        ServerFailure(message: 'Email hoặc mật khẩu không đúng.', code: 'UNAUTHENTICATED', statusCode: 401),
+      );
     } on Failure catch (failure) {
       return FailureResult<UserModel, Failure>(failure);
     } catch (e) {

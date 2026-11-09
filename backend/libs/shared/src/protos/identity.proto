@@ -55,6 +55,7 @@ message UserSummary {
   string fullName = 3;
   string role = 4;
   string organizationId = 5;
+  string status = 6;
 }
 
 message LoginResponse {
@@ -75,6 +76,7 @@ message RefreshTokenResponse {
 message LogoutRequest {
   string userId = 1;
   string sessionId = 2;
+  string familyId = 3;
 }
 
 message LogoutResponse {
@@ -226,6 +228,8 @@ message UpdateMyPassportRequest {
   repeated CertificateMessage certificates = 14;
   optional int32 expectedVersion = 15;
   optional string phone = 16;
+  // gRPC does not send empty lists; names the list fields the client emptied.
+  repeated string clearFields = 17;
 }
 
 // FR-PROF-05: field -> PRIVATE | TEAMMATES | PUBLIC; omitted fields keep their setting.

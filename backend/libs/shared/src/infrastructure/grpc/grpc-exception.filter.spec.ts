@@ -56,4 +56,28 @@ describe('GrpcExceptionFilter on controllers that also serve HTTP', () => {
       message: expect.stringContaining('"statusCode":404'),
     });
   });
+
+  it('forwards the domain error of a downstream gRPC service instead of a 500', async () => {
+    const host = { getType: () => 'rpc' } as unknown as ArgumentsHost;
+    const payload = JSON.stringify({
+      isDomainException: true,
+      code: 'SNAPSHOT_STALE',
+      message: 'Hồ sơ đã thay đổi',
+      statusCode: 409,
+    });
+    const serviceError = Object.assign(new Error(`2 UNKNOWN: ${payload}`), { code: 2, details: payload });
+
+    await expect(lastValueFrom(new GrpcExceptionFilter().catch(serviceError, host))).rejects.toMatchObject({
+      message: payload,
+    });
+  });
+
+  it('still scrubs a gRPC error that carries no domain payload', async () => {
+    const host = { getType: () => 'rpc' } as unknown as ArgumentsHost;
+    const serviceError = Object.assign(new Error('14 UNAVAILABLE'), { code: 14, details: 'No connection established' });
+
+    await expect(lastValueFrom(new GrpcExceptionFilter().catch(serviceError, host))).rejects.toMatchObject({
+      message: expect.stringContaining('INTERNAL_ERROR'),
+    });
+  });
 });

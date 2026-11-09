@@ -28,7 +28,7 @@ export interface IdentityGrpcClient {
   register(data: RegisterDto): Observable<Record<string, unknown>>;
   login(data: LoginDto): Observable<Record<string, unknown>>;
   refresh(data: RefreshTokenDto): Observable<Record<string, unknown>>;
-  logout(data: { userId: string; sessionId?: string }): Observable<Record<string, unknown>>;
+  logout(data: { userId: string; sessionId?: string; familyId?: string }): Observable<Record<string, unknown>>;
   sendOtp(data: SendOtpDto): Observable<Record<string, unknown>>;
   verifyOtp(data: VerifyOtpDto): Observable<Record<string, unknown>>;
   forgotPassword(data: ForgotPasswordDto): Observable<Record<string, unknown>>;
@@ -48,7 +48,7 @@ export interface IdentityGrpcClient {
   }): Observable<Record<string, unknown>>;
   getProfileView(data: { studentId: string; audience: string }): Observable<Record<string, unknown>>;
   updateMyPassport(
-    data: UpdatePassportDto & { studentId: string },
+    data: UpdatePassportDto & { studentId: string; clearFields?: string[] },
   ): Observable<Record<string, unknown>>;
   createConsent(
     data: CreateConsentDto & { studentId: string },

@@ -56,6 +56,29 @@ void main() {
       expect(api.calls.single.data['purpose'], 'VERIFY_EMAIL');
     });
 
+    test('login keeps no session while the email is not verified', () async {
+      api.reply(ApiEndpoints.login, <String, dynamic>{
+        'accessToken': 'access-1',
+        'refreshToken': 'refresh-1',
+        'user': <String, dynamic>{
+          'id': 'u1',
+          'email': 'sv@uni.edu.vn',
+          'fullName': 'Sinh Viên',
+          'role': 'STUDENT',
+          'status': 'PENDING_VERIFICATION',
+        },
+      });
+      final UserModel user = (await repo.login(email: 'sv@uni.edu.vn', password: 'matkhau123')).dataOrNull!;
+      expect(user.isPendingVerification, isTrue);
+      expect(storage.accessToken, isNull);
+    });
+
+    test('a wrong password is not reported as an expired session', () async {
+      api.reply(ApiEndpoints.login, const UnauthorizedFailure());
+      final Failure failure = (await repo.login(email: 'sv@uni.edu.vn', password: 'sai-mat-khau')).errorOrNull!;
+      expect(failure.message, 'Email hoặc mật khẩu không đúng.');
+    });
+
     test('logout clears local tokens even when the server call fails', () async {
       storage.accessToken = 'access-1';
       api.reply(ApiEndpoints.logout, const NetworkFailure());

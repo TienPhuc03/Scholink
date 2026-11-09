@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { MediaCategory } from '@shared';
+import { DomainException, ErrorCode, MediaCategory } from '@shared';
 import { IPassportRepository } from '../../domain/ports/passport.repository.port';
 import { Passport, Education, Certificate } from '../../domain/passport.entity';
 import { Consent } from '../../domain/consent.entity';
@@ -59,10 +59,13 @@ export class MongoosePassportRepository implements IPassportRepository {
     });
   }
 
-  async update(passport: Passport): Promise<void> {
-    await this.passportModel
+  async update(passport: Passport, expectedVersion?: number): Promise<void> {
+    const result = await this.passportModel
       .updateOne(
-        { id: { $eq: String(passport.id) } },
+        {
+          id: { $eq: String(passport.id) },
+          ...(expectedVersion !== undefined ? { version: { $eq: expectedVersion } } : {}),
+        },
         {
           $set: {
             fullName: passport.props.fullName,
@@ -86,6 +89,13 @@ export class MongoosePassportRepository implements IPassportRepository {
         },
       )
       .exec();
+
+    if (expectedVersion !== undefined && result.matchedCount === 0) {
+      throw DomainException.conflict(
+        ErrorCode.VERSION_MISMATCH,
+        'Passport vừa được cập nhật ở nơi khác. Vui lòng tải lại dữ liệu mới nhất',
+      );
+    }
   }
 
   async saveConsent(consent: Consent): Promise<void> {

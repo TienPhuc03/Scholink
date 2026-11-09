@@ -40,8 +40,11 @@ abstract class OtpFlowViewModel extends BaseViewModel {
 
   String? _devOtpPreview;
 
-  /// Only surfaced in debug builds, so release APKs never show it.
-  String? get devOtpHint => kDebugMode ? _devOtpPreview : null;
+  /// Lets a demo APK show the code while no mail server exists: --dart-define=SHOW_DEV_OTP=true.
+  static const bool _showDevOtpInRelease = bool.fromEnvironment('SHOW_DEV_OTP');
+
+  /// Only surfaced in debug builds or demo APKs; a production backend never sends a preview.
+  String? get devOtpHint => (kDebugMode || _showDevOtpInRelease) ? _devOtpPreview : null;
 
   @protected
   void startWithTicket(String email, OtpTicket? ticket, {String? initialError}) {
