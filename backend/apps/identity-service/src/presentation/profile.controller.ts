@@ -10,6 +10,8 @@ import {
 } from '../application/dtos/passport.dto';
 import { GrpcExceptionFilter } from '@shared';
 
+const CLEARABLE_LIST_FIELDS = ['skills', 'achievements', 'certificates'] as const;
+
 @UseFilters(GrpcExceptionFilter)
 @Controller()
 export class ProfileController {
@@ -24,8 +26,12 @@ export class ProfileController {
   }
 
   @GrpcMethod('IdentityGrpcService', 'UpdateMyPassport')
-  async updateMyPassport(data: UpdatePassportDto & { studentId: string }) {
-    const { studentId, ...dto } = data;
+  async updateMyPassport(data: UpdatePassportDto & { studentId: string; clearFields?: string[] }) {
+    const { studentId, clearFields, ...dto } = data;
+    // gRPC drops empty lists, so the gateway names the ones the client emptied.
+    for (const field of CLEARABLE_LIST_FIELDS) {
+      if (clearFields?.includes(field)) dto[field] = [];
+    }
     return this.passportUseCase.updateMyPassport(studentId, dto);
   }
 

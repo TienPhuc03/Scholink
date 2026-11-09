@@ -88,7 +88,7 @@ export class PassportUseCase {
     }
     const merged = { ...resolveFieldPrivacy(passport.props.fieldPrivacy), ...(update as Record<string, string>) };
     const updated = passport.withFieldPrivacy(merged);
-    await this.passportRepo.update(updated);
+    await this.passportRepo.update(updated, passport.version);
     return this.toResponse(updated, await this.loadContact(studentId));
   }
 
@@ -145,7 +145,7 @@ export class PassportUseCase {
 
     // Immutable update: Tạo bản sao Passport mới với version tăng lên 1
     const updatedPassport = currentPassport.updateProfile(changes);
-    await this.passportRepo.update(updatedPassport);
+    await this.passportRepo.update(updatedPassport, currentPassport.version);
 
     // FR-PROF-05: the phone lives on the account, next to the email.
     if (phone !== undefined && this.userRepo) {
@@ -346,9 +346,7 @@ export class PassportUseCase {
   }
 
   /**
-   * Xác thực các assetId bắt đầu bằng tiền tố chuẩn `ast_` (được tạo từ MediaUseCase).
-   * Cho phép các mã định danh tĩnh trong dữ liệu seed/test cũ của F04 (ví dụ `asset_avatar_1`)
-   * hoặc bắt buộc kiểm tra nghiêm ngặt mọi `ast_*` và khi asset tồn tại trong kho `media_assets`.
+   * Mọi assetId client gửi lên đều phải có bản ghi trong `media_assets`, READY và đúng chủ sở hữu.
    */
   private extractNewlySubmittedAssetIds(dto: UpdatePassportDto): string[] {
     const candidates: string[] = [];

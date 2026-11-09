@@ -194,10 +194,14 @@ export class GatewayProfileController implements OnModuleInit {
     @Req() req: { user: AuthenticatedUser },
     @Body(new ZodValidationPipe(UpdatePassportDtoSchema)) dto: UpdatePassportDto,
   ) {
+    const clearFields = (['skills', 'achievements', 'certificates'] as const).filter(
+      (field) => dto[field]?.length === 0,
+    );
     return firstValueFrom(
       this.identityService.updateMyPassport({
         ...dto,
         studentId: req.user.userId,
+        clearFields,
       }),
     );
   }
