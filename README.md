@@ -4,16 +4,25 @@
 [![NestJS](https://img.shields.io/badge/NestJS-v11-red.svg)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-v5-blue.svg)](https://www.typescriptlang.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-v7-brightgreen.svg)](https://www.mongodb.com/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-Native%20Android-purple.svg)](https://kotlinlang.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-Dart%203.x%20MVVM-blue.svg)](https://flutter.dev/)
 [![Clean Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20Hexagonal-orange.svg)]()
 
 Nền tảng hỗ trợ sinh viên tìm kiếm học bổng & cuộc thi, quản lý hồ sơ Passport số hóa, tìm kiếm đồng đội (Team-Up), nộp hồ sơ trực tuyến, liên lạc thời gian thực và quản lý tài chính ví tích hợp.
 
-Dự án được xây dựng dựa trên đặc tả kỹ thuật **Scholink SRS v3.2** (17/10/2026) theo kiến trúc **Clean Architecture / Hexagonal Architecture** với **1 API Gateway + 5 Microservices nghiệp vụ độc lập** và ứng dụng **Android Kotlin Native**.
+Dự án được xây dựng dựa trên đặc tả kỹ thuật **Scholink SRS v3.2** (17/10/2026) theo kiến trúc **Clean Architecture / Hexagonal Architecture** với **1 API Gateway + 5 Microservices nghiệp vụ độc lập** và ứng dụng di động **Flutter (Dart 3.x, MVVM)**.
 
 ---
 
-## 🏛️ Topology Kiến trúc 5 Microservices
+## 🏛️ Kiến trúc Phân Tách Độc Lập (Project Architecture)
+
+Hệ thống được tổ chức thành các module độc lập trong repository:
+- 🟢 **`backend/`**: Hệ sinh thái Microservices xây dựng trên NestJS Monorepo (1 API Gateway + 5 Microservices cô lập database + 1 Shared Kernel).
+- 🔵 **`mobile/`**: Ứng dụng di động đa nền tảng Flutter (Clean Architecture, MVVM, Sound Null-Safety, Secure Storage, MQTT).
+- 📚 **`docs/`**: Toàn bộ tài liệu đặc tả (SRS v3.2), sổ tay phát triển và kịch bản vận hành.
+
+---
+
+## 🏛️ Topology Kiến trúc 5 Microservices (backend/)
 
 | Service | Port | Database cô lập | Module sở hữu & Trách nhiệm chính |
 |---|---|---|---|
@@ -43,7 +52,7 @@ Tất cả các client (Android mobile app, Web portal) đều giao tiếp duy n
 
 ---
 
-## 🚀 Khởi động nhanh (Quick Start)
+## 🚀 Khởi động nhanh Backend (Quick Start)
 
 ### 1. Yêu cầu môi trường
 - **Node.js**: v20+ hoặc v22+
@@ -51,7 +60,7 @@ Tất cả các client (Android mobile app, Web portal) đều giao tiếp duy n
 - **Docker & Docker Compose**
 - **Android Studio Ladybug / Koala** (cho app Android)
 
-### 2. Khởi chạy Hạ tầng Docker
+### 2. Khởi chạy Hạ tầng Docker (tại thư mục gốc)
 ```bash
 docker compose up -d
 ```
@@ -63,6 +72,9 @@ docker compose up -d
 
 ### 3. Cài đặt Dependencies & Khởi tạo Dữ liệu mẫu (Seed)
 ```bash
+# Di chuyển vào thư mục backend
+cd backend
+
 # Cài đặt thư viện
 pnpm install
 
@@ -75,9 +87,10 @@ pnpm run seed
 - **ORGANIZER:** `organizer@scholink.edu.vn` | Mật khẩu: `Organizer@2026`
 - **STUDENT:** `student@scholink.edu.vn` | Mật khẩu: `Student@2026`
 
-### 4. Chạy các Microservices
-Mở từng cửa sổ terminal để chạy các service cần phát triển:
+### 4. Chạy các Microservices (tại thư mục backend/)
+Mở từng cửa sổ terminal trong thư mục `backend/` để chạy các service cần phát triển:
 ```bash
+cd backend
 pnpm run start:gateway        # API Gateway (Port 3000)
 pnpm run start:identity       # Identity Service (Port 3001)
 pnpm run start:opportunity    # Opportunity Service (Port 3002)
@@ -104,10 +117,16 @@ Mã nguồn ứng dụng di động nằm trong thư mục `android/`:
 - **Room Database** lưu cache offline danh sách cơ hội và trạng thái hồ sơ
 - **EMQX Paho MQTT Client** nhận thông báo và tin nhắn chat theo thời gian thực
 
-👉 Xem hướng dẫn chi tiết cho mobile tại: **[android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md)**
+👉 Xem hướng dẫn chi tiết cho mobile tại: **[docs/HUONG_DAN_ANDROID.md](./docs/HUONG_DAN_ANDROID.md)** (hoặc [android/HUONG_DAN_ANDROID.md](./android/HUONG_DAN_ANDROID.md))
 
 ---
 
-## 📖 Sổ tay phát triển cho Team
-👉 **[Tài liệu hướng dẫn phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./HUONG_DAN_PHAT_TRIEN.md)**  
-👉 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2](./Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+## 📖 Thư Mục Tài Liệu Kỹ Thuật Dự Án (docs/)
+Toàn bộ tài liệu kỹ thuật, đặc tả nghiệp vụ và hướng dẫn vận hành đã được quy hoạch tập trung trong thư mục **[`docs/`](./docs/README.md)**:
+
+- 🌟 **[Tài liệu Tổng quan Toàn diện Dự án (TONG_QUAN_DU_AN.md)](./docs/TONG_QUAN_DU_AN.md)**
+- 📑 **[Đặc tả nghiệp vụ chi tiết Scholink SRS v3.2 (52 trang)](./docs/Scholink_Tai_Lieu_Phat_Trien_Team.md)**
+- 📘 **[Sổ tay phát triển cho Team (HUONG_DAN_PHAT_TRIEN.md)](./docs/HUONG_DAN_PHAT_TRIEN.md)**
+- 📕 **[Runbook Vận hành Demo TV3 (RUNBOOK_VAN_HANH_DEMO_TV3.md)](./docs/RUNBOOK_VAN_HANH_DEMO_TV3.md)**
+- 📱 **[Hướng dẫn phát triển ứng dụng di động Android Native](./docs/HUONG_DAN_ANDROID.md)**
+- 🌐 **[Trang mục lục tài liệu (docs/README.md)](./docs/README.md)**

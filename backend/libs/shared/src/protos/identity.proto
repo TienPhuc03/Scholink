@@ -1,0 +1,383 @@
+syntax = "proto3";
+
+package scholink.identity;
+
+service IdentityGrpcService {
+  // Auth, OTP & Session RPCs (API Gateway -> Identity Service)
+  rpc Register (RegisterRequest) returns (RegisterResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+  rpc Refresh (RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout (LogoutRequest) returns (LogoutResponse);
+  rpc SendOtp (SendOtpRequest) returns (SendOtpResponse);
+  rpc VerifyOtp (VerifyOtpRequest) returns (VerifyOtpResponse);
+  rpc ForgotPassword (ForgotPasswordRequest) returns (SendOtpResponse);
+  rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (AccountDeletionTrackingResponse);
+  rpc GetDeletionTracking (GetDeletionTrackingRequest) returns (AccountDeletionTrackingResponse);
+  rpc ExportPersonalData (ExportPersonalDataRequest) returns (ExportPersonalDataResponse);
+
+  // Profile, MediaAsset & Passport RPCs (API Gateway -> Identity Service)
+  rpc GetMyPassport (GetMyPassportRequest) returns (PassportResponse);
+  rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
+  rpc UpdateFieldPrivacy (UpdateFieldPrivacyRequest) returns (PassportResponse);
+  rpc GetProfileView (GetProfileViewRequest) returns (ProfileViewResponse);
+  rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
+  rpc CreateUploadUrl (CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
+  rpc CompleteUpload (CompleteUploadRequest) returns (MediaAssetResponse);
+  rpc GetMediaAsset (GetMediaAssetRequest) returns (MediaAssetResponse);
+
+  // Cross-Service Internal RPCs (Opportunity Service -> Identity Service)
+  rpc GetProfileSnapshot (GetProfileSnapshotRequest) returns (ProfileSnapshotResponse);
+  rpc ValidateConsent (ValidateConsentRequest) returns (ValidateConsentResponse);
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string fullName = 3;
+}
+
+message RegisterResponse {
+  string userId = 1;
+  string email = 2;
+  string role = 3;
+  string status = 4;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message UserSummary {
+  string id = 1;
+  string email = 2;
+  string fullName = 3;
+  string role = 4;
+  string organizationId = 5;
+  string status = 6;
+}
+
+message LoginResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+  UserSummary user = 3;
+}
+
+message RefreshTokenRequest {
+  string refreshToken = 1;
+}
+
+message RefreshTokenResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+}
+
+message LogoutRequest {
+  string userId = 1;
+  string sessionId = 2;
+  string familyId = 3;
+}
+
+message LogoutResponse {
+  bool revoked = 1;
+}
+
+message SendOtpRequest {
+  string email = 1;
+  string purpose = 2;
+}
+
+message SendOtpResponse {
+  bool sent = 1;
+  string email = 2;
+  string purpose = 3;
+  int32 expiresInSeconds = 4;
+  int32 cooldownSeconds = 5;
+  string message = 6;
+  string devOtpPreview = 7;
+}
+
+message VerifyOtpRequest {
+  string email = 1;
+  string otpCode = 2;
+  string purpose = 3;
+}
+
+message VerifyOtpResponse {
+  bool verified = 1;
+  string email = 2;
+  string purpose = 3;
+  string status = 4;
+}
+
+message ForgotPasswordRequest {
+  string email = 1;
+}
+
+message ResetPasswordRequest {
+  string email = 1;
+  string otpCode = 2;
+  string newPassword = 3;
+}
+
+message ResetPasswordResponse {
+  bool passwordReset = 1;
+  string email = 2;
+  int32 sessionVersion = 3;
+}
+
+message CreateUploadUrlRequest {
+  string ownerId = 1;
+  string category = 2;
+  string fileName = 3;
+  string mimeType = 4;
+  int32 sizeBytes = 5;
+  string sha256 = 6;
+}
+
+message CreateUploadUrlResponse {
+  string assetId = 1;
+  string ownerId = 2;
+  string category = 3;
+  string fileName = 4;
+  string mimeType = 5;
+  int32 sizeBytes = 6;
+  string objectKey = 7;
+  string uploadUrl = 8;
+  string status = 9;
+  int32 expiresInSeconds = 10;
+}
+
+message CompleteUploadRequest {
+  string ownerId = 1;
+  string assetId = 2;
+  optional string fileHeaderHex = 3;
+  optional string sampleContent = 4;
+  optional int32 actualSizeBytes = 5;
+}
+
+message GetMediaAssetRequest {
+  string ownerId = 1;
+  string assetId = 2;
+}
+
+message MediaAssetResponse {
+  string id = 1;
+  string ownerId = 2;
+  string category = 3;
+  string fileName = 4;
+  string mimeType = 5;
+  int32 sizeBytes = 6;
+  string sha256 = 7;
+  string objectKey = 8;
+  string status = 9;
+  int32 version = 10;
+}
+
+message GetMyPassportRequest {
+  string studentId = 1;
+}
+
+message EducationMessage {
+  string institution = 1;
+  string major = 2;
+  int32 startYear = 3;
+  int32 endYear = 4;
+  double gpa = 5;
+  double gpaScale = 6;
+}
+
+// Ngày tháng truyền dạng chuỗi ISO 8601; status do server gán, không nhận từ client
+message CertificateMessage {
+  string type = 1;
+  string name = 2;
+  string score = 3;
+  string issuedDate = 4;
+  string expiryDate = 5;
+  string assetId = 6;
+  string status = 7;
+}
+
+message ScoreBreakdownMessage {
+  int32 basicScore = 1;
+  int32 educationScore = 2;
+  int32 certificateScore = 3;
+  int32 achievementScore = 4;
+  int32 skillScore = 5;
+  int32 cvOrVideoScore = 6;
+  int32 intentScore = 7;
+  int32 totalScore = 8;
+}
+
+// Dùng `optional` để giữ presence: phân biệt "không gửi" với "gửi false/rỗng" khi cập nhật từng phần
+message UpdateMyPassportRequest {
+  string studentId = 1;
+  optional string fullName = 2;
+  optional string bio = 3;
+  optional string avatarAssetId = 4;
+  optional string regionCode = 5;
+  EducationMessage education = 6;
+  repeated string skills = 7;
+  repeated string achievements = 8;
+  optional string cvAssetId = 9;
+  optional string pitchVideoAssetId = 10;
+  optional bool isLookingForTeammate = 11;
+  optional bool isOpenForScholarship = 12;
+  optional bool isOpenForMentoring = 13;
+  repeated CertificateMessage certificates = 14;
+  optional int32 expectedVersion = 15;
+  optional string phone = 16;
+  // gRPC does not send empty lists; names the list fields the client emptied.
+  repeated string clearFields = 17;
+}
+
+// FR-PROF-05: field -> PRIVATE | TEAMMATES | PUBLIC; omitted fields keep their setting.
+message UpdateFieldPrivacyRequest {
+  string studentId = 1;
+  map<string, string> fieldPrivacy = 2;
+}
+
+// audience: PUBLIC (anyone signed in) or TEAMMATES (caller checked the shared team).
+message GetProfileViewRequest {
+  string studentId = 1;
+  string audience = 2;
+}
+
+// Fields not granted to the audience are left out; `visibleFields` lists what was granted,
+// so an empty list or string is told apart from a hidden field.
+message ProfileViewResponse {
+  string studentId = 1;
+  string fullName = 2;
+  string avatarAssetId = 3;
+  string audience = 4;
+  repeated string visibleFields = 5;
+  string email = 6;
+  string phone = 7;
+  string bio = 8;
+  string regionCode = 9;
+  repeated string skills = 10;
+  EducationMessage education = 11;
+  repeated CertificateMessage certificates = 12;
+  repeated string achievements = 13;
+  string cvAssetId = 14;
+  string pitchVideoAssetId = 15;
+}
+
+message PassportResponse {
+  string id = 1;
+  string studentId = 2;
+  int32 profileVersion = 3;
+  string fullName = 4;
+  string bio = 5;
+  string avatarAssetId = 6;
+  string regionCode = 7;
+  EducationMessage education = 8;
+  repeated string skills = 9;
+  repeated string achievements = 10;
+  string cvAssetId = 11;
+  string pitchVideoAssetId = 12;
+  bool isLookingForTeammate = 13;
+  bool isOpenForScholarship = 14;
+  bool isOpenForMentoring = 15;
+  int32 completionScore = 16;
+  int32 scoreVersion = 17;
+  int32 version = 18;
+  repeated CertificateMessage certificates = 19;
+  ScoreBreakdownMessage scoreBreakdown = 20;
+  map<string, string> fieldPrivacy = 21;
+  string email = 22;
+  string phone = 23;
+}
+
+message CreateConsentRequest {
+  string studentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  string opportunityId = 4;
+  string submissionId = 5;
+  int32 profileVersion = 6;
+  int32 ruleVersion = 7;
+  string payloadHash = 8;
+  string manifestHash = 9;
+  repeated string scope = 10;
+}
+
+message ConsentResponse {
+  string consentId = 1;
+  string previewId = 2;
+  string snapshotId = 3;
+  string payloadHash = 4;
+  string expiresAt = 5;
+  repeated string scope = 6;
+}
+
+message GetProfileSnapshotRequest {
+  string studentId = 1;
+  repeated string attachmentIds = 2;
+}
+
+message ProfileSnapshotResponse {
+  string snapshotId = 1;
+  int32 profileVersion = 2;
+  int32 completionScore = 3;
+  string snapshotJson = 4;
+  string manifestJson = 5;
+  string manifestHash = 6;
+  repeated string missingFields = 7;
+}
+
+message ValidateConsentRequest {
+  string studentId = 1;
+  string consentId = 2;
+  string previewId = 3;
+  string snapshotId = 4;
+  string opportunityId = 5;
+  int32 expectedRuleVersion = 6;
+  string expectedPayloadHash = 7;
+  repeated string attachmentIds = 8;
+  repeated string requiredScope = 9;
+}
+
+message ValidateConsentResponse {
+  bool valid = 1;
+  int32 profileVersion = 2;
+}
+
+
+message RequestAccountDeletionRequest {
+  string userId = 1;
+  string currentPassword = 2;
+  string snapshotDecision = 3;
+  string reason = 4;
+}
+
+message GetDeletionTrackingRequest {
+  string userId = 1;
+  string trackingId = 2;
+}
+
+message AccountDeletionTrackingResponse {
+  string trackingId = 1;
+  string userId = 2;
+  string status = 3;
+  string snapshotDecision = 4;
+  int32 revokedSessionVersion = 5;
+  bool sessionsRevoked = 6;
+  bool ledgerPreserved = 7;
+  string scheduledPurgeAt = 8;
+  string requestedAt = 9;
+  string reason = 10;
+}
+
+message ExportPersonalDataRequest {
+  string userId = 1;
+}
+
+message ExportPersonalDataResponse {
+  string exportId = 1;
+  string userId = 2;
+  string exportedAt = 3;
+  string payloadJson = 4;
+  bool ledgerPreserved = 5;
+}

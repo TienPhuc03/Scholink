@@ -1,0 +1,9 @@
+allowBuilds:
+  "@scarf/scarf": true
+  protobufjs: true
+  esbuild: true
+  keccak: true
+  msgpackr-extract: false
+packages:
+  - "apps/*"
+  - "libs/*"

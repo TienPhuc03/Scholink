@@ -1,0 +1,2151 @@
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { Observable } from 'rxjs';
+import {
+  CryptoService,
+  DomainException,
+  ErrorCode,
+  sanitizeInput,
+  sanitizePlainText,
+  validateEnv,
+} from '@shared';
+import { User } from './domain/user.entity';
+import { Passport } from './domain/passport.entity';
+import { Consent } from './domain/consent.entity';
+import { OtpRecord } from './domain/otp-record.entity';
+import { MediaAsset } from './domain/media-asset.entity';
+import { IUserRepository, SessionRecord } from './domain/ports/user.repository.port';
+import { IPassportRepository } from './domain/ports/passport.repository.port';
+import { AuthUseCase } from './application/use-cases/auth.use-case';
+import { MediaUseCase } from './application/use-cases/media.use-case';
+import { PassportUseCase } from './application/use-cases/passport.use-case';
+import { ApplicationUseCase } from '../../opportunity-service/src/application/use-cases/application.use-case';
+import { Opportunity } from '../../opportunity-service/src/domain/opportunity.entity';
+import { Application } from '../../opportunity-service/src/domain/application.entity';
+import {
+  IApplicationRepository,
+  SubmissionPreviewRecord,
+  ApplicationRevisionRecord,
+  ApplicationMemberRecord,
+  SubmissionIntentRecord,
+} from '../../opportunity-service/src/domain/ports/application.repository.port';
+import { IOpportunityRepository } from '../../opportunity-service/src/domain/ports/opportunity.repository.port';
+
+describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-Service Invariants', () => {
+  const validJwtSecret = 'test_jwt_secret_minimum_32_characters_long_123';
+  const validEncryptionKey = 'test_encryption_key_min_32_chars_long_456';
+  let cryptoService: CryptoService;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'test';
+    process.env.JWT_SECRET = validJwtSecret;
+    process.env.ENCRYPTION_KEY = validEncryptionKey;
+    cryptoService = new CryptoService(new ConfigService({ ENCRYPTION_KEY: validEncryptionKey }));
+  });
+
+  describe('1. Security Checklist & Boundary Validation', () => {
+    it('fails loudly when required secrets are missing or too short', () => {
+      expect(() => validateEnv({ NODE_ENV: 'development' })).toThrow(/JWT_SECRET/);
+      expect(() =>
+        validateEnv({
+          JWT_SECRET: 'short',
+          ENCRYPTION_KEY: validEncryptionKey,
+        }),
+      ).toThrow(/32 ký tự/);
+      expect(() =>
+        validateEnv({
+          JWT_SECRET: 'replace_with_at_least_32_character_random_jwt_secret_key',
+          ENCRYPTION_KEY: validEncryptionKey,
+        }),
+      ).toThrow(/placeholder/);
+    });
+
+    it('sanitizes HTML tags and rejects NoSQL injection operator keys at boundary', () => {
+      const sanitized = sanitizeInput({
+        fullName: '  <script>alert(1)</script>Nguyen Van A  ',
+        skills: ['<b>TypeScript</b>', '  NestJS  '],
+      }) as { fullName: string; skills: string[] };
+
+      expect(sanitized.fullName).toBe('alert(1)Nguyen Van A');
+      expect(sanitized.skills).toEqual(['TypeScript', 'NestJS']);
+      expect(sanitizePlainText('<script>evil()</script><b>Clean Text</b>')).toBe('Clean Text');
+
+      expect(() =>
+        sanitizeInput({
+          email: { $ne: null },
+        }),
+      ).toThrow(DomainException);
+    });
+
+    it('computes deterministic RFC 8785 SHA-256 payloadHash regardless of key order', () => {
+      const hashA = cryptoService.generatePayloadHash({
+        b: 2,
+        a: { y: 'hello', x: 1 },
+      });
+      const hashB = cryptoService.generatePayloadHash({
+        a: { x: 1, y: 'hello' },
+        b: 2,
+      });
+
+      expect(hashA).toBe(hashB);
+    });
+  });
+
+  describe('2. Domain Immutability & Mục 12A Completion Score', () => {
+    it('enforces immutable updates on User and Passport and computes 7-component score + scoreBreakdown', () => {
+      const initialPassport = new Passport('pass_1', {
+        studentId: 'stu_1',
+        profileVersion: 1,
+        fullName: 'Nguyen Van A',
+        isLookingForTeammate: false,
+        isOpenForScholarship: false,
+        isOpenForMentoring: false,
+      });
+
+      expect(initialPassport.profileVersion).toBe(1);
+      expect(initialPassport.completionScore).toBe(10); // Only fullName (10 pts)
+      expect(initialPassport.scoreBreakdown.basicScore).toBe(10);
+      expect(initialPassport.getMissingFields()).toContain('education.institution');
+
+      const updatedPassport = initialPassport.updateProfile({
+        avatarAssetId: 'ast_avatar',
+        regionCode: 'VN-SG',
+        education: {
+          institution: 'UIT - VNUHCM',
+          major: 'Software Engineering',
+          startYear: 2023,
+          gpa: 3.6,
+          gpaScale: 4,
+        },
+        skills: ['TypeScript', 'typescript', 'NestJS', 'gRPC'],
+        achievements: ['First Prize Hackathon'],
+        certificates: [
+          {
+            type: 'LANGUAGE',
+            name: 'IELTS',
+            score: '7.5',
+            issuedDate: new Date(),
+            status: 'VERIFIED',
+          },
+        ],
+        cvAssetId: 'ast_cv',
+        isLookingForTeammate: true,
+      });
+
+      // Original instance remains untouched (Immutable)
+      expect(initialPassport.profileVersion).toBe(1);
+      expect(initialPassport.completionScore).toBe(10);
+
+      // New instance has version + 1, deduplicated skills, and 100/100 score
+      expect(updatedPassport.profileVersion).toBe(2);
+      expect(updatedPassport.props.skills).toEqual(['TypeScript', 'NestJS', 'gRPC']);
+      expect(updatedPassport.completionScore).toBe(100);
+      expect(updatedPassport.scoreBreakdown).toEqual({
+        basicScore: 20,
+        educationScore: 25,
+        certificateScore: 10,
+        achievementScore: 15,
+        skillScore: 15,
+        cvOrVideoScore: 5,
+        intentScore: 10,
+        totalScore: 100,
+      });
+      expect(updatedPassport.getMissingFields()).toHaveLength(0);
+    });
+  });
+
+  describe('3. AuthUseCase (F04 & F13) — Unique Email, OTP Lockout, Password Reset & Refresh Replay', () => {
+    let users: Map<string, User>;
+    let passports: Map<string, Passport>;
+    let sessions: Map<string, SessionRecord>;
+    let otpRecords: Map<string, OtpRecord>;
+    let authUseCase: AuthUseCase;
+
+    beforeEach(() => {
+      users = new Map();
+      passports = new Map();
+      sessions = new Map();
+      otpRecords = new Map();
+
+      const userRepo: IUserRepository = {
+        findById: async (id) => users.get(id) ?? null,
+        findByEmail: async (email) =>
+          Array.from(users.values()).find((u) => u.normalizedEmail === email.toLowerCase()) ??
+          null,
+        save: async (u) => {
+          users.set(u.id, u);
+        },
+        update: async (u) => {
+          users.set(u.id, u);
+        },
+        saveSession: async (s) => {
+          sessions.set(s.id, s);
+        },
+        findSessionByTokenHash: async (hash) =>
+          Array.from(sessions.values()).find((s) => s.tokenHash === hash) ?? null,
+        markSessionUsed: async (sessionId) => {
+          const current = sessions.get(sessionId);
+          if (current) {
+            sessions.set(sessionId, { ...current, isUsed: true });
+          }
+        },
+        revokeSessionFamily: async (familyId) => {
+          for (const [id, s] of sessions.entries()) {
+            if (s.familyId === familyId) {
+              sessions.set(id, { ...s, isRevoked: true });
+            }
+          }
+        },
+        revokeAllUserSessions: async (userId) => {
+          for (const [id, s] of sessions.entries()) {
+            if (s.userId === userId) {
+              sessions.set(id, { ...s, isRevoked: true });
+            }
+          }
+        },
+        findOtpRecord: async (email, purpose) =>
+          otpRecords.get(`${email.toLowerCase()}:${purpose}`) ?? null,
+        saveOtpRecord: async (rec) => {
+          otpRecords.set(`${rec.normalizedEmail}:${rec.purpose}`, rec);
+        },
+        deleteOtpRecord: async (email, purpose) => {
+          otpRecords.delete(`${email.toLowerCase()}:${purpose}`);
+        },
+      };
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: async (studentId) => passports.get(studentId) ?? null,
+        save: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        update: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        saveConsent: async () => undefined,
+        findConsentById: async () => null,
+        saveMediaAsset: async () => undefined,
+        updateMediaAsset: async () => undefined,
+        findMediaAssetById: async () => null,
+        findMediaAssetsByIds: async () => [],
+      };
+
+      const jwtService = new JwtService({ secret: validJwtSecret });
+      authUseCase = new AuthUseCase(userRepo, passportRepo, jwtService, cryptoService);
+    });
+
+    it('enforces unique email (EMAIL_ALREADY_EXISTS), assigns STUDENT role, and revokes token family on refresh replay', async () => {
+      const reg = await authUseCase.register({
+        email: 'student@uit.edu.vn',
+        password: 'StrongPassword123',
+        fullName: 'Nguyen Van A',
+      });
+
+      expect(reg.role).toBe('STUDENT');
+      expect(passports.has(reg.userId)).toBe(true);
+
+      // Duplicate registration must fail with EMAIL_ALREADY_EXISTS
+      await expect(
+        authUseCase.register({
+          email: 'STUDENT@uit.edu.vn',
+          password: 'AnotherPassword123',
+          fullName: 'Duplicate User',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.EMAIL_ALREADY_EXISTS,
+      });
+
+      const loginRes = await authUseCase.login({
+        email: 'student@uit.edu.vn',
+        password: 'StrongPassword123',
+      });
+
+      // 1st refresh rotates token and marks first session as isUsed = true
+      const rotated = await authUseCase.refresh({
+        refreshToken: loginRes.refreshToken,
+      });
+      expect(rotated.accessToken).toBeDefined();
+
+      // Replaying the old refreshToken must throw UNAUTHENTICATED and revoke the entire familyId!
+      await expect(
+        authUseCase.refresh({
+          refreshToken: loginRes.refreshToken,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+
+      // Even the newly rotated token in the same family is now revoked!
+      await expect(
+        authUseCase.refresh({
+          refreshToken: rotated.refreshToken,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+    });
+
+    it('enforces OTP 60s resend cooldown, locks after 5 failed attempts, and revokes old sessions on password reset', async () => {
+      await authUseCase.register({
+        email: 'otp_user@uit.edu.vn',
+        password: 'OldPassword123',
+        fullName: 'Tran Thi OTP',
+      });
+
+      const loginBeforeReset = await authUseCase.login({
+        email: 'otp_user@uit.edu.vn',
+        password: 'OldPassword123',
+      });
+
+      // Send OTP for email verification
+      const otpRes = await authUseCase.sendOtp({
+        email: 'otp_user@uit.edu.vn',
+        purpose: 'VERIFY_EMAIL',
+      });
+      expect(otpRes.sent).toBe(true);
+      expect(otpRes.devOtpPreview).toMatch(/^\d{6}$/);
+
+      // Immediate resend within 60s must be blocked with RATE_LIMITED
+      await expect(
+        authUseCase.sendOtp({
+          email: 'otp_user@uit.edu.vn',
+          purpose: 'VERIFY_EMAIL',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.RATE_LIMITED,
+      });
+
+      // 4 wrong OTP attempts throw OTP_INVALID, 5th attempt locks for 15 minutes with OTP_LOCKED
+      for (let i = 1; i <= 4; i++) {
+        await expect(
+          authUseCase.verifyOtp({
+            email: 'otp_user@uit.edu.vn',
+            otpCode: '000000',
+            purpose: 'VERIFY_EMAIL',
+          }),
+        ).rejects.toMatchObject({
+          code: ErrorCode.OTP_INVALID,
+        });
+      }
+
+      await expect(
+        authUseCase.verifyOtp({
+          email: 'otp_user@uit.edu.vn',
+          otpCode: '000000',
+          purpose: 'VERIFY_EMAIL',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.OTP_LOCKED,
+      });
+
+      // Forgot password & Reset password flow (uses separate purpose 'RESET_PASSWORD')
+      const forgotRes = await authUseCase.forgotPassword({
+        email: 'otp_user@uit.edu.vn',
+      });
+      expect(forgotRes.sent).toBe(true);
+      expect(forgotRes.devOtpPreview).toMatch(/^\d{6}$/);
+
+      const resetRes = await authUseCase.resetPassword({
+        email: 'otp_user@uit.edu.vn',
+        otpCode: forgotRes.devOtpPreview,
+        newPassword: 'NewStrongPassword@2026',
+      });
+      expect(resetRes.passwordReset).toBe(true);
+      expect(resetRes.sessionVersion).toBe(2);
+
+      // Old refreshToken issued before password reset must now be rejected!
+      await expect(
+        authUseCase.refresh({
+          refreshToken: loginBeforeReset.refreshToken,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+
+      // Login with new password succeeds
+      const loginAfterReset = await authUseCase.login({
+        email: 'otp_user@uit.edu.vn',
+        password: 'NewStrongPassword@2026',
+      });
+      expect(loginAfterReset.accessToken).toBeDefined();
+    });
+  });
+
+  describe('4. F13 MediaAsset Inspection, Passport Optimistic Version & Asset Ownership Invariants', () => {
+    let passports: Map<string, Passport>;
+    let mediaAssets: Map<string, MediaAsset>;
+    let mediaUseCase: MediaUseCase;
+    let passportUseCase: PassportUseCase;
+    const studentA = 'stu_A';
+    const studentB = 'stu_B';
+
+    beforeEach(() => {
+      passports = new Map();
+      mediaAssets = new Map();
+
+      passports.set(
+        studentA,
+        new Passport('pass_A', {
+          studentId: studentA,
+          profileVersion: 1,
+          fullName: 'Student A',
+          isLookingForTeammate: false,
+          isOpenForScholarship: true,
+          isOpenForMentoring: false,
+        }),
+      );
+
+      passports.set(
+        studentB,
+        new Passport('pass_B', {
+          studentId: studentB,
+          profileVersion: 1,
+          fullName: 'Student B',
+          isLookingForTeammate: false,
+          isOpenForScholarship: true,
+          isOpenForMentoring: false,
+        }),
+      );
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: async (id) => passports.get(id) ?? null,
+        save: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        update: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        saveConsent: async () => undefined,
+        findConsentById: async () => null,
+        saveMediaAsset: async (asset) => {
+          mediaAssets.set(asset.id, asset);
+        },
+        updateMediaAsset: async (asset) => {
+          mediaAssets.set(asset.id, asset);
+        },
+        findMediaAssetById: async (id) => mediaAssets.get(id) ?? null,
+        findMediaAssetsByIds: async (ids) =>
+          ids.map((id) => mediaAssets.get(id)).filter((a): a is MediaAsset => Boolean(a)),
+      };
+
+      mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      passportUseCase = new PassportUseCase(passportRepo, mediaUseCase, cryptoService);
+    });
+
+    it('validates MIME/size, blocks EICAR/malicious files, blocks non-READY assets, and rejects another users asset', async () => {
+      // 1. Invalid MIME type for CV -> INVALID_FILE_TYPE
+      await expect(
+        mediaUseCase.createUploadUrl(studentA, {
+          category: 'CV',
+          fileName: 'trojan.exe',
+          mimeType: 'application/x-msdownload',
+          sizeBytes: 1024,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.INVALID_FILE_TYPE,
+      });
+
+      // 2. Oversized CV (> 5MB) -> FILE_TOO_LARGE
+      await expect(
+        mediaUseCase.createUploadUrl(studentA, {
+          category: 'CV',
+          fileName: 'huge-cv.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 6 * 1024 * 1024,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FILE_TOO_LARGE,
+      });
+
+      // 3. Create valid upload URL -> status is UPLOADING
+      const initiatedCv = await mediaUseCase.createUploadUrl(studentA, {
+        category: 'CV',
+        fileName: 'cv-student-a.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 250000,
+      });
+      expect(initiatedCv.status).toBe('UPLOADING');
+
+      // 4. Attempting to attach UPLOADING asset to Passport before completeUpload -> 409 ASSET_NOT_AVAILABLE
+      await expect(
+        passportUseCase.updateMyPassport(studentA, {
+          cvAssetId: initiatedCv.assetId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.ASSET_NOT_AVAILABLE,
+      });
+
+      // 5. Malicious file upload (EICAR or Embedded PDF JS) -> 422 MALICIOUS_FILE_DETECTED and status becomes REJECTED
+      const maliciousUpload = await mediaUseCase.createUploadUrl(studentA, {
+        category: 'CERTIFICATE',
+        fileName: 'infected.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 10240,
+      });
+      await expect(
+        mediaUseCase.completeUpload(studentA, maliciousUpload.assetId, {
+          fileHeaderHex: '255044462d312e37',
+          sampleContent: 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.MALICIOUS_FILE_DETECTED,
+      });
+
+      const rejectedAsset = await mediaUseCase.getMediaAsset(studentA, maliciousUpload.assetId);
+      expect(rejectedAsset.status).toBe('REJECTED');
+
+      // 6. Complete clean PDF upload for Student A -> status becomes READY
+      const completedCv = await mediaUseCase.completeUpload(studentA, initiatedCv.assetId, {
+        fileHeaderHex: '255044462d312e37',
+        sampleContent: '%PDF-1.7 Clean Academic CV',
+        actualSizeBytes: 250000,
+      });
+      expect(completedCv.status).toBe('READY');
+
+      // 7. Student B attempts to attach Student A's READY asset -> 403 FORBIDDEN_RESOURCE ("không nhận asset người khác")
+      await expect(
+        passportUseCase.updateMyPassport(studentB, {
+          cvAssetId: completedCv.id,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 8. Student A attaches their own READY asset with expectedVersion = 1 -> succeeds and increments version to 2
+      const updatedPassportA = await passportUseCase.updateMyPassport(studentA, {
+        expectedVersion: 1,
+        cvAssetId: completedCv.id,
+      });
+      expect(updatedPassportA.version).toBe(2);
+      expect(updatedPassportA.cvAssetId).toBe(completedCv.id);
+
+      // 9. Stale expectedVersion (1 instead of 2) -> 409 VERSION_MISMATCH
+      await expect(
+        passportUseCase.updateMyPassport(studentA, {
+          expectedVersion: 1,
+          bio: 'Outdated version update attempt',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.VERSION_MISMATCH,
+      });
+    });
+  });
+
+  describe('5. End-to-End Preview -> Consent -> Submit & Withdraw/Resubmit Workflow', () => {
+    let passports: Map<string, Passport>;
+    let consents: Map<string, Consent>;
+    let mediaAssets: Map<string, MediaAsset>;
+    let previews: Map<string, SubmissionPreviewRecord>;
+    let applications: Map<string, Application>;
+    let mediaUseCase: MediaUseCase;
+    let passportUseCase: PassportUseCase;
+    let applicationUseCase: ApplicationUseCase;
+    const studentId = 'stu_100';
+    const opportunityId = 'opp_100';
+
+    beforeEach(() => {
+      passports = new Map();
+      consents = new Map();
+      mediaAssets = new Map();
+      previews = new Map();
+      applications = new Map();
+
+      const completedPassport = new Passport('pass_100', {
+        studentId,
+        profileVersion: 1,
+        fullName: 'Le Thi B',
+        education: {
+          institution: 'HCMUT',
+          major: 'Computer Science',
+          startYear: 2022,
+          gpa: 3.8,
+          gpaScale: 4,
+        },
+        skills: ['Python', 'AI'],
+        isLookingForTeammate: false,
+        isOpenForScholarship: true,
+        isOpenForMentoring: false,
+      });
+      passports.set(studentId, completedPassport);
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: async (id) => passports.get(id) ?? null,
+        save: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        update: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        saveConsent: async (c) => {
+          consents.set(c.id, c);
+        },
+        findConsentById: async (id) => consents.get(id) ?? null,
+        saveMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        updateMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        findMediaAssetById: async (id) => mediaAssets.get(id) ?? null,
+        findMediaAssetsByIds: async (ids) =>
+          ids.map((id) => mediaAssets.get(id)).filter((a): a is MediaAsset => Boolean(a)),
+      };
+
+      const opportunity = new Opportunity(opportunityId, {
+        type: 'SCHOLARSHIP',
+        title: 'Scholink Excellence Scholarship 2026',
+        description: 'Full tuition scholarship for STEM students',
+        organizationId: 'org_1',
+        createdBy: 'usr_org_1',
+        organizerName: 'Scholink Foundation',
+        applyMode: 'IN_APP',
+        status: 'PUBLISHED',
+        registerDeadline: new Date(Date.now() + 86400000),
+        timezone: 'Asia/Ho_Chi_Minh',
+        ruleVersion: 1,
+      });
+
+      const opportunityRepo: IOpportunityRepository = {
+        findById: async (id) => (id === opportunityId ? opportunity : null),
+        findMany: async () => [opportunity],
+        save: async () => undefined,
+        update: async () => undefined,
+      };
+
+      const applicationRepo: IApplicationRepository = {
+        findById: async (id) => applications.get(id) ?? null,
+        findByOpportunityAndStudent: async (oppId, stuId) =>
+          Array.from(applications.values()).find(
+            (a) => a.opportunityId === oppId && a.studentId === stuId,
+          ) ?? null,
+        findManyByStudent: async (stuId) =>
+          Array.from(applications.values()).filter((a) => a.studentId === stuId),
+        findManyByOpportunity: async (oppId) =>
+          Array.from(applications.values()).filter((a) => a.opportunityId === oppId),
+        save: async (app) => {
+          applications.set(app.id, app);
+        },
+        update: async (app) => {
+          applications.set(app.id, app);
+        },
+        savePreview: async (prv) => {
+          previews.set(prv.previewId, prv);
+        },
+        findPreviewById: async (prvId) => previews.get(prvId) ?? null,
+        saveRevision: async () => undefined,
+        appendEvent: async () => undefined,
+      };
+
+      mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      passportUseCase = new PassportUseCase(passportRepo, mediaUseCase, cryptoService);
+
+      const asyncGrpcClient = {
+        getService: () => ({
+          getProfileSnapshot: (req: { studentId: string; attachmentIds: string[] }) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .getProfileSnapshot(req.studentId, req.attachmentIds)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+          validateConsent: (req: any) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .validateConsent(req)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+        }),
+      };
+
+      applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+        asyncGrpcClient as any,
+      );
+      applicationUseCase.onModuleInit();
+    });
+
+    it('creates immutable preview, verifies consent hash, submits, withdraws, and resubmits with revision=2', async () => {
+      const uploadedAttachment = await mediaUseCase.createUploadUrl(studentId, {
+        category: 'ATTACHMENT',
+        fileName: 'transcript.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 120000,
+      });
+      await mediaUseCase.completeUpload(studentId, uploadedAttachment.assetId, {
+        fileHeaderHex: '255044462d312e37',
+        sampleContent: '%PDF-1.7 Official Transcript',
+      });
+
+      // Step 1: Create Preview
+      const preview = await applicationUseCase.createPreview(studentId, {
+        opportunityId,
+        submissionId: 'sub_1',
+        attachmentIds: [uploadedAttachment.assetId],
+        expectedRuleVersion: 1,
+      });
+
+      expect(preview.previewId).toMatch(/^prv_/);
+      expect(preview.profileVersion).toBe(1);
+
+      // Step 2: Create Consent matching Preview
+      const consent = await passportUseCase.createConsent(studentId, {
+        opportunityId,
+        submissionId: 'sub_1',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+      });
+
+      // Step 3: Submit Application (Revision 1)
+      const submitted = await applicationUseCase.submit(studentId, {
+        opportunityId,
+        submissionId: 'sub_1',
+        submissionType: 'INDIVIDUAL',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: preview.payloadHash,
+        consentId: consent.consentId,
+      });
+
+      expect(submitted.status).toBe('SUBMITTED');
+      expect(submitted.revision).toBe(1);
+
+      // Step 4: Withdraw Application
+      const withdrawn = await applicationUseCase.withdraw(submitted.applicationId, studentId);
+      expect(withdrawn.status).toBe('WITHDRAWN');
+
+      // Step 5: Resubmit Application -> increments revision to 2
+      const resubmitted = await applicationUseCase.submit(studentId, {
+        opportunityId,
+        submissionId: 'sub_2',
+        submissionType: 'INDIVIDUAL',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: preview.payloadHash,
+        consentId: consent.consentId,
+      });
+
+      expect(resubmitted.applicationId).toBe(submitted.applicationId);
+      expect(resubmitted.status).toBe('SUBMITTED');
+      expect(resubmitted.revision).toBe(2);
+    });
+
+    it('blocks submission with SNAPSHOT_STALE if Passport is edited after Preview/Consent', async () => {
+      const preview = await applicationUseCase.createPreview(studentId, {
+        opportunityId,
+        submissionId: 'sub_stale',
+        attachmentIds: [],
+        expectedRuleVersion: 1,
+      });
+
+      const consent = await passportUseCase.createConsent(studentId, {
+        opportunityId,
+        submissionId: 'sub_stale',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT', 'ATTACHMENTS'],
+      });
+
+      // Student modifies their Passport after creating Preview & Consent -> profileVersion becomes 2
+      await passportUseCase.updateMyPassport(studentId, {
+        bio: 'Updated bio after preview',
+      });
+
+      await expect(
+        applicationUseCase.submit(studentId, {
+          opportunityId,
+          submissionId: 'sub_stale',
+          submissionType: 'INDIVIDUAL',
+          previewId: preview.previewId,
+          snapshotId: preview.snapshotId,
+          profileVersion: preview.profileVersion,
+          expectedRuleVersion: 1,
+          payloadHash: preview.payloadHash,
+          consentId: consent.consentId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.SNAPSHOT_STALE,
+      });
+    });
+
+    it('F22: enforces Consent scope, re-verifies MediaAsset READY at commit, evaluates Screening rules (ELIGIBLE/NEEDS_REVIEW/INELIGIBLE), and commits Outbox atomically', async () => {
+      const outboxEvents: Array<Record<string, unknown>> = [];
+      const revisions: Array<Record<string, unknown>> = [];
+      const events: Array<Record<string, unknown>> = [];
+      const strictOppId = 'opp_strict_f22';
+
+      const strictOpportunity = new Opportunity(strictOppId, {
+        type: 'SCHOLARSHIP',
+        title: 'AI Research Fellowship 2026',
+        description: 'Strict GPA and English certificate rules',
+        organizationId: 'org_1',
+        createdBy: 'usr_org_1',
+        organizerName: 'AI Institute',
+        applyMode: 'IN_APP',
+        status: 'PUBLISHED',
+        registerDeadline: new Date(Date.now() + 7 * 86400000),
+        timezone: 'Asia/Ho_Chi_Minh',
+        requiredFields: ['fullName', 'education.gpa', 'skills'],
+        eligibilityRules: [
+          {
+            fieldKey: 'education.gpa',
+            operator: 'GTE',
+            value: 3.5,
+            scale: 4,
+            type: 'HARD',
+          },
+          {
+            fieldKey: 'certificates.type',
+            operator: 'EQ',
+            value: 'LANGUAGE',
+            type: 'SOFT',
+          },
+        ],
+        ruleVersion: 1,
+      });
+
+      const f22OpportunityRepo: IOpportunityRepository = {
+        findById: async (id) => (id === strictOppId ? strictOpportunity : null),
+        findMany: async () => [strictOpportunity],
+        save: async () => undefined,
+        update: async () => undefined,
+      };
+
+      const f22ApplicationRepo: IApplicationRepository = {
+        findById: async (id) => applications.get(id) ?? null,
+        findByOpportunityAndStudent: async (oppId, stuId) =>
+          Array.from(applications.values()).find(
+            (a) => a.opportunityId === oppId && a.studentId === stuId,
+          ) ?? null,
+        findManyByStudent: async (stuId) =>
+          Array.from(applications.values()).filter((a) => a.studentId === stuId),
+        findManyByOpportunity: async (oppId) =>
+          Array.from(applications.values()).filter((a) => a.opportunityId === oppId),
+        save: async (app) => {
+          applications.set(app.id, app);
+        },
+        update: async (app) => {
+          applications.set(app.id, app);
+        },
+        savePreview: async (prv) => {
+          previews.set(prv.previewId, prv);
+        },
+        findPreviewById: async (prvId) => previews.get(prvId) ?? null,
+        saveRevision: async (rev) => {
+          revisions.push(rev as unknown as Record<string, unknown>);
+        },
+        appendEvent: async (evt) => {
+          events.push(evt as unknown as Record<string, unknown>);
+        },
+        findRevisionsByApplicationId: async (appId) =>
+          revisions.filter((r) => r.applicationId === appId) as any,
+        findEventsByApplicationId: async (appId) =>
+          events.filter((e) => e.applicationId === appId) as any,
+        commitSubmissionWithOutbox: async ({ application, revision, event, outbox }) => {
+          applications.set(application.id, application);
+          revisions.push(revision as unknown as Record<string, unknown>);
+          events.push(event as unknown as Record<string, unknown>);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+        commitWithdrawalWithOutbox: async ({ application, event, outbox }) => {
+          applications.set(application.id, application);
+          events.push(event as unknown as Record<string, unknown>);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+      };
+
+      const f22GrpcClient = {
+        getService: () => ({
+          getProfileSnapshot: (req: { studentId: string; attachmentIds: string[] }) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .getProfileSnapshot(req.studentId, req.attachmentIds)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+          validateConsent: (req: any) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .validateConsent(req)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+        }),
+      };
+
+      const f22AppUseCase = new ApplicationUseCase(
+        f22ApplicationRepo,
+        f22OpportunityRepo,
+        cryptoService,
+        f22GrpcClient as any,
+      );
+      f22AppUseCase.onModuleInit();
+
+      // 1. Check Readiness (FR-PROF-03/08): Student has GPA 3.8 (scale 4) but no LANGUAGE certificate yet (SOFT rule)
+      const readiness1 = await f22AppUseCase.checkReadiness(studentId, strictOppId);
+      expect(readiness1.readinessScore).toBe(100);
+      expect(readiness1.isReady).toBe(true);
+      expect(readiness1.screening).toBe('NEEDS_REVIEW');
+      expect(readiness1.screeningReasons[0].reasonCode).toBe('SOFT_RULE_UNMET');
+
+      // 2. Upload READY attachment and create Preview
+      const attachment = await mediaUseCase.createUploadUrl(studentId, {
+        category: 'ATTACHMENT',
+        fileName: 'portfolio.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 95000,
+      });
+      await mediaUseCase.completeUpload(studentId, attachment.assetId, {
+        fileHeaderHex: '255044462d312e37',
+        sampleContent: '%PDF-1.7 Portfolio',
+      });
+
+      const preview = await f22AppUseCase.createPreview(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        attachmentIds: [attachment.assetId],
+        expectedRuleVersion: 1,
+      });
+      expect(preview.screening).toBe('NEEDS_REVIEW');
+
+      // 3. Consent missing 'ATTACHMENTS' scope when preview has attachmentIds -> 422 CONSENT_REQUIRED
+      const narrowConsent = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+
+      await expect(
+        f22AppUseCase.submit(studentId, {
+          opportunityId: strictOppId,
+          submissionId: 'sub_f22_1',
+          submissionType: 'INDIVIDUAL',
+          previewId: preview.previewId,
+          snapshotId: preview.snapshotId,
+          profileVersion: preview.profileVersion,
+          expectedRuleVersion: 1,
+          payloadHash: preview.payloadHash,
+          consentId: narrowConsent.consentId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.CONSENT_REQUIRED,
+      });
+
+      // 4. Create full-scope Consent ['SNAPSHOT', 'ATTACHMENTS']
+      const fullConsent = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT', 'ATTACHMENTS'],
+      });
+
+      // 5. Simulate attachment becoming REJECTED/revoked right before commit -> 409 ASSET_NOT_AVAILABLE
+      const currentAsset = mediaAssets.get(attachment.assetId)!;
+      mediaAssets.set(attachment.assetId, currentAsset.markRejected());
+
+      await expect(
+        f22AppUseCase.submit(studentId, {
+          opportunityId: strictOppId,
+          submissionId: 'sub_f22_1',
+          submissionType: 'INDIVIDUAL',
+          previewId: preview.previewId,
+          snapshotId: preview.snapshotId,
+          profileVersion: preview.profileVersion,
+          expectedRuleVersion: 1,
+          payloadHash: preview.payloadHash,
+          consentId: fullConsent.consentId,
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.ASSET_NOT_AVAILABLE,
+      });
+
+      // Restore asset to READY and commit Application -> succeeds and writes Outbox event
+      mediaAssets.set(attachment.assetId, currentAsset);
+      const committed = await f22AppUseCase.submit(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_1',
+        submissionType: 'INDIVIDUAL',
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: preview.payloadHash,
+        consentId: fullConsent.consentId,
+      });
+
+      expect(committed.status).toBe('SUBMITTED');
+      expect(committed.screening).toBe('NEEDS_REVIEW');
+      expect(outboxEvents).toHaveLength(1);
+      expect(outboxEvents[0].type).toBe('application.submitted');
+
+      // 6. GetApplicationById works for owner student, blocks another student with 403 FORBIDDEN_RESOURCE (FR-APP-08)
+      const detail = await f22AppUseCase.getApplicationById(committed.applicationId, studentId);
+      expect(detail.revisions).toHaveLength(1);
+      expect(detail.events).toHaveLength(1);
+
+      await expect(
+        f22AppUseCase.getApplicationById(committed.applicationId, 'another_student_id'),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 7. Withdraw & Resubmit when HARD rule fails (GPA 3.1 < 3.5) -> commits as status 'INELIGIBLE'
+      await f22AppUseCase.withdraw(committed.applicationId, studentId);
+      expect(outboxEvents).toHaveLength(2);
+      expect(outboxEvents[1].type).toBe('application.withdrawn');
+
+      await passportUseCase.updateMyPassport(studentId, {
+        education: {
+          institution: 'HCMUT',
+          major: 'Computer Science',
+          startYear: 2022,
+          gpa: 3.1,
+          gpaScale: 4,
+        },
+      });
+
+      const previewIneligible = await f22AppUseCase.createPreview(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        attachmentIds: [],
+        expectedRuleVersion: 1,
+      });
+      expect(previewIneligible.screening).toBe('INELIGIBLE');
+
+      const consentIneligible = await passportUseCase.createConsent(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        previewId: previewIneligible.previewId,
+        snapshotId: previewIneligible.snapshotId,
+        profileVersion: previewIneligible.profileVersion,
+        ruleVersion: previewIneligible.ruleVersion,
+        manifestHash: previewIneligible.manifestHash,
+        payloadHash: previewIneligible.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+
+      const resubmittedIneligible = await f22AppUseCase.submit(studentId, {
+        opportunityId: strictOppId,
+        submissionId: 'sub_f22_2',
+        submissionType: 'INDIVIDUAL',
+        previewId: previewIneligible.previewId,
+        snapshotId: previewIneligible.snapshotId,
+        profileVersion: previewIneligible.profileVersion,
+        expectedRuleVersion: 1,
+        payloadHash: previewIneligible.payloadHash,
+        consentId: consentIneligible.consentId,
+      });
+
+      expect(resubmittedIneligible.revision).toBe(2);
+      expect(resubmittedIneligible.screening).toBe('INELIGIBLE');
+      expect(resubmittedIneligible.status).toBe('INELIGIBLE');
+      expect(outboxEvents).toHaveLength(3);
+      expect(outboxEvents[2].type).toBe('application.resubmitted');
+    });
+  });
+
+  describe('6. F31 Backend — Team Submission Intent, Commit/Abort Mutual Exclusion, Unique Active Application Members & Per-Member Snapshots', () => {
+    const competitionId = 'opp_team_hackathon_2026';
+    const leader1 = 'stu_leader_1';
+    const leader2 = 'stu_leader_2';
+    const sharedMember = 'stu_shared_member';
+    const member3 = 'stu_member_3';
+
+    let passports: Map<string, Passport>;
+    let consents: Map<string, Consent>;
+    let mediaAssets: Map<string, MediaAsset>;
+    let previews: Map<string, SubmissionPreviewRecord>;
+    let applications: Map<string, Application>;
+    let revisions: ApplicationRevisionRecord[];
+    let appMembers: ApplicationMemberRecord[];
+    let intents: Map<string, SubmissionIntentRecord>;
+    let outboxEvents: Array<Record<string, unknown>>;
+    let passportUseCase: PassportUseCase;
+    let applicationUseCase: ApplicationUseCase;
+    let currentCompetition: Opportunity;
+
+    const createReadyPassport = (studentId: string, fullName: string, gpa = 3.7) =>
+      new Passport(`pass_${studentId}`, {
+        studentId,
+        profileVersion: 1,
+        fullName,
+        education: {
+          institution: 'UIT - VNUHCM',
+          major: 'Computer Science',
+          startYear: 2023,
+          gpa,
+          gpaScale: 4,
+        },
+        skills: ['TypeScript', 'NestJS'],
+        isLookingForTeammate: true,
+        isOpenForScholarship: false,
+        isOpenForMentoring: false,
+      });
+
+    beforeEach(() => {
+      passports = new Map();
+      consents = new Map();
+      mediaAssets = new Map();
+      previews = new Map();
+      applications = new Map();
+      revisions = [];
+      appMembers = [];
+      intents = new Map();
+      outboxEvents = [];
+
+      passports.set(leader1, createReadyPassport(leader1, 'Leader One'));
+      passports.set(leader2, createReadyPassport(leader2, 'Leader Two'));
+      passports.set(sharedMember, createReadyPassport(sharedMember, 'Shared Member'));
+      passports.set(member3, createReadyPassport(member3, 'Member Three'));
+
+      currentCompetition = new Opportunity(competitionId, {
+        type: 'COMPETITION',
+        title: 'Scholink AI Hackathon 2026',
+        description: 'National AI Team Competition for University Students',
+        organizationId: 'org_hackathon',
+        createdBy: 'usr_org_1',
+        organizerName: 'Scholink Tech Org',
+        applyMode: 'IN_APP',
+        status: 'PUBLISHED',
+        competitionMode: 'TEAM',
+        minTeamSize: 2,
+        maxTeamSize: 4,
+        registerDeadline: new Date(Date.now() + 5 * 86400000),
+        timezone: 'Asia/Ho_Chi_Minh',
+        requiredFields: ['fullName', 'education.gpa', 'skills'],
+        eligibilityRules: [
+          {
+            fieldKey: 'education.gpa',
+            operator: 'GTE',
+            value: 3.2,
+            scale: 4,
+            type: 'HARD',
+          },
+        ],
+        ruleVersion: 1,
+      });
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: async (id) => passports.get(id) ?? null,
+        save: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        update: async (p) => {
+          passports.set(p.studentId, p);
+        },
+        saveConsent: async (c) => {
+          consents.set(c.id, c);
+        },
+        findConsentById: async (id) => consents.get(id) ?? null,
+        saveMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        updateMediaAsset: async (a) => {
+          mediaAssets.set(a.id, a);
+        },
+        findMediaAssetById: async (id) => mediaAssets.get(id) ?? null,
+        findMediaAssetsByIds: async (ids) =>
+          ids.map((id) => mediaAssets.get(id)).filter((a): a is MediaAsset => Boolean(a)),
+      };
+
+      const opportunityRepo: IOpportunityRepository = {
+        findById: async (id) => (id === competitionId ? currentCompetition : null),
+        findMany: async () => [currentCompetition],
+        save: async () => undefined,
+        update: async () => undefined,
+      };
+
+      const applicationRepo: IApplicationRepository = {
+        findById: async (id) => applications.get(id) ?? null,
+        findByOpportunityAndStudent: async (oppId, stuId) =>
+          Array.from(applications.values()).find(
+            (a) =>
+              a.opportunityId === oppId &&
+              a.props.submissionType === 'INDIVIDUAL' &&
+              a.studentId === stuId,
+          ) ?? null,
+        findByOpportunityAndTeam: async (oppId, teamId) =>
+          Array.from(applications.values()).find(
+            (a) =>
+              a.opportunityId === oppId &&
+              a.props.submissionType === 'TEAM' &&
+              a.teamId === teamId,
+          ) ?? null,
+        findManyByStudent: async (stuId) =>
+          Array.from(applications.values()).filter(
+            (a) => a.studentId === stuId || a.memberIds.includes(stuId),
+          ),
+        findManyByOpportunity: async (oppId) =>
+          Array.from(applications.values()).filter((a) => a.opportunityId === oppId),
+        save: async (app) => {
+          applications.set(app.id, app);
+        },
+        update: async (app) => {
+          applications.set(app.id, app);
+        },
+        savePreview: async (prv) => {
+          previews.set(prv.previewId, prv);
+        },
+        findPreviewById: async (prvId) => previews.get(prvId) ?? null,
+        saveRevision: async (rev) => {
+          revisions.push(rev);
+        },
+        appendEvent: async () => undefined,
+        findRevisionsByApplicationId: async (appId) =>
+          revisions.filter((r) => r.applicationId === appId),
+        findEventsByApplicationId: async () => [],
+        findActiveMembersByOpportunityAndStudents: async (oppId, studentIds) =>
+          appMembers.filter(
+            (m) =>
+              m.opportunityId === oppId &&
+              m.isActive &&
+              studentIds.includes(m.studentId),
+          ),
+        releaseApplicationMembers: async (appId) => {
+          appMembers = appMembers.map((m) =>
+            m.applicationId === appId ? { ...m, isActive: false } : m,
+          );
+        },
+        findSubmissionIntentById: async (subId) => intents.get(subId) ?? null,
+        createOrGetSubmissionIntent: async (intent) => {
+          const existing = intents.get(intent.submissionId);
+          if (existing) {
+            if (existing.status === 'ABORTED') {
+              throw DomainException.conflict(
+                ErrorCode.HOLD_EXPIRED,
+                'Submission Intent đã bị hủy (ABORTED)',
+              );
+            }
+            return existing;
+          }
+          const created: SubmissionIntentRecord = Object.freeze({
+            ...intent,
+            status: 'PENDING',
+          });
+          intents.set(intent.submissionId, created);
+          return created;
+        },
+        abortSubmissionIntent: async ({ submissionId, opportunityId, teamId, leaderId, reason }) => {
+          const existing = intents.get(submissionId);
+          if (existing) {
+            if (existing.status === 'COMMITTED') {
+              return Object.freeze({
+                ...existing,
+                aborted: false,
+              });
+            }
+            const abortedIntent: SubmissionIntentRecord = Object.freeze({
+              ...existing,
+              status: 'ABORTED',
+              reason: reason ?? existing.reason,
+            });
+            intents.set(submissionId, abortedIntent);
+            return Object.freeze({
+              ...abortedIntent,
+              aborted: true,
+            });
+          }
+          const tombstone: SubmissionIntentRecord = Object.freeze({
+            submissionId,
+            opportunityId: opportunityId ?? competitionId,
+            teamId: teamId ?? 'UNKNOWN',
+            leaderId: leaderId ?? 'SYSTEM',
+            status: 'ABORTED',
+            reason: reason ?? 'LEASE_EXPIRED',
+          });
+          intents.set(submissionId, tombstone);
+          return Object.freeze({
+            ...tombstone,
+            aborted: true,
+          });
+        },
+        commitSubmissionWithOutbox: async ({
+          application,
+          isResubmission,
+          revision,
+          outbox,
+          submissionIntent,
+          activeMemberIds,
+        }) => {
+          if (submissionIntent) {
+            const currentIntent = intents.get(submissionIntent.submissionId);
+            if (currentIntent?.status === 'ABORTED') {
+              throw DomainException.conflict(
+                ErrorCode.HOLD_EXPIRED,
+                'Submission Intent đã bị ABORTED trước khi commit',
+              );
+            }
+            if (currentIntent?.status === 'COMMITTED') {
+              throw DomainException.conflict(
+                ErrorCode.ALREADY_APPLIED,
+                'Submission Intent đã được COMMITTED',
+              );
+            }
+            intents.set(
+              submissionIntent.submissionId,
+              Object.freeze({
+                ...submissionIntent,
+                status: 'COMMITTED',
+                applicationId: application.id,
+              }),
+            );
+          }
+
+          if (activeMemberIds && activeMemberIds.length > 0) {
+            if (isResubmission) {
+              appMembers = appMembers.map((m) =>
+                m.applicationId === application.id ? { ...m, isActive: false } : m,
+              );
+            }
+            const conflict = appMembers.find(
+              (m) =>
+                m.opportunityId === application.opportunityId &&
+                m.isActive &&
+                m.applicationId !== application.id &&
+                activeMemberIds.includes(m.studentId),
+            );
+            if (conflict) {
+              throw DomainException.conflict(
+                ErrorCode.ALREADY_APPLIED,
+                `Thành viên ${conflict.studentId} đang thuộc hồ sơ đội khác còn hiệu lực`,
+              );
+            }
+            for (const stuId of activeMemberIds) {
+              appMembers.push({
+                id: `am_${stuId}_${application.revision}`,
+                opportunityId: application.opportunityId,
+                applicationId: application.id,
+                studentId: stuId,
+                isActive: true,
+              });
+            }
+          }
+
+          applications.set(application.id, application);
+          revisions.push(revision);
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+        commitWithdrawalWithOutbox: async ({ application, outbox }) => {
+          applications.set(application.id, application);
+          appMembers = appMembers.map((m) =>
+            m.applicationId === application.id ? { ...m, isActive: false } : m,
+          );
+          outboxEvents.push(outbox as unknown as Record<string, unknown>);
+        },
+      };
+
+      const mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      passportUseCase = new PassportUseCase(passportRepo, mediaUseCase, cryptoService);
+
+      const grpcClient = {
+        getService: () => ({
+          getProfileSnapshot: (req: { studentId: string; attachmentIds: string[] }) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .getProfileSnapshot(req.studentId, req.attachmentIds)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+          validateConsent: (req: any) =>
+            new Observable((subscriber) => {
+              passportUseCase
+                .validateConsent(req)
+                .then((res) => {
+                  subscriber.next(res);
+                  subscriber.complete();
+                })
+                .catch((err) => subscriber.error(err));
+            }),
+        }),
+      };
+
+      applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+        grpcClient as any,
+      );
+      applicationUseCase.onModuleInit();
+    });
+
+    const prepareMemberConsent = async (studentId: string, submissionId: string) => {
+      const preview = await applicationUseCase.createPreview(studentId, {
+        opportunityId: competitionId,
+        submissionId,
+        attachmentIds: [],
+        expectedRuleVersion: currentCompetition.ruleVersion,
+      });
+      const consent = await passportUseCase.createConsent(studentId, {
+        opportunityId: competitionId,
+        submissionId,
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        ruleVersion: preview.ruleVersion,
+        manifestHash: preview.manifestHash,
+        payloadHash: preview.payloadHash,
+        scope: ['SNAPSHOT'],
+      });
+      return {
+        studentId,
+        previewId: preview.previewId,
+        snapshotId: preview.snapshotId,
+        profileVersion: preview.profileVersion,
+        payloadHash: preview.payloadHash,
+        consentId: consent.consentId,
+      };
+    };
+
+    it('ensures Commit and Abort never both win on the same submission_intents document', async () => {
+      // Case A: Abort wins first (e.g., Reservation lease timeout worker fires before leader commits)
+      const intentA = await applicationUseCase.createSubmissionIntent(leader1, {
+        opportunityId: competitionId,
+        teamId: 'team_alpha',
+        submissionId: 'sub_race_abort_wins',
+        rosterVersion: 1,
+        memberIds: [leader1, sharedMember],
+      });
+      expect(intentA.status).toBe('PENDING');
+
+      const c1 = await prepareMemberConsent(leader1, 'sub_race_abort_wins');
+      const c2 = await prepareMemberConsent(sharedMember, 'sub_race_abort_wins');
+
+      // Worker aborts the pending submission intent
+      const abortResA = await applicationUseCase.abortSubmissionIntent({
+        submissionId: 'sub_race_abort_wins',
+        reason: 'LEASE_TIMEOUT',
+      });
+      expect(abortResA.status).toBe('ABORTED');
+      expect(abortResA.aborted).toBe(true);
+
+      // Late commit attempt for 'sub_race_abort_wins' MUST fail with HOLD_EXPIRED
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_race_abort_wins',
+          submissionType: 'TEAM',
+          teamId: 'team_alpha',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [c1, c2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.HOLD_EXPIRED,
+      });
+      expect(applications.size).toBe(0);
+
+      // Case B: Commit wins first -> subsequent AbortSubmissionIntent cannot overwrite COMMITTED!
+      await applicationUseCase.createSubmissionIntent(leader1, {
+        opportunityId: competitionId,
+        teamId: 'team_alpha',
+        submissionId: 'sub_race_commit_wins',
+        rosterVersion: 1,
+        memberIds: [leader1, sharedMember],
+      });
+
+      const c1Commit = await prepareMemberConsent(leader1, 'sub_race_commit_wins');
+      const c2Commit = await prepareMemberConsent(sharedMember, 'sub_race_commit_wins');
+
+      const committedTeamApp = await applicationUseCase.submit(leader1, {
+        opportunityId: competitionId,
+        submissionId: 'sub_race_commit_wins',
+        submissionType: 'TEAM',
+        teamId: 'team_alpha',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [c1Commit, c2Commit],
+      });
+      expect(committedTeamApp.status).toBe('SUBMITTED');
+      expect(committedTeamApp.submissionType).toBe('TEAM');
+
+      // Late AbortSubmissionIntent from timeout worker sees COMMITTED and returns aborted: false
+      const lateAbort = await applicationUseCase.abortSubmissionIntent({
+        submissionId: 'sub_race_commit_wins',
+        reason: 'LATE_WORKER_TICK',
+      });
+      expect(lateAbort.status).toBe('COMMITTED');
+      expect(lateAbort.aborted).toBe(false);
+      expect(lateAbort.applicationId).toBe(committedTeamApp.applicationId);
+
+      // Per-member snapshots & consentRefs are stored in ApplicationRevision; each member sees only their own
+      for (const member of [leader1, sharedMember]) {
+        const detail = await applicationUseCase.getApplicationById(committedTeamApp.applicationId, member);
+        expect(detail.revisions).toHaveLength(1);
+        expect(detail.revisions[0].memberSnapshots.map((s) => s.studentId)).toEqual([member]);
+        expect(detail.revisions[0].consentRefs.map((c) => c.studentId)).toEqual([member]);
+      }
+    });
+
+    it('blocks two teams from sharing an active member (application_members unique) until the first team withdraws', async () => {
+      // Team 1 (leader1 + sharedMember) submits
+      const t1c1 = await prepareMemberConsent(leader1, 'sub_team_1');
+      const t1c2 = await prepareMemberConsent(sharedMember, 'sub_team_1');
+
+      const team1App = await applicationUseCase.submit(leader1, {
+        opportunityId: competitionId,
+        submissionId: 'sub_team_1',
+        submissionType: 'TEAM',
+        teamId: 'team_1',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [t1c1, t1c2],
+      });
+      expect(team1App.status).toBe('SUBMITTED');
+
+      // Team 2 (leader2 + sharedMember) attempts to submit for the same competition -> blocked by active application_members!
+      const t2c1 = await prepareMemberConsent(leader2, 'sub_team_2');
+      const t2c2 = await prepareMemberConsent(sharedMember, 'sub_team_2');
+
+      await expect(
+        applicationUseCase.submit(leader2, {
+          opportunityId: competitionId,
+          submissionId: 'sub_team_2',
+          submissionType: 'TEAM',
+          teamId: 'team_2',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [t2c1, t2c2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.ALREADY_APPLIED,
+      });
+
+      // Non-leader member cannot withdraw Team 1's application -> 403 FORBIDDEN_RESOURCE
+      await expect(
+        applicationUseCase.withdraw(team1App.applicationId, sharedMember),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // Leader 1 withdraws Team 1's application before deadline -> releases application_members (isActive: false)
+      const withdrawn = await applicationUseCase.withdraw(team1App.applicationId, leader1);
+      expect(withdrawn.status).toBe('WITHDRAWN');
+
+      // Now Team 2 (leader2 + sharedMember) can commit cleanly!
+      const team2App = await applicationUseCase.submit(leader2, {
+        opportunityId: competitionId,
+        submissionId: 'sub_team_2',
+        submissionType: 'TEAM',
+        teamId: 'team_2',
+        rosterVersion: 1,
+        expectedRuleVersion: 1,
+        memberConsents: [t2c1, t2c2],
+      });
+      expect(team2App.status).toBe('SUBMITTED');
+      expect(team2App.teamId).toBe('team_2');
+    });
+
+    it('validates deadline, ruleVersion, and per-member Consent freshness (SNAPSHOT_STALE)', async () => {
+      const m1 = await prepareMemberConsent(leader1, 'sub_stale_member');
+      const m2 = await prepareMemberConsent(member3, 'sub_stale_member');
+
+      // Member 3 updates their Passport after signing Consent -> profileVersion becomes 2
+      await passportUseCase.updateMyPassport(member3, {
+        bio: 'Member 3 edited passport after signing team consent',
+      });
+
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_stale_member',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [m1, m2],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.SNAPSHOT_STALE,
+      });
+
+      // RuleVersion mismatch -> 409 VERSION_MISMATCH
+      const m2Fresh = await prepareMemberConsent(member3, 'sub_rule_mismatch');
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_rule_mismatch',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 99,
+          memberConsents: [m1, m2Fresh],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.VERSION_MISMATCH,
+      });
+
+      // Expired registerDeadline -> 409 DEADLINE_PASSED
+      currentCompetition = new Opportunity(competitionId, {
+        ...currentCompetition.props,
+        registerDeadline: new Date(Date.now() - 60000),
+      });
+
+      await expect(
+        applicationUseCase.submit(leader1, {
+          opportunityId: competitionId,
+          submissionId: 'sub_deadline_passed',
+          submissionType: 'TEAM',
+          teamId: 'team_beta',
+          rosterVersion: 1,
+          expectedRuleVersion: 1,
+          memberConsents: [m1, m2Fresh],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.DEADLINE_PASSED,
+      });
+    });
+  });
+
+  // ============================================================================
+  // 7. F40 Backend — Account Deletion Session Revocation, Personal Data Tracking,
+  //    Snapshot Retention/Purge Decision & AC Test Result Log (FR-AUTH-08, APP-01/05, NFR11)
+  // ============================================================================
+  describe('7. F40 Backend — Account Deletion Session Revocation, Personal Data Tracking, Snapshot Retention/Purge & AC Test Result Log', () => {
+    it('revokes all sessions immediately on account deletion, records trackingId with ledgerPreserved=true, and blocks unverified/deleted users from applying', async () => {
+      const users = new Map<string, User>();
+      const sessions = new Map<string, SessionRecord>();
+      const otpRecords = new Map<string, OtpRecord>();
+      const passports = new Map<string, Passport>();
+      const consents = new Map<string, Consent>();
+      const deletionTrackings = new Map<string, any>();
+      const outboxEvents: any[] = [];
+
+      const userRepo: IUserRepository = {
+        findById: jest.fn(async (id) => users.get(id) ?? null),
+        findByEmail: jest.fn(async (email) => {
+          const norm = email.trim().toLowerCase();
+          for (const u of users.values()) {
+            if (u.normalizedEmail === norm) return u;
+          }
+          return null;
+        }),
+        save: jest.fn(async (u) => {
+          users.set(u.id, u);
+        }),
+        update: jest.fn(async (u) => {
+          users.set(u.id, u);
+        }),
+        saveSession: jest.fn(async (s) => {
+          sessions.set(s.id, s);
+        }),
+        findSessionByTokenHash: jest.fn(async (hash) => {
+          for (const s of sessions.values()) {
+            if (s.tokenHash === hash) return s;
+          }
+          return null;
+        }),
+        markSessionUsed: jest.fn(async (id) => {
+          const s = sessions.get(id);
+          if (s) sessions.set(id, { ...s, isUsed: true });
+        }),
+        revokeSessionFamily: jest.fn(async (familyId) => {
+          for (const [k, s] of sessions.entries()) {
+            if (s.familyId === familyId) sessions.set(k, { ...s, isRevoked: true });
+          }
+        }),
+        revokeAllUserSessions: jest.fn(async (userId) => {
+          for (const [k, s] of sessions.entries()) {
+            if (s.userId === userId) sessions.set(k, { ...s, isRevoked: true });
+          }
+        }),
+        findOtpRecord: jest.fn(async (email, purpose) => otpRecords.get(`${email}:${purpose}`) ?? null),
+        saveOtpRecord: jest.fn(async (rec) => {
+          otpRecords.set(`${rec.normalizedEmail}:${rec.purpose}`, rec);
+        }),
+        deleteOtpRecord: jest.fn(async (email, purpose) => {
+          otpRecords.delete(`${email}:${purpose}`);
+        }),
+        saveDeletionTracking: jest.fn(async (rec) => {
+          deletionTrackings.set(rec.trackingId, rec);
+        }),
+        findDeletionTrackingById: jest.fn(async (id) => deletionTrackings.get(id) ?? null),
+        findDeletionTrackingsByUser: jest.fn(async (uid) =>
+          Array.from(deletionTrackings.values()).filter((t) => t.userId === uid),
+        ),
+        saveOutboxEvent: jest.fn(async (evt) => {
+          outboxEvents.push(evt);
+        }),
+      };
+
+      const passportRepo: IPassportRepository = {
+        findByStudentId: jest.fn(async (sid) => passports.get(sid) ?? null),
+        save: jest.fn(async (p) => {
+          passports.set(p.studentId, p);
+        }),
+        update: jest.fn(async (p) => {
+          passports.set(p.studentId, p);
+        }),
+        saveConsent: jest.fn(async (c) => {
+          consents.set(c.id, c);
+        }),
+        findConsentById: jest.fn(async (cid) => consents.get(cid) ?? null),
+        saveMediaAsset: jest.fn(),
+        updateMediaAsset: jest.fn(),
+        findMediaAssetById: jest.fn(async () => null),
+        findMediaAssetsByIds: jest.fn(async () => []),
+      };
+
+      const jwtService = new JwtService({ secret: 'test_secret_f40' });
+      const mediaUseCase = new MediaUseCase(passportRepo, cryptoService);
+      const passportUseCase = new PassportUseCase(
+        passportRepo,
+        mediaUseCase,
+        cryptoService,
+        userRepo,
+      );
+      const authUseCase = new AuthUseCase(
+        userRepo,
+        passportRepo,
+        jwtService,
+        cryptoService,
+      );
+
+      // 1. Unverified user (PENDING_VERIFICATION) cannot get snapshot or sign consent (FR-AUTH-02)
+      const unverifiedId = 'stu_unverified_f40';
+      users.set(
+        unverifiedId,
+        new User(unverifiedId, {
+          email: 'unverified@scholink.edu.vn',
+          passwordHash: 'hash',
+          role: 'STUDENT',
+          status: 'PENDING_VERIFICATION',
+          fullName: 'Sinh Viên Chưa Xác Minh',
+        }),
+      );
+      passports.set(
+        unverifiedId,
+        new Passport('pass_unverified', {
+          studentId: unverifiedId,
+          profileVersion: 1,
+          fullName: 'Sinh Viên Chưa Xác Minh',
+          isLookingForTeammate: false,
+          isOpenForScholarship: true,
+          isOpenForMentoring: false,
+        }),
+      );
+
+      await expect(passportUseCase.getProfileSnapshot(unverifiedId, [])).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 2. Register & Login active student
+      const reg = await authUseCase.register({
+        email: 'phuc.f40@scholink.edu.vn',
+        password: 'CorrectPassword@2026',
+        fullName: 'Phúc TV1 F40',
+      });
+      const loginRes = await authUseCase.login({
+        email: 'phuc.f40@scholink.edu.vn',
+        password: 'CorrectPassword@2026',
+      });
+      expect(loginRes.refreshToken).toBeDefined();
+
+      // 3. Export personal data (FR-AUTH-08) — must not leak passwordHash
+      const exported = await authUseCase.exportPersonalData(reg.userId);
+      expect(exported.exportId).toMatch(/^exp_/);
+      expect(exported.ledgerPreserved).toBe(true);
+      expect(exported.payloadJson).not.toContain('passwordHash');
+      expect(exported.payload.account.email).toBe('phuc.f40@scholink.edu.vn');
+
+      // 4. Request account deletion with wrong password -> 401 UNAUTHENTICATED
+      await expect(
+        authUseCase.requestAccountDeletion(reg.userId, {
+          currentPassword: 'WrongPassword@123',
+          snapshotDecision: 'RETAIN',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+
+      // 5. Request account deletion with valid password -> revokes sessions & creates trackingId
+      const deletionRes = await authUseCase.requestAccountDeletion(reg.userId, {
+        currentPassword: 'CorrectPassword@2026',
+        snapshotDecision: 'PURGE',
+        reason: 'Người dùng yêu cầu xóa tài khoản cá nhân',
+      });
+      expect(deletionRes.trackingId).toMatch(/^del_/);
+      expect(deletionRes.sessionsRevoked).toBe(true);
+      expect(deletionRes.ledgerPreserved).toBe(true);
+      expect(deletionRes.snapshotDecision).toBe('PURGE');
+      expect(deletionRes.status).toBe('SCHEDULED_PURGE');
+      expect(outboxEvents).toHaveLength(1);
+      expect(outboxEvents[0].type).toBe('user.deleted');
+
+      // 6. Query deletion tracking by owner vs non-owner
+      const trackingCheck = await authUseCase.getDeletionTracking(
+        reg.userId,
+        deletionRes.trackingId,
+      );
+      expect(trackingCheck.trackingId).toBe(deletionRes.trackingId);
+      await expect(
+        authUseCase.getDeletionTracking('other_user_id', deletionRes.trackingId),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+
+      // 7. Refresh token & Login & Apply snapshot are immediately blocked after account deletion
+      await expect(
+        authUseCase.refresh({ refreshToken: loginRes.refreshToken }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+      await expect(
+        authUseCase.login({
+          email: 'phuc.f40@scholink.edu.vn',
+          password: 'CorrectPassword@2026',
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN_RESOURCE,
+      });
+      await expect(passportUseCase.getProfileSnapshot(reg.userId, [])).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+    });
+
+    it('applies RETAIN vs PURGE snapshot decision while preserving ACCEPTED audit snapshots (D06 / FR-APP-01/05)', async () => {
+      const studentId = 'stu_snapshot_f40';
+      const previews = new Map<string, SubmissionPreviewRecord>();
+      const applications = new Map<string, Application>();
+      const revisions = new Map<string, ApplicationRevisionRecord>();
+
+      previews.set('prv_unsubmitted_1', {
+        previewId: 'prv_unsubmitted_1',
+        actorId: studentId,
+        opportunityId: 'opp_1',
+        submissionId: 'sub_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Sensitive Name' }),
+        manifestJson: '[]',
+        manifestHash: 'h'.repeat(64),
+        payloadHash: 'p'.repeat(64),
+        screening: 'ELIGIBLE',
+        expiresAt: new Date(Date.now() + 600000),
+      });
+
+      // App 1: SUBMITTED (eligible for withdrawal & snapshot purge when decision=PURGE)
+      const submittedApp = new Application('app_submitted_f40', {
+        opportunityId: 'opp_1',
+        studentId,
+        submissionType: 'INDIVIDUAL',
+        status: 'SUBMITTED',
+        screening: 'ELIGIBLE',
+        previewId: 'prv_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        payloadHash: 'p'.repeat(64),
+        consentId: 'con_1',
+        submittedAt: new Date(),
+        revision: 1,
+      });
+      applications.set(submittedApp.id, submittedApp);
+      revisions.set('rev_submitted_1', {
+        id: 'rev_submitted_1',
+        applicationId: submittedApp.id,
+        revision: 1,
+        previewId: 'prv_1',
+        snapshotId: 'snap_1',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Sensitive Name', gpa: 3.8 }),
+        manifestJson: JSON.stringify([{ assetId: 'ast_cv_1' }]),
+        payloadHash: 'p'.repeat(64),
+        consentId: 'con_1',
+        screening: 'ELIGIBLE',
+        retentionStatus: 'ACTIVE',
+        submittedAt: new Date(),
+      });
+
+      // App 2: ACCEPTED (must retain snapshot for audit/compliance per D06 & Mục 29 even if decision=PURGE)
+      const acceptedApp = new Application('app_accepted_f40', {
+        opportunityId: 'opp_2',
+        studentId,
+        submissionType: 'INDIVIDUAL',
+        status: 'ACCEPTED',
+        screening: 'ELIGIBLE',
+        previewId: 'prv_2',
+        snapshotId: 'snap_2',
+        profileVersion: 1,
+        ruleVersion: 1,
+        payloadHash: 'q'.repeat(64),
+        consentId: 'con_2',
+        submittedAt: new Date(),
+        revision: 1,
+      });
+      applications.set(acceptedApp.id, acceptedApp);
+      revisions.set('rev_accepted_2', {
+        id: 'rev_accepted_2',
+        applicationId: acceptedApp.id,
+        revision: 1,
+        previewId: 'prv_2',
+        snapshotId: 'snap_2',
+        profileVersion: 1,
+        ruleVersion: 1,
+        snapshotJson: JSON.stringify({ studentId, fullName: 'Accepted Winner Name', gpa: 3.9 }),
+        manifestJson: JSON.stringify([{ assetId: 'ast_cv_2' }]),
+        payloadHash: 'q'.repeat(64),
+        consentId: 'con_2',
+        screening: 'ELIGIBLE',
+        retentionStatus: 'ACTIVE',
+        submittedAt: new Date(),
+      });
+
+      const applicationRepo: IApplicationRepository = {
+        findById: jest.fn(async (id) => applications.get(id) ?? null),
+        findByOpportunityAndStudent: jest.fn(async () => null),
+        findManyByStudent: jest.fn(async (sid) =>
+          Array.from(applications.values()).filter((a) => a.studentId === sid),
+        ),
+        findManyByOpportunity: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(async (app) => {
+          applications.set(app.id, app);
+        }),
+        savePreview: jest.fn(),
+        findPreviewById: jest.fn(async (pid) => previews.get(pid) ?? null),
+        saveRevision: jest.fn(),
+        appendEvent: jest.fn(),
+        deletePreviewsByStudent: jest.fn(async (sid) => {
+          let deleted = 0;
+          for (const [k, p] of previews.entries()) {
+            if (p.actorId === sid) {
+              previews.delete(k);
+              deleted += 1;
+            }
+          }
+          return deleted;
+        }),
+        applySnapshotRetentionByStudent: jest.fn(async ({ studentId: sid, decision, trackingId }) => {
+          let purgedPreviewsCount = 0;
+          for (const [k, p] of previews.entries()) {
+            if (p.actorId === sid) {
+              previews.delete(k);
+              purgedPreviewsCount += 1;
+            }
+          }
+          let withdrawnApplicationsCount = 0;
+          let retainedSnapshotsCount = 0;
+          let purgedSnapshotsCount = 0;
+
+          for (const app of Array.from(applications.values()).filter((a) => a.studentId === sid)) {
+            let current = app;
+            if (current.status === 'SUBMITTED') {
+              current = current.withdraw();
+              applications.set(current.id, current);
+              withdrawnApplicationsCount += 1;
+            }
+            const mustRetain = decision === 'RETAIN' || current.status === 'ACCEPTED';
+            for (const [revId, rev] of revisions.entries()) {
+              if (rev.applicationId !== current.id) continue;
+              if (mustRetain) {
+                revisions.set(revId, { ...rev, retentionStatus: 'RETAINED_BY_POLICY' });
+                retainedSnapshotsCount += 1;
+              } else {
+                revisions.set(revId, {
+                  ...rev,
+                  snapshotJson: JSON.stringify({
+                    studentId: sid,
+                    redacted: true,
+                    trackingId: trackingId ?? null,
+                  }),
+                  manifestJson: '[]',
+                  retentionStatus: 'PURGED_ANONYMIZED',
+                });
+                purgedSnapshotsCount += 1;
+              }
+            }
+          }
+          return Object.freeze({
+            studentId: sid,
+            decision,
+            trackingId,
+            purgedPreviewsCount,
+            withdrawnApplicationsCount,
+            retainedSnapshotsCount,
+            purgedSnapshotsCount,
+            processedAt: new Date(),
+          });
+        }),
+      };
+
+      const opportunityRepo: IOpportunityRepository = {
+        findById: jest.fn(async () => null),
+        findMany: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+      };
+
+      const applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+      );
+
+      const summary = await applicationUseCase.applySnapshotRetentionDecision({
+        studentId,
+        decision: 'PURGE',
+        trackingId: 'del_track_001',
+      });
+
+      expect(summary.purgedPreviewsCount).toBe(1);
+      expect(previews.size).toBe(0);
+      expect(summary.withdrawnApplicationsCount).toBe(1);
+      expect(applications.get('app_submitted_f40')?.status).toBe('WITHDRAWN');
+      expect(summary.purgedSnapshotsCount).toBe(1);
+      expect(summary.retainedSnapshotsCount).toBe(1);
+
+      const purgedRev = revisions.get('rev_submitted_1')!;
+      expect(purgedRev.retentionStatus).toBe('PURGED_ANONYMIZED');
+      expect(JSON.parse(purgedRev.snapshotJson).redacted).toBe(true);
+      expect(purgedRev.snapshotJson).not.toContain('Sensitive Name');
+
+      const retainedAcceptedRev = revisions.get('rev_accepted_2')!;
+      expect(retainedAcceptedRev.retentionStatus).toBe('RETAINED_BY_POLICY');
+      expect(retainedAcceptedRev.snapshotJson).toContain('Accepted Winner Name');
+    });
+
+    it('blocks claiming AC completion when any test case is NOT_RUN or FAILED (Mục 30 SRS)', async () => {
+      const opportunityRepo: IOpportunityRepository = {
+        findById: jest.fn(async () => null),
+        findMany: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+      };
+      const applicationRepo: IApplicationRepository = {
+        findById: jest.fn(async () => null),
+        findByOpportunityAndStudent: jest.fn(async () => null),
+        findManyByStudent: jest.fn(async () => []),
+        findManyByOpportunity: jest.fn(async () => []),
+        save: jest.fn(),
+        update: jest.fn(),
+        savePreview: jest.fn(),
+        findPreviewById: jest.fn(async () => null),
+        saveRevision: jest.fn(),
+        appendEvent: jest.fn(),
+      };
+      const applicationUseCase = new ApplicationUseCase(
+        applicationRepo,
+        opportunityRepo,
+        cryptoService,
+      );
+
+      // 1. Evaluate when 1 test case is still NOT_RUN -> canClaimAllAc MUST be false
+      const partialLog = await applicationUseCase.evaluateTestResultLog({
+        runId: 'trun_week5_partial',
+        strictClaim: false,
+        testCases: [
+          {
+            tcId: 'TC-AUTH-08-01',
+            acId: 'AC-AUTH-08-01',
+            title: 'Xóa tài khoản thu hồi toàn bộ phiên và trả mã trackingId',
+            status: 'PASSED',
+          },
+          {
+            tcId: 'TC-APP-05-02',
+            acId: 'AC-APP-05-01',
+            title: 'Snapshot giữ hoặc xóa theo quyết định D06',
+            status: 'NOT_RUN',
+          },
+        ],
+      });
+
+      expect(partialLog.canClaimAllAc).toBe(false);
+      expect(partialLog.notRunCases).toBe(1);
+      const acAuth = partialLog.acSummaries.find((a) => a.acId === 'AC-AUTH-08-01')!;
+      const acApp = partialLog.acSummaries.find((a) => a.acId === 'AC-APP-05-01')!;
+      expect(acAuth.canClaimAc).toBe(true);
+      expect(acAuth.acStatus).toBe('VERIFIED');
+      expect(acApp.canClaimAc).toBe(false);
+      expect(acApp.acStatus).toBe('INCOMPLETE_NOT_RUN');
+
+      // 2. strictClaim: true MUST throw 409 STATE_CONFLICT when any test case is NOT_RUN
+      await expect(
+        applicationUseCase.evaluateTestResultLog({
+          runId: 'trun_week5_strict_fail',
+          strictClaim: true,
+          testCases: [
+            {
+              tcId: 'TC-AUTH-08-01',
+              acId: 'AC-AUTH-08-01',
+              title: 'Xóa tài khoản thu hồi phiên',
+              status: 'PASSED',
+            },
+            {
+              tcId: 'TC-APP-05-02',
+              acId: 'AC-APP-05-01',
+              title: 'Snapshot giữ/xóa theo quyết định',
+              status: 'NOT_RUN',
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: ErrorCode.STATE_CONFLICT,
+      });
+
+      // 3. All test cases PASSED (0 NOT_RUN, 0 FAILED) -> strictClaim: true succeeds with canClaimAllAc = true
+      const fullLog = await applicationUseCase.evaluateTestResultLog({
+        runId: 'trun_week5_complete',
+        strictClaim: true,
+        testCases: [
+          {
+            tcId: 'TC-AUTH-08-01',
+            acId: 'AC-AUTH-08-01',
+            title: 'Xóa tài khoản thu hồi phiên và sinh trackingId',
+            status: 'PASSED',
+          },
+          {
+            tcId: 'TC-APP-05-02',
+            acId: 'AC-APP-05-01',
+            title: 'Snapshot giữ/xóa theo quyết định D06',
+            status: 'PASSED',
+          },
+        ],
+      });
+      expect(fullLog.canClaimAllAc).toBe(true);
+      expect(fullLog.notRunCases).toBe(0);
+      expect(fullLog.failedCases).toBe(0);
+      expect(fullLog.acSummaries.every((a) => a.canClaimAc)).toBe(true);
+    });
+  });
+});

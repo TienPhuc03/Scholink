@@ -1,0 +1,306 @@
+### ==============================================================================
+### SCHOLINK F04 BACKEND - REST CLIENT TEST FILE (VS Code REST Client / Thunder Client)
+### ==============================================================================
+
+@baseUrl = http://localhost:3000/api/v1
+
+### 1. Health Check
+GET {{baseUrl}}/health
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 2. Đăng ký tài khoản sinh viên mới (Role tự động gán STUDENT từ server)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "student.uit.2026@scholink.edu.vn",
+  "password": "StrongPassword@2026",
+  "fullName": "Nguyễn Văn Sinh Viên"
+}
+
+### ------------------------------------------------------------------------------
+### 3. Đăng nhập lấy Access Token & Refresh Token
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "password": "Student@2026"
+}
+
+### Lưu biến từ response đăng nhập
+@token = {{login.response.body.accessToken}}
+@refreshToken = {{login.response.body.refreshToken}}
+
+### ------------------------------------------------------------------------------
+### 4. Lấy Passport cá nhân (profileVersion ban đầu = 1)
+GET {{baseUrl}}/profiles/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 5. Cập nhật Passport (Điểm hoàn thiện 7 thành phần -> 100 điểm, profileVersion -> 2)
+PUT {{baseUrl}}/profiles/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn Sinh Viên",
+  "bio": "Sinh viên năm 3 ngành Kỹ thuật Phần mềm UIT, đam mê AI & Microservices.",
+  "regionCode": "VN-SG",
+  "avatarAssetId": "asset_avatar_001",
+  "education": {
+    "institution": "Đại học Công nghệ Thông tin - ĐHQG TP.HCM",
+    "major": "Kỹ thuật Phần mềm",
+    "startYear": 2023,
+    "gpa": 3.85,
+    "gpaScale": 4
+  },
+  "skills": ["TypeScript", "NestJS", "Kotlin Jetpack Compose", "gRPC"],
+  "certificates": [
+    {
+      "type": "LANGUAGE",
+      "name": "IELTS Academic",
+      "score": "7.5",
+      "issuedDate": "2025-01-15T00:00:00.000Z"
+    }
+  ],
+  "achievements": [
+    "Giải Nhất Học bổng Khuyến khích Học tập",
+    "Top 5 Hackathon UIT 2025"
+  ],
+  "cvAssetId": "asset_cv_nguyen_van_sinh_vien.pdf",
+  "pitchVideoAssetId": "asset_pitch_video_001.mp4",
+  "isLookingForTeammate": true,
+  "isOpenForScholarship": true,
+  "isOpenForMentoring": false
+}
+
+### ------------------------------------------------------------------------------
+### 6. Danh sách cơ hội học bổng & cuộc thi (Public - Hỗ trợ Chế độ khách)
+# @name listOpportunities
+GET {{baseUrl}}/opportunities
+Content-Type: application/json
+
+### Lấy Opportunity ID mẫu
+@opportunityId = opp_vinai_scholarship_2026
+
+### ------------------------------------------------------------------------------
+### 7. Tạo bản xem trước (Preview) bất biến - TTL 10 phút (gRPC -> IdentityService)
+# @name createPreview
+POST {{baseUrl}}/applications/previews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "opportunityId": "{{opportunityId}}",
+  "submissionId": "sub_client_001",
+  "attachmentIds": ["asset_cv_nguyen_van_sinh_vien.pdf"],
+  "expectedRuleVersion": 1
+}
+
+### Lưu biến từ Preview response
+@previewId = {{createPreview.response.body.previewId}}
+@snapshotId = {{createPreview.response.body.snapshotId}}
+@payloadHash = {{createPreview.response.body.payloadHash}}
+@manifestHash = {{createPreview.response.body.manifestHash}}
+
+### ------------------------------------------------------------------------------
+### 8. Ký Consent chia sẻ dữ liệu khớp đúng với Snapshot & PayloadHash
+# @name createConsent
+POST {{baseUrl}}/profiles/me/consents
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "opportunityId": "{{opportunityId}}",
+  "submissionId": "sub_client_001",
+  "previewId": "{{previewId}}",
+  "snapshotId": "{{snapshotId}}",
+  "profileVersion": 2,
+  "ruleVersion": 1,
+  "manifestHash": "{{manifestHash}}",
+  "payloadHash": "{{payloadHash}}"
+}
+
+### Lưu consentId
+@consentId = {{createConsent.response.body.consentId}}
+
+### ------------------------------------------------------------------------------
+### 9. Nộp hồ sơ ứng tuyển chính thức (Revision 1)
+# @name submitApplication
+POST {{baseUrl}}/applications
+Authorization: Bearer {{token}}
+Idempotency-Key: idem-test-f04-001
+Content-Type: application/json
+
+{
+  "opportunityId": "{{opportunityId}}",
+  "submissionId": "sub_client_001",
+  "submissionType": "INDIVIDUAL",
+  "previewId": "{{previewId}}",
+  "snapshotId": "{{snapshotId}}",
+  "profileVersion": 2,
+  "expectedRuleVersion": 1,
+  "payloadHash": "{{payloadHash}}",
+  "consentId": "{{consentId}}"
+}
+
+### Lưu applicationId
+@applicationId = {{submitApplication.response.body.applicationId}}
+
+### ------------------------------------------------------------------------------
+### 10. Xem danh sách hồ sơ đã nộp của tôi
+GET {{baseUrl}}/applications/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 11. Rút hồ sơ ứng tuyển (Chuyển trạng thái WITHDRAWN)
+POST {{baseUrl}}/applications/{{applicationId}}/withdraw
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 12. Nộp lại hồ sơ sau khi rút (Revision 2)
+POST {{baseUrl}}/applications
+Authorization: Bearer {{token}}
+Idempotency-Key: idem-test-f04-002
+Content-Type: application/json
+
+{
+  "opportunityId": "{{opportunityId}}",
+  "submissionId": "sub_client_002",
+  "submissionType": "INDIVIDUAL",
+  "previewId": "{{previewId}}",
+  "snapshotId": "{{snapshotId}}",
+  "profileVersion": 2,
+  "expectedRuleVersion": 1,
+  "payloadHash": "{{payloadHash}}",
+  "consentId": "{{consentId}}"
+}
+
+### ------------------------------------------------------------------------------
+### 13. Xoay vòng Refresh Token (Token Rotation)
+# @name refreshToken
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### ------------------------------------------------------------------------------
+### 14. Kiểm tra Chống Tấn Công Tái Sử Dụng (Replay Attack)
+# Dùng lại token cũ -> Phải trả về lỗi 401 UNAUTHENTICATED
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### ==============================================================================
+### PHẦN BỔ SUNG F13 BACKEND (TUẦN 2): EMAIL OTP, PASSWORD RESET & MEDIA UPLOAD
+### ==============================================================================
+
+### 15. [F13] Gửi mã OTP xác thực Email (TTL 5p, Cooldown 60s, SHA-256 Hash)
+# @name sendOtp
+POST {{baseUrl}}/auth/send-otp
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "purpose": "VERIFY_EMAIL"
+}
+
+### Lấy mã OTP preview trong môi trường dev
+@otpCode = {{sendOtp.response.body.devOtpPreview}}
+
+### ------------------------------------------------------------------------------
+### 16. [F13] Xác thực mã OTP (Nhập sai 5 lần liên tiếp sẽ khóa 15 phút - 429 OTP_LOCKED)
+POST {{baseUrl}}/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "otpCode": "{{otpCode}}",
+  "purpose": "VERIFY_EMAIL"
+}
+
+### ------------------------------------------------------------------------------
+### 17. [F13] Quên mật khẩu (Anti-Enumeration: luôn trả thông báo đồng nhất)
+# @name forgotPassword
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn"
+}
+
+@resetOtpCode = {{forgotPassword.response.body.devOtpPreview}}
+
+### ------------------------------------------------------------------------------
+### 18. [F13] Đặt lại mật khẩu bằng OTP (Tự động tăng sessionVersion & thu hồi phiên cũ)
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "student@scholink.edu.vn",
+  "otpCode": "{{resetOtpCode}}",
+  "newPassword": "Student@2026"
+}
+
+### ------------------------------------------------------------------------------
+### 19. [F13] Xin cấp Presigned Upload URL cho CV PDF (Kiểm MIME & Dung lượng <= 5MB)
+# @name createUploadUrl
+POST {{baseUrl}}/media/upload-url
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "category": "CV",
+  "fileName": "cv-nguyen-van-sinh-vien.pdf",
+  "mimeType": "application/pdf",
+  "sizeBytes": 524288
+}
+
+@uploadedAssetId = {{createUploadUrl.response.body.assetId}}
+
+### ------------------------------------------------------------------------------
+### 20. [F13] Hoàn tất tải lên & Quét Magic Bytes (%PDF = 25504446) + Malware Scan -> READY
+POST {{baseUrl}}/media/{{uploadedAssetId}}/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fileHeaderHex": "255044462d312e37",
+  "sampleContent": "%PDF-1.7 Clean Academic CV Document",
+  "actualSizeBytes": 524288
+}
+
+### ------------------------------------------------------------------------------
+### 21. [F13] Xem thông tin MediaAsset đã READY (Chỉ chủ sở hữu mới truy cập được)
+GET {{baseUrl}}/media/{{uploadedAssetId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ==============================================================================
+### PHẦN BỔ SUNG F22 BACKEND (TUẦN 3): READINESS, SCREENING & APPLICATION DETAIL
+### ==============================================================================
+
+### 22. [F22] Kiểm tra độ sẵn sàng hồ sơ & dự báo Screening theo Cơ hội (FR-PROF-03 / FR-PROF-08)
+GET {{baseUrl}}/profiles/me/readiness?opportunityId={{opportunityId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### ------------------------------------------------------------------------------
+### 23. [F22] Xem chi tiết hồ sơ ứng tuyển kèm lịch sử Revisions bất biến và Events (FR-APP-03 / FR-APP-08)
+GET {{baseUrl}}/applications/{{applicationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+

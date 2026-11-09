@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package identity;
+
+service IdentityGrpcService {
+  rpc GetProfileSnapshot (GetProfileSnapshotRequest) returns (GetProfileSnapshotResponse);
+  rpc ValidateConsent (ValidateConsentRequest) returns (ValidateConsentResponse);
+  rpc VerifyToken (VerifyTokenRequest) returns (VerifyTokenResponse);
+}
+
+message GetProfileSnapshotRequest {
+  string student_id = 1;
+  string caller_service = 2;
+}
+
+message GetProfileSnapshotResponse {
+  string student_id = 1;
+  string full_name = 2;
+  string email = 3;
+  int32 completion_score = 4;
+  string snapshot_hash = 5;
+  string snapshot_json = 6;
+  bool is_valid = 7;
+}
+
+message ValidateConsentRequest {
+  string student_id = 1;
+  string opportunity_id = 2;
+  string consent_hash = 3;
+}
+
+message ValidateConsentResponse {
+  bool is_valid = 1;
+  string consent_id = 2;
+  string error_code = 3;
+}
+
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+message VerifyTokenResponse {
+  bool is_valid = 1;
+  string user_id = 2;
+  string role = 3;
+  string email = 4;
+  string error_message = 5;
+}
