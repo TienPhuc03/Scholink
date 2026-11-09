@@ -62,6 +62,7 @@ describe('AuthUseCase Integration Test (Authentication & Security Rules)', () =>
       });
 
       expect(result.role).toBe('STUDENT');
+      expect(result.status).toBe('PENDING_VERIFICATION');
       expect(mockUserRepo.save).toHaveBeenCalledTimes(1);
       expect(mockPassportRepo.save).toHaveBeenCalledTimes(1);
     });

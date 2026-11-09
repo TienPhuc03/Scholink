@@ -55,6 +55,7 @@ message UserSummary {
   string fullName = 3;
   string role = 4;
   string organizationId = 5;
+  string status = 6;
 }
 
 message LoginResponse {

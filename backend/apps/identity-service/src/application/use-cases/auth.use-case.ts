@@ -68,7 +68,8 @@ export class AuthUseCase {
       passwordHash,
       fullName: dto.fullName.trim(),
       role: 'STUDENT',
-      status: 'ACTIVE',
+      // FR-AUTH-02: chỉ chuyển sang ACTIVE sau khi xác minh OTP email
+      status: 'PENDING_VERIFICATION',
     });
 
     await this.userRepo.save(user);
@@ -125,6 +126,7 @@ export class AuthUseCase {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        status: user.status,
         ...(organizationId ? { organizationId } : {}),
       },
     });
