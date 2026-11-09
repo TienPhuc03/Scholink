@@ -12,6 +12,7 @@ import {
   ProcessedEventSchema,
   IdempotencyKeyModel,
   IdempotencyKeySchema,
+  validateEnv,
 } from "@shared";
 import {
   OpportunityModel,
@@ -63,6 +64,7 @@ import { COLLABORATION_GRPC_CLIENT } from "./application/use-cases/collaboration
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
+      validate: validateEnv,
     }),
     DatabaseModule.forService("OPPORTUNITY_DB_NAME", "scholink_opportunity"),
     SharedModule,
@@ -92,6 +94,8 @@ import { COLLABORATION_GRPC_CLIENT } from "./application/use-cases/collaboration
           options: {
             package: "collaboration",
             protoPath: join(process.cwd(), "proto/collaboration.proto"),
+            // collaboration.proto dùng tên trường snake_case; mặc định loader đổi sang camelCase.
+            loader: { keepCase: true },
             url: config.get<string>(
               "COLLABORATION_GRPC_URL",
               "localhost:50053",

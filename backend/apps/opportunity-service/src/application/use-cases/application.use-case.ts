@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import {
   IApplicationRepository,
   APPLICATION_REPOSITORY,
+  ApplicationRevisionRecord,
   SubmissionPreviewRecord,
   SubmissionIntentRecord,
   TeamMemberSnapshotRecord,
@@ -61,6 +62,7 @@ export interface CollaborationGrpcClientService {
   validateReservation(data: {
     team_id: string;
     fencing_token: number;
+    roster_version?: number;
   }): Observable<{
     is_valid: boolean;
     status: string;
@@ -320,6 +322,16 @@ export class ApplicationUseCase implements OnModuleInit {
     fencingToken?: number;
     reason?: string;
   }) {
+    // Worker nội bộ và Admin không có actorId; sinh viên chỉ được hủy phiên do chính mình làm trưởng đội
+    if (params.actorId) {
+      const intent = params.submissionId
+        ? await this.applicationRepo.findSubmissionIntentById?.(params.submissionId)
+        : null;
+      if (!intent || intent.leaderId !== params.actorId) {
+        throw DomainException.forbidden('Chỉ trưởng đội của phiên nộp mới được hủy phiên này');
+      }
+    }
+
     const resolvedSubmissionId = params.submissionId || params.reservationId || '';
     const resolvedTeamId = params.teamId || '';
     const resolvedReservationId = params.reservationId || params.submissionId || '';
@@ -733,19 +745,23 @@ export class ApplicationUseCase implements OnModuleInit {
     const memberIds = dto.memberConsents.map((m) => m.studentId);
     this.validateTeamRosterBounds(opportunity, leaderId, memberIds);
 
-    // Kiểm tra Reservation & FencingToken với CollaborationService nếu được cấu hình
-    if (this.collaborationGrpc && dto.fencingToken !== undefined) {
+    // FR-APP-05: luôn kiểm Reservation, FencingToken và Roster với CollaborationService
+    if (this.collaborationGrpc) {
       const reservationCheck = await firstValueFrom(
         this.collaborationGrpc.validateReservation({
           team_id: dto.teamId,
-          fencing_token: dto.fencingToken,
+          fencing_token: dto.fencingToken ?? 0,
+          roster_version: dto.rosterVersion,
         }),
       );
       if (!reservationCheck.is_valid) {
-        if (reservationCheck.error_code === 'FENCING_TOKEN_MISMATCH') {
+        if (
+          reservationCheck.error_code === 'FENCING_TOKEN_MISMATCH' ||
+          reservationCheck.error_code === 'ROSTER_VERSION_MISMATCH'
+        ) {
           throw DomainException.conflict(
             ErrorCode.VERSION_MISMATCH,
-            'Fencing token của phiên giữ chỗ đội không còn hợp lệ',
+            'Fencing token hoặc danh sách đội của phiên giữ chỗ không còn hợp lệ',
           );
         }
         throw DomainException.conflict(
@@ -1178,6 +1194,7 @@ export class ApplicationUseCase implements OnModuleInit {
     const viewerIsOwner = application.studentId === studentId;
     const registrationOpen = Boolean(opportunity?.isRegistrationOpen());
     const deadline = opportunity?.registerDeadline ? new Date(opportunity.registerDeadline) : null;
+    const isTeam = application.props.submissionType === 'TEAM';
 
     return Object.freeze({
       ...application.props,
@@ -1193,7 +1210,7 @@ export class ApplicationUseCase implements OnModuleInit {
       canResubmit: viewerIsOwner && registrationOpen && application.canResubmit(),
       revisions: revisions.map((r) =>
         Object.freeze({
-          ...r,
+          ...(isTeam ? this.teamRevisionVisibleTo(r, studentId) : r),
           submittedAt: r.submittedAt.toISOString(),
         }),
       ),
@@ -1205,6 +1222,48 @@ export class ApplicationUseCase implements OnModuleInit {
         }),
       ),
     });
+  }
+
+  /**
+   * FR-APP-08 & Mục 7 SRS: mỗi thành viên chỉ đồng ý chia sẻ snapshot của mình với đơn vị tổ chức,
+   * nên trong đội (kể cả trưởng đội) chỉ thấy snapshot của chính mình và tên các thành viên khác.
+   */
+  private teamRevisionVisibleTo(
+    revision: ApplicationRevisionRecord,
+    viewerId: string,
+  ): ApplicationRevisionRecord {
+    const isViewer = (item: { studentId?: unknown }) => item.studentId === viewerId;
+    const snapshot = parseJsonObject(revision.snapshotJson);
+    const members = Array.isArray(snapshot.members)
+      ? (snapshot.members as Array<Record<string, unknown>>).map((member) =>
+          isViewer(member)
+            ? member
+            : {
+                studentId: member.studentId,
+                snapshotRestricted: true,
+                snapshot: {
+                  fullName: (member.snapshot as { fullName?: unknown } | undefined)?.fullName ?? '',
+                },
+              },
+        )
+      : null;
+
+    let manifest: unknown = [];
+    try {
+      manifest = JSON.parse(revision.manifestJson);
+    } catch {
+      manifest = [];
+    }
+
+    return {
+      ...revision,
+      snapshotJson: members ? JSON.stringify({ ...snapshot, members }) : revision.snapshotJson,
+      manifestJson: Array.isArray(manifest)
+        ? JSON.stringify((manifest as Array<{ studentId?: unknown }>).filter(isViewer))
+        : revision.manifestJson,
+      memberSnapshots: (revision.memberSnapshots ?? []).filter(isViewer),
+      consentRefs: (revision.consentRefs ?? []).filter(isViewer),
+    };
   }
 
   /**

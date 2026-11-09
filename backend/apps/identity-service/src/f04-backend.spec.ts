@@ -1506,14 +1506,13 @@ describe('F04 & F13 Backend — Security, Immutability, OTP, MediaAsset & Cross-
       expect(lateAbort.aborted).toBe(false);
       expect(lateAbort.applicationId).toBe(committedTeamApp.applicationId);
 
-      // Verify per-member snapshots & consentRefs are immutably stored in ApplicationRevision
-      const detail = await applicationUseCase.getApplicationById(
-        committedTeamApp.applicationId,
-        sharedMember, // team member can also view their team's application
-      );
-      expect(detail.revisions).toHaveLength(1);
-      expect(detail.revisions[0].memberSnapshots).toHaveLength(2);
-      expect(detail.revisions[0].consentRefs).toHaveLength(2);
+      // Per-member snapshots & consentRefs are stored in ApplicationRevision; each member sees only their own
+      for (const member of [leader1, sharedMember]) {
+        const detail = await applicationUseCase.getApplicationById(committedTeamApp.applicationId, member);
+        expect(detail.revisions).toHaveLength(1);
+        expect(detail.revisions[0].memberSnapshots.map((s) => s.studentId)).toEqual([member]);
+        expect(detail.revisions[0].consentRefs.map((c) => c.studentId)).toEqual([member]);
+      }
     });
 
     it('blocks two teams from sharing an active member (application_members unique) until the first team withdraws', async () => {
