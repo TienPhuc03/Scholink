@@ -46,13 +46,14 @@ const CATEGORY_POLICIES: Readonly<Record<MediaCategory, CategoryPolicy>> = Objec
 
 /**
  * Magic Bytes (chữ ký nhị phân đầu file ở dạng hex chữ thường) theo MIME type để chống giả mạo phần mở rộng (.exe đổi tên thành .pdf).
+ * Chữ ký phải nằm đúng vị trí: WebP có "WEBP" tại byte 8, MP4 có "ftyp" tại byte 4.
  */
-const EXPECTED_MAGIC_HEX_PREFIXES: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  'application/pdf': ['25504446'], // %PDF
-  'image/png': ['89504e47'], // .PNG
-  'image/jpeg': ['ffd8ff'], // JPEG SOI
-  'image/webp': ['52494646'], // RIFF
-  'video/mp4': ['0000001866747970', '0000001c66747970', '0000002066747970', '66747970'], // ftyp
+const MAGIC_BYTE_CHECKS: Readonly<Record<string, (hex: string) => boolean>> = Object.freeze({
+  'application/pdf': (hex: string) => hex.startsWith('25504446'), // %PDF
+  'image/png': (hex: string) => hex.startsWith('89504e47'), // .PNG
+  'image/jpeg': (hex: string) => hex.startsWith('ffd8ff'), // JPEG SOI
+  'image/webp': (hex: string) => hex.startsWith('52494646') && hex.slice(16, 24) === '57454250', // RIFF....WEBP
+  'video/mp4': (hex: string) => hex.slice(8, 16) === '66747970', // ....ftyp
 });
 
 /**
@@ -212,6 +213,25 @@ export class MediaAsset extends AggregateRoot<string> {
       throw DomainException.forbidden('Bạn không có quyền hoàn tất hoặc thao tác trên tệp của người khác');
     }
 
+    // Gọi lại sau khi đã READY là an toàn; tệp đã bị từ chối không được quét lại để thành READY.
+    if (this._props.status === 'READY') {
+      return Object.freeze({ updatedAsset: this });
+    }
+    if (this._props.status !== 'UPLOADING') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        `Tệp đang ở trạng thái '${this._props.status}', vui lòng tải lên một tệp mới`,
+      );
+    }
+
+    if (!params.fileHeaderHex || params.sampleContent === undefined) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Thiếu chữ ký đầu tệp (fileHeaderHex) hoặc mẫu nội dung (sampleContent) để quét tệp',
+        400,
+      );
+    }
+
     const policy = CATEGORY_POLICIES[this._props.category];
     if (
       params.actualSizeBytes !== undefined &&
@@ -223,37 +243,30 @@ export class MediaAsset extends AggregateRoot<string> {
       });
     }
 
-    // 1. Kiểm tra chữ ký nhị phân (Magic Bytes) nếu có gửi kèm hoặc chặn mã thực thi PE (4d5a = MZ) / ELF (7f454c46)
-    if (params.fileHeaderHex) {
-      const normalizedHex = params.fileHeaderHex.trim().toLowerCase();
-      if (normalizedHex.startsWith('4d5a') || normalizedHex.startsWith('7f454c46')) {
-        return Object.freeze({
-          updatedAsset: this.withStatus('REJECTED'),
-          rejectionReason: 'Phát hiện tệp thực thi nhị phân nguy hiểm (PE/ELF executable)',
-        });
-      }
+    // 1. Kiểm tra chữ ký nhị phân (Magic Bytes) và chặn mã thực thi PE (4d5a = MZ) / ELF (7f454c46)
+    const normalizedHex = params.fileHeaderHex.trim().toLowerCase();
+    if (normalizedHex.startsWith('4d5a') || normalizedHex.startsWith('7f454c46')) {
+      return Object.freeze({
+        updatedAsset: this.withStatus('REJECTED'),
+        rejectionReason: 'Phát hiện tệp thực thi nhị phân nguy hiểm (PE/ELF executable)',
+      });
+    }
 
-      const allowedPrefixes = EXPECTED_MAGIC_HEX_PREFIXES[this._props.mimeType] ?? [];
-      const matchesMagic = allowedPrefixes.some(
-        (prefix) => normalizedHex.startsWith(prefix) || normalizedHex.includes(prefix),
-      );
-      if (allowedPrefixes.length > 0 && !matchesMagic) {
-        return Object.freeze({
-          updatedAsset: this.withStatus('REJECTED'),
-          rejectionReason: `Chữ ký tệp (Magic Bytes) không khớp với định dạng khai báo ${this._props.mimeType}`,
-        });
-      }
+    const matchesMagic = MAGIC_BYTE_CHECKS[this._props.mimeType];
+    if (matchesMagic && !matchesMagic(normalizedHex)) {
+      return Object.freeze({
+        updatedAsset: this.withStatus('REJECTED'),
+        rejectionReason: `Chữ ký tệp (Magic Bytes) không khớp với định dạng khai báo ${this._props.mimeType}`,
+      });
     }
 
     // 2. Quét mẫu nội dung tìm mã độc EICAR / Embedded PDF JavaScript / XSS script
-    if (params.sampleContent) {
-      for (const pattern of MALICIOUS_CONTENT_PATTERNS) {
-        if (pattern.test(params.sampleContent)) {
-          return Object.freeze({
-            updatedAsset: this.withStatus('REJECTED'),
-            rejectionReason: 'Phát hiện mã độc hoặc kịch bản nhúng nguy hiểm trong tệp tải lên',
-          });
-        }
+    for (const pattern of MALICIOUS_CONTENT_PATTERNS) {
+      if (pattern.test(params.sampleContent)) {
+        return Object.freeze({
+          updatedAsset: this.withStatus('REJECTED'),
+          rejectionReason: 'Phát hiện mã độc hoặc kịch bản nhúng nguy hiểm trong tệp tải lên',
+        });
       }
     }
 

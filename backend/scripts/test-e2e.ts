@@ -286,7 +286,7 @@ async function runE2ETests() {
       fullName: `Sinh Viên Test ${randomSuffix}`,
       bio: 'Đam mê AI và Kiến trúc Microservices',
       regionCode: 'VN-SG',
-      avatarAssetId: 'asset_avatar_001',
+      avatarAssetId: cvAssetId,
       education: {
         institution: 'Đại học Bách Khoa TP.HCM',
         major: 'Khoa học Máy tính',
