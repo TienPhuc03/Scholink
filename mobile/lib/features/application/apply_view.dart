@@ -303,7 +303,7 @@ class _ApplyViewState extends State<ApplyView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const Text(
-              'PDF, JPG, PNG hoặc WEBP · tối đa 5 MB mỗi tệp · tối đa ${AttachmentRules.maxFiles} tệp.',
+              'Chỉ nhận PDF · tối đa 5 MB mỗi tệp · tối đa ${AttachmentRules.maxFiles} tệp.',
               style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
             const SizedBox(height: 12),

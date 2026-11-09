@@ -73,6 +73,12 @@ void main() {
       expect(storage.accessToken, isNull);
     });
 
+    test('a wrong password is not reported as an expired session', () async {
+      api.reply(ApiEndpoints.login, const UnauthorizedFailure());
+      final Failure failure = (await repo.login(email: 'sv@uni.edu.vn', password: 'sai-mat-khau')).errorOrNull!;
+      expect(failure.message, 'Email hoặc mật khẩu không đúng.');
+    });
+
     test('logout clears local tokens even when the server call fails', () async {
       storage.accessToken = 'access-1';
       api.reply(ApiEndpoints.logout, const NetworkFailure());

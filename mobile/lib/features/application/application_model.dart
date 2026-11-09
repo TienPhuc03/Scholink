@@ -245,13 +245,9 @@ enum ApplicationStatus {
         ApplicationStatus.unknown => 'Không rõ',
       };
 
-  /// Withdrawn/cancelled/reopened applications do not block a new submission (Q15).
-  bool get isActive => !<ApplicationStatus>{
-        ApplicationStatus.withdrawn,
-        ApplicationStatus.cancelled,
-        ApplicationStatus.reopened,
-        ApplicationStatus.draft,
-      }.contains(this);
+  /// Only withdrawn/reopened applications allow a new submission, as `Application.canResubmit`
+  /// does on the backend: anything else is refused there with ALREADY_APPLIED.
+  bool get isActive => this != ApplicationStatus.withdrawn && this != ApplicationStatus.reopened;
 }
 
 /// One row of `GET /api/v1/applications/me` (ApplicationSummaryMessage).
@@ -361,12 +357,16 @@ class TeamMemberSnapshot {
   /// Name as submitted, or the student id when the snapshot has none.
   final String displayName;
 
+  /// Another member's snapshot: the server only sends their name (FR-APP-08).
+  final bool isRestricted;
+
   const TeamMemberSnapshot({
     required this.studentId,
     required this.profileVersion,
     required this.passport,
     required this.displayName,
     this.attachmentIds = const <String>[],
+    this.isRestricted = false,
   });
 }
 
@@ -445,6 +445,7 @@ class ApplicationRevision {
           passport: PassportModel.fromJson(passport),
           displayName: _strOrNull(passport['fullName']) ?? studentId,
           attachmentIds: memberFiles[studentId] ?? const <String>[],
+          isRestricted: m['snapshotRestricted'] == true,
         );
       }).toList();
     }

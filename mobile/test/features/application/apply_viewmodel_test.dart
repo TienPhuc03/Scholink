@@ -62,6 +62,17 @@ void main() {
       vm.dispose();
     });
 
+    test('a cancelled application stops the flow, as the backend refuses to resubmit it', () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
+          <String, dynamic>{'id': 'app_old', 'opportunityId': oppId, 'status': 'CANCELLED', 'submissionType': 'INDIVIDUAL'},
+        ]);
+      final ApplyViewModel vm = h.build();
+      await vm.start();
+      expect(vm.existingApplication?.id, 'app_old');
+      vm.dispose();
+    });
+
     test('a withdrawn application does not block a new one', () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
@@ -83,7 +94,11 @@ void main() {
 
       h.picker.queue.add(PickedAttachment(name: 'notes.docx', bytes: Uint8List.fromList(<int>[1, 2, 3, 4])));
       await vm.pickAttachment();
-      expect(vm.attachmentError, contains('PDF, JPG, PNG'));
+      expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
+
+      h.picker.queue.add(PickedAttachment(name: 'photo.jpg', bytes: Uint8List.fromList(<int>[0xFF, 0xD8, 0xFF, 0])));
+      await vm.pickAttachment();
+      expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
 
       h.picker.queue.add(pdf('big.pdf', size: AttachmentRules.maxBytes + 1));
       await vm.pickAttachment();
