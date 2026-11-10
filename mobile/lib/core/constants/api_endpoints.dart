@@ -62,11 +62,13 @@ abstract final class ApiEndpoints {
   static String teamSubmissionConsents(String reservationId) => '/api/v1/teams/submissions/$reservationId/consents';
   static String abortTeamSubmission(String reservationId) => '/api/v1/teams/submissions/$reservationId/abort';
   static String competitionTeams(String compId) => '/api/v1/teams/competitions/$compId';
-  static String joinTeam(String id) => '/api/v1/teams/$id/join';
+  static String joinTeam(String id) => '/api/v1/teams/$id/join-requests';
   static String leaveTeam(String id) => '/api/v1/teams/$id/leave';
-  static String teamJoinRequests(String teamId) => '/api/v1/teams/$teamId/requests';
+  static String teamJoinRequests(String teamId) => '/api/v1/teams/$teamId/join-requests';
   static String reviewJoinRequest(String teamId, String requestId) =>
-      '/api/v1/teams/$teamId/requests/$requestId/review';
+      '/api/v1/teams/$teamId/join-requests/$requestId/review';
+  static String withdrawJoinRequest(String requestId) =>
+      '/api/v1/teams/join-requests/$requestId/withdraw';
 
   // Chat routes
   static const String chatRooms = '/api/v1/chat/rooms';
