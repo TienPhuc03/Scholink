@@ -62,6 +62,24 @@ export const MICROSERVICE_ROUTES: MicroserviceRoute[] = [
   },
 ];
 
+/** Paths that only other microservices may call (see ReverseProxyMiddleware.use). */
+const INTERNAL_ONLY_PREFIXES = [
+  '/api/v1/notifications/events/',
+  '/api/v1/notifications/transactional',
+  '/api/v1/notifications/reminders',
+];
+
+export function isInternalOnlyPath(originalUrl: string): boolean {
+  let path = originalUrl.split('?')[0];
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Malformed escapes: match on the raw path.
+  }
+  path = path.toLowerCase().replace(/\/{2,}/g, '/');
+  return INTERNAL_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 @Injectable()
 export class ReverseProxyMiddleware implements NestMiddleware {
   private readonly logger = new Logger('ReverseProxy');
@@ -72,6 +90,25 @@ export class ReverseProxyMiddleware implements NestMiddleware {
     // SCHOL-14: Admin organizations endpoint is explicitly managed by GatewayAdminOrgController
     if (originalUrl.startsWith('/api/v1/admin/organizations')) {
       return next();
+    }
+
+    // F32: Admin opportunities and crawler review endpoint is managed by GatewayAdminOpportunityController
+    if (originalUrl.startsWith('/api/v1/admin/opportunities')) {
+      return next();
+    }
+
+    // NOTI-02: service-to-service endpoints of the Notification Service (bookmark/opportunity
+    // events, transactional inserts, reminder debug list) are @Public inside the service and
+    // must never be reachable from clients through the gateway.
+    if (isInternalOnlyPath(originalUrl)) {
+      res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Không tìm thấy tài nguyên.',
+          correlationId: (req.headers['x-correlation-id'] as string) || undefined,
+        },
+      });
+      return;
     }
 
     // Check if request matches any downstream microservice route

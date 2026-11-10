@@ -12,6 +12,7 @@ export interface UserProps {
   readonly fullName: string;
   readonly phone?: string;
   readonly sessionVersion?: number;
+  readonly deletedAt?: Date;
   readonly createdAt?: Date;
   readonly updatedAt?: Date;
   readonly version?: number;
@@ -69,6 +70,21 @@ export class User extends AggregateRoot<string> {
     return this._props;
   }
 
+  get phone(): string | undefined {
+    return this._props.phone;
+  }
+
+  /** FR-PROF-05: contact phone; an empty value removes it. */
+  public withPhone(phone: string): User {
+    const trimmed = phone.trim();
+    return new User(this.id, {
+      ...this._props,
+      phone: trimmed.length > 0 ? trimmed : undefined,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
   public activate(): User {
     return new User(this.id, {
       ...this._props,
@@ -107,6 +123,22 @@ export class User extends AggregateRoot<string> {
     return new User(this.id, {
       ...this._props,
       role: newRole,
+      sessionVersion: this.sessionVersion + 1,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
+   * F40 Backend — FR-AUTH-08, Mục 28, Mục 29, E13 SRS:
+   * Đánh dấu xóa tài khoản (status = DELETED) và tăng sessionVersion
+   * để thu hồi ngay toàn bộ phiên làm việc hiện tại.
+   */
+  public markDeleted(): User {
+    return new User(this.id, {
+      ...this._props,
+      status: 'DELETED',
+      deletedAt: new Date(),
       sessionVersion: this.sessionVersion + 1,
       version: this.version + 1,
       updatedAt: new Date(),

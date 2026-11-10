@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { requireJwtSecret } from './infrastructure/config/env.validation';
 import { CryptoService } from './infrastructure/security/crypto.service';
 import { RedisService } from './infrastructure/redis/redis.service';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
@@ -15,10 +16,7 @@ import { RateLimitGuard } from './infrastructure/guards/rate-limit.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const secret =
-          config.get<string>('JWT_SECRET') ||
-          process.env.JWT_SECRET ||
-          'scholink-super-secret-jwt-key-minimum-32-chars-long!';
+        const secret = requireJwtSecret(config.get<string>('JWT_SECRET') || process.env.JWT_SECRET);
         return {
           secret,
           signOptions: {

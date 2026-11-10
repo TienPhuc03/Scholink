@@ -22,6 +22,7 @@ import { GatewayChatController } from './controllers/gateway-chat.controller';
 import { GatewayBillingController } from './controllers/gateway-billing.controller';
 import { GatewayNotificationController } from './controllers/gateway-notification.controller';
 import { GatewayAdminOrgController } from './controllers/gateway-admin-org.controller';
+import { GatewayAdminOpportunityController } from './controllers/gateway-admin-opportunity.controller';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { GatewayAdminOrgController } from './controllers/gateway-admin-org.contr
     GatewayBillingController,
     GatewayNotificationController,
     GatewayAdminOrgController,
+    GatewayAdminOpportunityController,
   ],
   providers: [
     ReverseProxyMiddleware,

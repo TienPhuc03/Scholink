@@ -7,6 +7,7 @@ import {
   VerifyOtpDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestAccountDeletionDto,
   CreateUploadUrlDto,
   CompleteUploadDto,
   UpdatePassportDto,
@@ -14,7 +15,10 @@ import {
   CreateOpportunityDto,
   QueryOpportunityDto,
   CreatePreviewDto,
+  CreateSubmissionIntentDto,
   SubmitApplicationDto,
+  ApplySnapshotRetentionDto,
+  EvaluateTestResultLogDto,
 } from '@shared';
 
 export const GATEWAY_IDENTITY_GRPC = Symbol('GATEWAY_IDENTITY_GRPC');
@@ -24,14 +28,27 @@ export interface IdentityGrpcClient {
   register(data: RegisterDto): Observable<Record<string, unknown>>;
   login(data: LoginDto): Observable<Record<string, unknown>>;
   refresh(data: RefreshTokenDto): Observable<Record<string, unknown>>;
-  logout(data: { userId: string; sessionId?: string }): Observable<Record<string, unknown>>;
+  logout(data: { userId: string; sessionId?: string; familyId?: string }): Observable<Record<string, unknown>>;
   sendOtp(data: SendOtpDto): Observable<Record<string, unknown>>;
   verifyOtp(data: VerifyOtpDto): Observable<Record<string, unknown>>;
   forgotPassword(data: ForgotPasswordDto): Observable<Record<string, unknown>>;
   resetPassword(data: ResetPasswordDto): Observable<Record<string, unknown>>;
+  requestAccountDeletion(
+    data: RequestAccountDeletionDto & { userId: string },
+  ): Observable<Record<string, unknown>>;
+  getDeletionTracking(data: {
+    userId: string;
+    trackingId: string;
+  }): Observable<Record<string, unknown>>;
+  exportPersonalData(data: { userId: string }): Observable<Record<string, unknown>>;
   getMyPassport(data: { studentId: string }): Observable<Record<string, unknown>>;
+  updateFieldPrivacy(data: {
+    studentId: string;
+    fieldPrivacy: Record<string, string>;
+  }): Observable<Record<string, unknown>>;
+  getProfileView(data: { studentId: string; audience: string }): Observable<Record<string, unknown>>;
   updateMyPassport(
-    data: UpdatePassportDto & { studentId: string },
+    data: UpdatePassportDto & { studentId: string; clearFields?: string[] },
   ): Observable<Record<string, unknown>>;
   createConsent(
     data: CreateConsentDto & { studentId: string },
@@ -65,12 +82,37 @@ export interface OpportunityGrpcClient {
     studentId: string;
     previewId: string;
   }): Observable<Record<string, unknown>>;
+  createSubmissionIntent(
+    data: CreateSubmissionIntentDto & { leaderId: string },
+  ): Observable<Record<string, unknown>>;
+  abortSubmissionIntent(data: {
+    submissionId: string;
+    actorId?: string;
+    opportunityId?: string;
+    teamId?: string;
+    reason?: string;
+  }): Observable<Record<string, unknown>>;
+  getSubmissionById(data: { submissionId: string }): Observable<Record<string, unknown>>;
   submitApplication(
     data: SubmitApplicationDto & { studentId: string },
   ): Observable<Record<string, unknown>>;
   getMyApplications(data: { studentId: string }): Observable<{ items?: unknown[] }>;
+  getApplicationById(data: {
+    applicationId: string;
+    studentId: string;
+  }): Observable<Record<string, unknown>>;
   withdrawApplication(data: {
     applicationId: string;
     studentId: string;
   }): Observable<Record<string, unknown>>;
+  checkReadiness(data: {
+    studentId: string;
+    opportunityId: string;
+  }): Observable<Record<string, unknown>>;
+  applySnapshotRetentionDecision(
+    data: ApplySnapshotRetentionDto,
+  ): Observable<Record<string, unknown>>;
+  evaluateTestResultLog(
+    data: EvaluateTestResultLogDto,
+  ): Observable<Record<string, unknown>>;
 }

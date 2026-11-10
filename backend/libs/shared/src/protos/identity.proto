@@ -12,10 +12,15 @@ service IdentityGrpcService {
   rpc VerifyOtp (VerifyOtpRequest) returns (VerifyOtpResponse);
   rpc ForgotPassword (ForgotPasswordRequest) returns (SendOtpResponse);
   rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (AccountDeletionTrackingResponse);
+  rpc GetDeletionTracking (GetDeletionTrackingRequest) returns (AccountDeletionTrackingResponse);
+  rpc ExportPersonalData (ExportPersonalDataRequest) returns (ExportPersonalDataResponse);
 
   // Profile, MediaAsset & Passport RPCs (API Gateway -> Identity Service)
   rpc GetMyPassport (GetMyPassportRequest) returns (PassportResponse);
   rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
+  rpc UpdateFieldPrivacy (UpdateFieldPrivacyRequest) returns (PassportResponse);
+  rpc GetProfileView (GetProfileViewRequest) returns (ProfileViewResponse);
   rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
   rpc CreateUploadUrl (CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
   rpc CompleteUpload (CompleteUploadRequest) returns (MediaAssetResponse);
@@ -50,6 +55,7 @@ message UserSummary {
   string fullName = 3;
   string role = 4;
   string organizationId = 5;
+  string status = 6;
 }
 
 message LoginResponse {
@@ -70,6 +76,7 @@ message RefreshTokenResponse {
 message LogoutRequest {
   string userId = 1;
   string sessionId = 2;
+  string familyId = 3;
 }
 
 message LogoutResponse {
@@ -220,6 +227,41 @@ message UpdateMyPassportRequest {
   optional bool isOpenForMentoring = 13;
   repeated CertificateMessage certificates = 14;
   optional int32 expectedVersion = 15;
+  optional string phone = 16;
+  // gRPC does not send empty lists; names the list fields the client emptied.
+  repeated string clearFields = 17;
+}
+
+// FR-PROF-05: field -> PRIVATE | TEAMMATES | PUBLIC; omitted fields keep their setting.
+message UpdateFieldPrivacyRequest {
+  string studentId = 1;
+  map<string, string> fieldPrivacy = 2;
+}
+
+// audience: PUBLIC (anyone signed in) or TEAMMATES (caller checked the shared team).
+message GetProfileViewRequest {
+  string studentId = 1;
+  string audience = 2;
+}
+
+// Fields not granted to the audience are left out; `visibleFields` lists what was granted,
+// so an empty list or string is told apart from a hidden field.
+message ProfileViewResponse {
+  string studentId = 1;
+  string fullName = 2;
+  string avatarAssetId = 3;
+  string audience = 4;
+  repeated string visibleFields = 5;
+  string email = 6;
+  string phone = 7;
+  string bio = 8;
+  string regionCode = 9;
+  repeated string skills = 10;
+  EducationMessage education = 11;
+  repeated CertificateMessage certificates = 12;
+  repeated string achievements = 13;
+  string cvAssetId = 14;
+  string pitchVideoAssetId = 15;
 }
 
 message PassportResponse {
@@ -243,6 +285,9 @@ message PassportResponse {
   int32 version = 18;
   repeated CertificateMessage certificates = 19;
   ScoreBreakdownMessage scoreBreakdown = 20;
+  map<string, string> fieldPrivacy = 21;
+  string email = 22;
+  string phone = 23;
 }
 
 message CreateConsentRequest {
@@ -255,6 +300,7 @@ message CreateConsentRequest {
   int32 ruleVersion = 7;
   string payloadHash = 8;
   string manifestHash = 9;
+  repeated string scope = 10;
 }
 
 message ConsentResponse {
@@ -263,6 +309,7 @@ message ConsentResponse {
   string snapshotId = 3;
   string payloadHash = 4;
   string expiresAt = 5;
+  repeated string scope = 6;
 }
 
 message GetProfileSnapshotRequest {
@@ -288,9 +335,49 @@ message ValidateConsentRequest {
   string opportunityId = 5;
   int32 expectedRuleVersion = 6;
   string expectedPayloadHash = 7;
+  repeated string attachmentIds = 8;
+  repeated string requiredScope = 9;
 }
 
 message ValidateConsentResponse {
   bool valid = 1;
   int32 profileVersion = 2;
+}
+
+
+message RequestAccountDeletionRequest {
+  string userId = 1;
+  string currentPassword = 2;
+  string snapshotDecision = 3;
+  string reason = 4;
+}
+
+message GetDeletionTrackingRequest {
+  string userId = 1;
+  string trackingId = 2;
+}
+
+message AccountDeletionTrackingResponse {
+  string trackingId = 1;
+  string userId = 2;
+  string status = 3;
+  string snapshotDecision = 4;
+  int32 revokedSessionVersion = 5;
+  bool sessionsRevoked = 6;
+  bool ledgerPreserved = 7;
+  string scheduledPurgeAt = 8;
+  string requestedAt = 9;
+  string reason = 10;
+}
+
+message ExportPersonalDataRequest {
+  string userId = 1;
+}
+
+message ExportPersonalDataResponse {
+  string exportId = 1;
+  string userId = 2;
+  string exportedAt = 3;
+  string payloadJson = 4;
+  bool ledgerPreserved = 5;
 }

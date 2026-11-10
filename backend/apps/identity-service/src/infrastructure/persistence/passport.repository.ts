@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { MediaCategory } from '@shared';
+import { DomainException, ErrorCode, MediaCategory } from '@shared';
 import { IPassportRepository } from '../../domain/ports/passport.repository.port';
 import { Passport, Education, Certificate } from '../../domain/passport.entity';
 import { Consent } from '../../domain/consent.entity';
@@ -52,16 +52,20 @@ export class MongoosePassportRepository implements IPassportRepository {
       isLookingForTeammate: passport.props.isLookingForTeammate,
       isOpenForScholarship: passport.props.isOpenForScholarship,
       isOpenForMentoring: passport.props.isOpenForMentoring,
+      ...(passport.props.fieldPrivacy ? { fieldPrivacy: { ...passport.props.fieldPrivacy } } : {}),
       completionScore: passport.completionScore,
       scoreVersion: passport.scoreVersion,
       version: passport.version,
     });
   }
 
-  async update(passport: Passport): Promise<void> {
-    await this.passportModel
+  async update(passport: Passport, expectedVersion?: number): Promise<void> {
+    const result = await this.passportModel
       .updateOne(
-        { id: { $eq: String(passport.id) } },
+        {
+          id: { $eq: String(passport.id) },
+          ...(expectedVersion !== undefined ? { version: { $eq: expectedVersion } } : {}),
+        },
         {
           $set: {
             fullName: passport.props.fullName,
@@ -77,6 +81,7 @@ export class MongoosePassportRepository implements IPassportRepository {
             isLookingForTeammate: passport.props.isLookingForTeammate,
             isOpenForScholarship: passport.props.isOpenForScholarship,
             isOpenForMentoring: passport.props.isOpenForMentoring,
+            ...(passport.props.fieldPrivacy ? { fieldPrivacy: { ...passport.props.fieldPrivacy } } : {}),
             completionScore: passport.completionScore,
             scoreVersion: passport.scoreVersion,
             version: passport.version,
@@ -84,6 +89,13 @@ export class MongoosePassportRepository implements IPassportRepository {
         },
       )
       .exec();
+
+    if (expectedVersion !== undefined && result.matchedCount === 0) {
+      throw DomainException.conflict(
+        ErrorCode.VERSION_MISMATCH,
+        'Passport vừa được cập nhật ở nơi khác. Vui lòng tải lại dữ liệu mới nhất',
+      );
+    }
   }
 
   async saveConsent(consent: Consent): Promise<void> {
@@ -99,6 +111,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       ruleVersion: consent.ruleVersion,
       manifestHash: consent.manifestHash,
       payloadHash: consent.payloadHash,
+      scope: [...consent.scope],
       expiresAt: consent.expiresAt,
     });
   }
@@ -120,6 +133,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       ruleVersion: doc.ruleVersion,
       manifestHash: doc.manifestHash,
       payloadHash: doc.payloadHash,
+      scope: doc.scope,
       expiresAt: new Date(doc.expiresAt),
     });
   }
@@ -215,6 +229,7 @@ export class MongoosePassportRepository implements IPassportRepository {
     isLookingForTeammate: boolean;
     isOpenForScholarship: boolean;
     isOpenForMentoring: boolean;
+    fieldPrivacy?: Record<string, string>;
     completionScore: number;
     scoreVersion?: number;
     version: number;
@@ -235,6 +250,7 @@ export class MongoosePassportRepository implements IPassportRepository {
       isLookingForTeammate: doc.isLookingForTeammate,
       isOpenForScholarship: doc.isOpenForScholarship,
       isOpenForMentoring: doc.isOpenForMentoring,
+      fieldPrivacy: doc.fieldPrivacy,
       completionScore: doc.completionScore,
       scoreVersion: doc.scoreVersion ?? 1,
     });

@@ -3,6 +3,7 @@
  * Chạy kiểm thử luồng thực tế thông qua HTTP API Gateway (http://localhost:3000)
  */
 
+export {};
 const BASE_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
 
 async function request(path: string, options: RequestInit = {}) {
@@ -285,7 +286,7 @@ async function runE2ETests() {
       fullName: `Sinh Viên Test ${randomSuffix}`,
       bio: 'Đam mê AI và Kiến trúc Microservices',
       regionCode: 'VN-SG',
-      avatarAssetId: 'asset_avatar_001',
+      avatarAssetId: cvAssetId,
       education: {
         institution: 'Đại học Bách Khoa TP.HCM',
         major: 'Khoa học Máy tính',
@@ -340,6 +341,18 @@ async function runE2ETests() {
   const opp = oppsRes.data.items.find((o: any) => o.applyMode === 'IN_APP') || oppsRes.data.items[0];
   const opportunityId = opp.id;
   console.log(`THÀNH CÔNG (Chọn cơ hội: ${opp.title} [ID: ${opportunityId}])`);
+
+  // Step 9B: Check Readiness (F22: FR-PROF-03 / FR-PROF-08)
+  process.stdout.write('9B. [F22] Kiểm tra độ sẵn sàng (Readiness) & dự báo Screening theo Cơ hội... ');
+  const readinessRes = await request(`/profiles/me/readiness?opportunityId=${encodeURIComponent(opportunityId)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (readinessRes.status !== 200 || readinessRes.data.isReady !== true) {
+    console.error('THẤT BẠI readiness:', readinessRes.data);
+    process.exit(1);
+  }
+  console.log(`THÀNH CÔNG (readinessScore: ${readinessRes.data.readinessScore}%, screening: ${readinessRes.data.screening})`);
 
   // Step 10: Create Preview with verified READY cvAssetId
   process.stdout.write('10. Tạo bản xem trước Preview (gRPC Gateway -> Opportunity -> Identity)... ');
@@ -409,6 +422,26 @@ async function runE2ETests() {
   }
   const applicationId = submitRes.data.applicationId;
   console.log(`THÀNH CÔNG (applicationId: ${applicationId}, status: ${submitRes.data.status}, revision: 1)`);
+
+  // Step 12B: Get Application Detail & Block Other Student (F22: FR-APP-03 / FR-APP-08)
+  process.stdout.write('12B. [F22] Xem chi tiết đơn + lịch sử Revision & chặn Sinh viên B xem đơn của A... ');
+  const appDetailRes = await request(`/applications/${applicationId}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (appDetailRes.status !== 200 || !Array.isArray(appDetailRes.data.revisions)) {
+    console.error(' THẤT BẠI xem chi tiết đơn:', appDetailRes.data);
+    process.exit(1);
+  }
+  const crossViewAppRes = await request(`/applications/${applicationId}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${otherLogin.data.accessToken}` },
+  });
+  if (crossViewAppRes.status !== 403) {
+    console.error(' LỖI BẢO MẬT: Sinh viên B xem đơn của Sinh viên A phải bị chặn 403, nhận được:', crossViewAppRes.status);
+    process.exit(1);
+  }
+  console.log(`THÀNH CÔNG (Revisions: ${appDetailRes.data.revisions.length}, chặn truy cập chéo 403)`);
 
   // Step 13: Withdraw Application
   process.stdout.write('13. Rút hồ sơ ứng tuyển... ');

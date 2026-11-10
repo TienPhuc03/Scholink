@@ -4,7 +4,10 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ApplicationUseCase } from '../application/use-cases/application.use-case';
 import {
   CreatePreviewDto,
+  CreateSubmissionIntentDto,
   SubmitApplicationDto,
+  ApplySnapshotRetentionDto,
+  EvaluateTestResultLogDto,
   UpdateApplicationStatusDto,
   UpdateApplicationStatusDtoSchema,
 } from '../application/dtos/opportunity.dto';
@@ -23,7 +26,7 @@ import {
 export class ApplicationController {
   constructor(private readonly applicationUseCase: ApplicationUseCase) {}
 
-  // ================= gRPC Handlers (API Gateway Dispatch) =================
+  // ================= gRPC Handlers (API Gateway / Collaboration Dispatch — F04, F13, F22, F31, F40, SCHOL-20) =================
   @GrpcMethod('OpportunityGrpcService', 'CreateApplicationPreview')
   async createPreview(data: CreatePreviewDto & { studentId: string }) {
     const { studentId, ...dto } = data;
@@ -33,6 +36,46 @@ export class ApplicationController {
   @GrpcMethod('OpportunityGrpcService', 'GetApplicationPreview')
   async getPreview(data: { studentId: string; previewId: string }) {
     return this.applicationUseCase.getPreview(data.studentId, data.previewId);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'CreateSubmissionIntent')
+  async createSubmissionIntent(data: CreateSubmissionIntentDto & { leaderId: string }) {
+    const { leaderId, ...dto } = data;
+    return this.applicationUseCase.createSubmissionIntent(leaderId, dto);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'AbortSubmissionIntent')
+  async abortSubmissionIntent(data: {
+    submissionId?: string;
+    actorId?: string;
+    opportunityId?: string;
+    teamId?: string;
+    reservationId?: string;
+    fencingToken?: number;
+    team_id?: string;
+    reservation_id?: string;
+    fencing_token?: number;
+    reason?: string;
+  }) {
+    return this.applicationUseCase.abortSubmissionIntent({
+      submissionId: data.submissionId,
+      actorId: data.actorId,
+      opportunityId: data.opportunityId,
+      teamId: data.teamId ?? data.team_id,
+      reservationId: data.reservationId ?? data.reservation_id,
+      fencingToken:
+        data.fencingToken !== undefined
+          ? Number(data.fencingToken)
+          : data.fencing_token !== undefined
+            ? Number(data.fencing_token)
+            : undefined,
+      reason: data.reason,
+    });
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'GetSubmissionById')
+  async getSubmissionById(data: { submissionId: string }) {
+    return this.applicationUseCase.getSubmissionById(data.submissionId);
   }
 
   @GrpcMethod('OpportunityGrpcService', 'SubmitApplication')
@@ -47,28 +90,32 @@ export class ApplicationController {
     return { items };
   }
 
+  @GrpcMethod('OpportunityGrpcService', 'GetApplicationById')
+  async getApplicationById(data: { applicationId: string; studentId: string }) {
+    return this.applicationUseCase.getApplicationById(data.applicationId, data.studentId);
+  }
+
   @GrpcMethod('OpportunityGrpcService', 'WithdrawApplication')
   async withdraw(data: { applicationId: string; studentId: string }) {
     return this.applicationUseCase.withdraw(data.applicationId, data.studentId);
   }
 
-  // SCHOL-20: Team Submission Intent Abort RPC (Collaboration Worker -> Opportunity Service)
-  @GrpcMethod('OpportunityGrpcService', 'AbortSubmissionIntent')
-  async abortSubmissionIntent(data: {
-    team_id: string;
-    reservation_id: string;
-    fencing_token: number;
-    reason?: string;
-  }) {
-    return this.applicationUseCase.abortSubmissionIntent({
-      teamId: data.team_id,
-      reservationId: data.reservation_id,
-      fencingToken: Number(data.fencing_token),
-      reason: data.reason,
-    });
+  @GrpcMethod('OpportunityGrpcService', 'CheckReadiness')
+  async checkReadiness(data: { studentId: string; opportunityId: string }) {
+    return this.applicationUseCase.checkReadiness(data.studentId, data.opportunityId);
   }
 
-  // ================= HTTP Handlers (SCHOL-14: Organizer Kanban, Detail, Attachments, Status) =================
+  @GrpcMethod('OpportunityGrpcService', 'ApplySnapshotRetentionDecision')
+  async applySnapshotRetentionDecision(data: ApplySnapshotRetentionDto) {
+    return this.applicationUseCase.applySnapshotRetentionDecision(data);
+  }
+
+  @GrpcMethod('OpportunityGrpcService', 'EvaluateTestResultLog')
+  async evaluateTestResultLog(data: EvaluateTestResultLogDto) {
+    return this.applicationUseCase.evaluateTestResultLog(data);
+  }
+
+  // ================= HTTP Handlers (SCHOL-14 / F24: Organizer Kanban, Detail, Attachments, Status) =================
   @Get('organizer/kanban/:opportunityId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

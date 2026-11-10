@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, Optional, Inject } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { DomainException, ErrorCode } from '@shared';
 import {
   IIdentityClientPort,
   MemberProfileValidationResult,
@@ -30,7 +31,7 @@ export class IdentityGrpcClient implements IIdentityClientPort, OnModuleInit {
   async validateMemberProfile(studentId: string): Promise<MemberProfileValidationResult> {
     if (this.grpcService && typeof this.grpcService.getProfileSnapshot === 'function') {
       try {
-        const res = await firstValueFrom(
+        const res: any = await firstValueFrom(
           this.grpcService.getProfileSnapshot({
             studentId,
             attachmentIds: [],
@@ -55,5 +56,12 @@ export class IdentityGrpcClient implements IIdentityClientPort, OnModuleInit {
 
     // Default fallback in standalone / mocked environment
     return { isValid: true, completionScore: 100 };
+  }
+
+  async getProfileView(studentId: string, audience: 'PUBLIC' | 'TEAMMATES'): Promise<Record<string, unknown>> {
+    if (!this.grpcService || typeof this.grpcService.getProfileView !== 'function') {
+      throw new DomainException(ErrorCode.INTERNAL_ERROR, 'Không kết nối được Identity Service để lấy hồ sơ', 503);
+    }
+    return firstValueFrom(this.grpcService.getProfileView({ studentId, audience })) as Promise<Record<string, unknown>>;
   }
 }

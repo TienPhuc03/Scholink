@@ -10,6 +10,9 @@ export interface TeamMemberConsent {
   profileVersion: number;
   rosterVersion: number;
   confirmedAt: Date;
+  /** F37: the member's own preview and Identity consent, needed by the leader to commit the team Application. */
+  previewId?: string;
+  identityConsentId?: string;
 }
 
 export interface SubmissionReservationProps {
@@ -105,8 +108,8 @@ export class SubmissionReservation extends Entity<string> {
     return this._props.members.every((mId) => this._props.consents.some((c) => c.studentId === mId));
   }
 
-  public confirm(): void {
-    if (this.isExpired()) {
+  public confirm(force = false): void {
+    if (!force && this.isExpired()) {
       throw new DomainException(ErrorCode.HOLD_EXPIRED, 'Phiên giữ chỗ đã hết hạn, không thể xác nhận nộp', 409);
     }
 

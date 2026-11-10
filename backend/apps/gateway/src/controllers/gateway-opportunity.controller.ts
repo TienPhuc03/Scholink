@@ -51,6 +51,22 @@ async function forwardOpportunity(path: string, options: RequestInit = {}) {
   }
 }
 
+/** gRPC carries eligibility rules as JSON text; clients get the array back (FR-OPP-04). */
+export function fromGrpcOpportunity(msg: any): any {
+  if (!msg || typeof msg !== 'object') return msg;
+  const { eligibilityRulesJson, ...rest } = msg;
+  let eligibilityRules: unknown[] = [];
+  if (typeof eligibilityRulesJson === 'string' && eligibilityRulesJson.trim()) {
+    try {
+      const parsed = JSON.parse(eligibilityRulesJson);
+      if (Array.isArray(parsed)) eligibilityRules = parsed;
+    } catch {
+      eligibilityRules = [];
+    }
+  }
+  return { ...rest, eligibilityRules };
+}
+
 @ApiTags('Opportunity Catalog (Opportunity Service)')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/opportunities')
@@ -73,8 +89,8 @@ export class GatewayOpportunityController implements OnModuleInit {
   ) {
     const res = await firstValueFrom(this.opportunityService.listOpportunities(query));
     return {
-      items: res.items ?? [],
-      nextCursor: res.nextCursor ?? null,
+      items: ((res.items as unknown[] | undefined) ?? []).map(fromGrpcOpportunity),
+      nextCursor: res.nextCursor || null,
       hasMore: Boolean(res.hasMore),
     };
   }
@@ -90,12 +106,78 @@ export class GatewayOpportunityController implements OnModuleInit {
     });
   }
 
+  // ================= F14 / OPP-06: Bookmark (forward HTTP to Opportunity Service) =================
+
+  @Get('bookmarks/me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Danh sách cơ hội đã lưu của tôi (đồng bộ bookmark giữa thiết bị)' })
+  @ApiResponse({ status: 200, description: 'Danh sách opportunityId đã lưu' })
+  async listMyBookmarks(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/opportunities/bookmarks/me', {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Post(':id/bookmark')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lưu / bỏ lưu cơ hội. Body { bookmarked: boolean } đặt trạng thái đích (idempotent).',
+  })
+  @ApiBody({
+    required: false,
+    schema: { type: 'object', properties: { bookmarked: { type: 'boolean', example: true } } },
+  })
+  @ApiResponse({ status: 201, description: 'Trạng thái bookmark sau khi cập nhật' })
+  async toggleBookmark(
+    @Param('id') id: string,
+    @Headers('authorization') auth: string,
+    @Body() body: { bookmarked?: boolean } = {},
+  ) {
+    return forwardOpportunity(`/api/v1/opportunities/${encodeURIComponent(id)}/bookmark`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
+  // ================= APP-04 / WF05: tự đánh dấu đã nộp tại nguồn ngoài =================
+
+  @Get(':id/external-mark')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Trạng thái tự đánh dấu nộp tại nguồn (FR-APP-04)' })
+  async getExternalMark(@Param('id') id: string, @Headers('authorization') auth: string) {
+    return forwardOpportunity(`/api/v1/opportunities/${encodeURIComponent(id)}/external-mark`, {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Post(':id/external-mark')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Tự đánh dấu đã nộp tại nguồn ngoài (không tạo Application). Body { marked: boolean }.',
+  })
+  @ApiBody({
+    required: false,
+    schema: { type: 'object', properties: { marked: { type: 'boolean', example: true } } },
+  })
+  async toggleExternalMark(
+    @Param('id') id: string,
+    @Headers('authorization') auth: string,
+    @Body() body: { marked?: boolean } = {},
+  ) {
+    return forwardOpportunity(`/api/v1/opportunities/${encodeURIComponent(id)}/external-mark`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết học bổng / cuộc thi (Hỗ trợ Chế độ Khách FR-AUTH-01)' })
   @ApiResponse({ status: 200, description: 'Chi tiết cơ hội' })
   async getById(@Param('id') id: string) {
-    return firstValueFrom(this.opportunityService.getOpportunityById({ id }));
+    return fromGrpcOpportunity(await firstValueFrom(this.opportunityService.getOpportunityById({ id })));
   }
 
   @Post()

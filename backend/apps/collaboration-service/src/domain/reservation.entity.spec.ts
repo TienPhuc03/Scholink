@@ -41,6 +41,8 @@ describe('SubmissionReservation Entity & Roster Freeze (SRS F33)', () => {
       consentId: 'consent_001',
       snapshotId: 'snap_001',
       payloadHash: 'hash_abc123',
+      profileVersion: 1,
+      rosterVersion: 1,
       confirmedAt: new Date(),
     };
 
@@ -66,6 +68,8 @@ describe('SubmissionReservation Entity & Roster Freeze (SRS F33)', () => {
       consentId: 'consent_fake',
       snapshotId: 'snap_fake',
       payloadHash: 'hash_fake',
+      profileVersion: 1,
+      rosterVersion: 1,
       confirmedAt: new Date(),
     };
 
@@ -87,6 +91,8 @@ describe('SubmissionReservation Entity & Roster Freeze (SRS F33)', () => {
           consentId: 'c1',
           snapshotId: 's1',
           payloadHash: 'h1',
+          profileVersion: 1,
+          rosterVersion: 1,
           confirmedAt: new Date(),
         },
       ],
@@ -109,6 +115,8 @@ describe('SubmissionReservation Entity & Roster Freeze (SRS F33)', () => {
         consentId: `consent_${index}`,
         snapshotId: `snap_${index}`,
         payloadHash: 'common_payload_hash_sha256',
+        profileVersion: 1,
+        rosterVersion: 1,
         confirmedAt: new Date(),
       })),
     });
@@ -132,6 +140,8 @@ describe('SubmissionReservation Entity & Roster Freeze (SRS F33)', () => {
         consentId: `c_${mId}`,
         snapshotId: `s_${mId}`,
         payloadHash: 'hash',
+        profileVersion: 1,
+        rosterVersion: 1,
         confirmedAt: new Date(),
       })),
     });

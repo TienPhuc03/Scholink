@@ -1,8 +1,22 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { OtpPurpose, RedisService } from '@shared';
-import { IUserRepository, SessionRecord } from '../../domain/ports/user.repository.port';
+import {
+  DomainException,
+  ErrorCode,
+  OtpPurpose,
+  OutboxDocument,
+  OutboxModel,
+  RedisService,
+  SnapshotRetentionDecision,
+} from '@shared';
+import {
+  DataDeletionTrackingRecord,
+  DeletionTrackingStatus,
+  IdentityOutboxEventRecord,
+  IUserRepository,
+  SessionRecord,
+} from '../../domain/ports/user.repository.port';
 import { User, UserRole, UserStatus } from '../../domain/user.entity';
 import { OtpRecord } from '../../domain/otp-record.entity';
 import {
@@ -12,7 +26,11 @@ import {
   SessionDocument,
   OtpRecordModel,
   OtpRecordDocument,
+  DataDeletionTrackingModel,
+  DataDeletionTrackingDocument,
 } from './user.schema';
+
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class MongooseUserRepository implements IUserRepository {
@@ -25,6 +43,12 @@ export class MongooseUserRepository implements IUserRepository {
     private readonly otpRecordModel: Model<OtpRecordDocument>,
     @Optional()
     private readonly redisService?: RedisService,
+    @Optional()
+    @InjectModel(DataDeletionTrackingModel.name)
+    private readonly deletionTrackingModel?: Model<DataDeletionTrackingDocument>,
+    @Optional()
+    @InjectModel(OutboxModel.name)
+    private readonly outboxModel?: Model<OutboxDocument>,
   ) {}
 
   async findById(id: string): Promise<User | null> {
@@ -49,17 +73,26 @@ export class MongooseUserRepository implements IUserRepository {
   }
 
   async save(user: User): Promise<void> {
-    await this.userModel.create({
-      id: user.id,
-      email: user.email,
-      normalizedEmail: user.normalizedEmail,
-      passwordHash: user.passwordHash,
-      fullName: user.fullName,
-      role: user.role,
-      status: user.status,
-      sessionVersion: user.sessionVersion,
-      version: user.version,
-    });
+    try {
+      await this.userModel.create({
+        id: user.id,
+        email: user.email,
+        normalizedEmail: user.normalizedEmail,
+        passwordHash: user.passwordHash,
+        fullName: user.fullName,
+        role: user.role,
+        status: user.status,
+        sessionVersion: user.sessionVersion,
+        deletedAt: user.props.deletedAt,
+        version: user.version,
+      });
+    } catch (err: unknown) {
+      // Hai request đăng ký cùng email: index unique chặn request đến sau
+      if ((err as { code?: number })?.code === 11000) {
+        throw DomainException.conflict(ErrorCode.EMAIL_ALREADY_EXISTS, 'Email đã được sử dụng');
+      }
+      throw err;
+    }
   }
 
   async update(user: User): Promise<void> {
@@ -73,6 +106,8 @@ export class MongooseUserRepository implements IUserRepository {
             role: user.role,
             status: user.status,
             sessionVersion: user.sessionVersion,
+            phone: user.props.phone ?? null,
+            ...(user.props.deletedAt ? { deletedAt: user.props.deletedAt } : {}),
             version: user.version,
           },
         },
@@ -109,10 +144,14 @@ export class MongooseUserRepository implements IUserRepository {
     });
   }
 
-  async markSessionUsed(sessionId: string): Promise<void> {
-    await this.sessionModel
-      .updateOne({ id: { $eq: String(sessionId) } }, { $set: { isUsed: true } })
+  async markSessionUsed(sessionId: string): Promise<boolean> {
+    const result = await this.sessionModel
+      .updateOne(
+        { id: { $eq: String(sessionId) }, isUsed: { $eq: false }, isRevoked: { $eq: false } },
+        { $set: { isUsed: true } },
+      )
       .exec();
+    return result.modifiedCount === 1;
   }
 
   async revokeSessionFamily(familyId: string, reason: string): Promise<void> {
@@ -122,6 +161,11 @@ export class MongooseUserRepository implements IUserRepository {
         { $set: { isRevoked: true, revokedReason: String(reason) } },
       )
       .exec();
+
+    // FR-AUTH-04: access tokens already issued stop working now, not when they expire.
+    if (this.redisService?.isAvailable) {
+      await this.redisService.set(`revoked_family:${familyId}`, String(reason), ACCESS_TOKEN_TTL_SECONDS);
+    }
   }
 
   async revokeAllUserSessions(userId: string, reason: string): Promise<void> {
@@ -132,9 +176,10 @@ export class MongooseUserRepository implements IUserRepository {
       )
       .exec();
 
-    // SCHOL-14: Invalidate token instantly in Redis cache if available (7 days TTL)
+    // SCHOL-14: reject tokens issued before now, without blocking the next login (7 days TTL)
     if (this.redisService?.isAvailable) {
-      await this.redisService.set(`revoked_user:${userId}`, String(reason), 7 * 24 * 3600);
+      const revokedAtSeconds = Math.floor(Date.now() / 1000);
+      await this.redisService.set(`revoked_before:${userId}`, String(revokedAtSeconds), 7 * 24 * 3600);
     }
   }
 
@@ -192,6 +237,82 @@ export class MongooseUserRepository implements IUserRepository {
       .exec();
   }
 
+  async saveDeletionTracking(record: DataDeletionTrackingRecord): Promise<void> {
+    if (!this.deletionTrackingModel) return;
+    await this.deletionTrackingModel.create({
+      trackingId: record.trackingId,
+      userId: record.userId,
+      status: record.status,
+      snapshotDecision: record.snapshotDecision,
+      revokedSessionVersion: record.revokedSessionVersion,
+      sessionsRevoked: record.sessionsRevoked,
+      ledgerPreserved: record.ledgerPreserved,
+      scheduledPurgeAt: record.scheduledPurgeAt,
+      requestedAt: record.requestedAt,
+      reason: record.reason,
+    });
+  }
+
+  async findDeletionTrackingById(trackingId: string): Promise<DataDeletionTrackingRecord | null> {
+    if (!this.deletionTrackingModel) return null;
+    const doc = await this.deletionTrackingModel
+      .findOne({ trackingId: { $eq: String(trackingId) } })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return this.toTrackingRecord(doc);
+  }
+
+  async findDeletionTrackingsByUser(userId: string): Promise<DataDeletionTrackingRecord[]> {
+    if (!this.deletionTrackingModel) return [];
+    const docs = await this.deletionTrackingModel
+      .find({ userId: { $eq: String(userId) } })
+      .sort({ requestedAt: -1 })
+      .lean()
+      .exec();
+    return docs.map((d) => this.toTrackingRecord(d));
+  }
+
+  async saveOutboxEvent(event: IdentityOutboxEventRecord): Promise<void> {
+    if (!this.outboxModel) return;
+    await this.outboxModel.create({
+      eventId: event.eventId,
+      type: event.type,
+      occurredAt: event.occurredAt,
+      producer: event.producer,
+      aggregateId: event.aggregateId,
+      aggregateVersion: event.aggregateVersion,
+      correlationId: event.correlationId,
+      data: event.data,
+    });
+  }
+
+  private toTrackingRecord(doc: {
+    trackingId: string;
+    userId: string;
+    status: string;
+    snapshotDecision: string;
+    revokedSessionVersion: number;
+    sessionsRevoked: boolean;
+    ledgerPreserved: boolean;
+    scheduledPurgeAt: Date;
+    requestedAt: Date;
+    reason?: string;
+  }): DataDeletionTrackingRecord {
+    return Object.freeze({
+      trackingId: doc.trackingId,
+      userId: doc.userId,
+      status: doc.status as DeletionTrackingStatus,
+      snapshotDecision: doc.snapshotDecision as SnapshotRetentionDecision,
+      revokedSessionVersion: doc.revokedSessionVersion,
+      sessionsRevoked: doc.sessionsRevoked,
+      ledgerPreserved: doc.ledgerPreserved,
+      scheduledPurgeAt: new Date(doc.scheduledPurgeAt),
+      requestedAt: new Date(doc.requestedAt),
+      reason: doc.reason,
+    });
+  }
+
   private toDomain(doc: {
     id: string;
     email: string;
@@ -200,7 +321,9 @@ export class MongooseUserRepository implements IUserRepository {
     fullName: string;
     role: string;
     status: string;
+    phone?: string | null;
     sessionVersion?: number;
+    deletedAt?: Date;
     version: number;
   }): User {
     return new User(doc.id, {
@@ -210,7 +333,10 @@ export class MongooseUserRepository implements IUserRepository {
       fullName: doc.fullName,
       role: doc.role as UserRole,
       status: doc.status as UserStatus,
+      // Mapped so that other account updates (password reset, block…) keep the stored phone.
+      phone: doc.phone ?? undefined,
       sessionVersion: doc.sessionVersion ?? 1,
+      deletedAt: doc.deletedAt ? new Date(doc.deletedAt) : undefined,
       version: doc.version,
     });
   }

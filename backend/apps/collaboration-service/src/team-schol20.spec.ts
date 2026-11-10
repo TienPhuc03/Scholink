@@ -218,19 +218,17 @@ class InMemoryChatRepository implements IChatRepository {
     return null;
   }
 
-  async appendMessageWithSeqAndOutbox(): Promise<{ message: Message; outbox: OutboxRecord }> {
-    throw new Error('Not needed for SCHOL-20');
-  }
-
-  async findMessagesByRoom(): Promise<Message[]> {
+  async findMessagesByRoom(roomId: string, afterSeq?: number, limit?: number): Promise<Message[]> {
     return [];
   }
 
-  async updateReadCursor(): Promise<number> {
-    return 0;
+  async saveMessageWithOutboxInTransaction(): Promise<any> {
+    return { message: {} as any, isDuplicate: false };
   }
 
-  async getReadCursor(): Promise<number> {
+  async updateReadReceipt(): Promise<void> {}
+
+  async getReadReceipt(): Promise<number> {
     return 0;
   }
 
@@ -238,8 +236,9 @@ class InMemoryChatRepository implements IChatRepository {
     return [];
   }
 
-  async markOutboxPublished(): Promise<void> {}
-  async markOutboxFailed(): Promise<void> {}
+  async markOutboxPublished(id: string): Promise<void> {}
+
+  async markOutboxFailed(id: string, error: string, nextRetryAt: Date, retryCount: number): Promise<void> {}
 }
 
 /**
@@ -395,6 +394,8 @@ describe('SCHOL-20: Team Consent, Roster Freeze & Reservation Suite', () => {
         maxSize: 4,
         status: 'FORMING',
         members: [{ studentId: leaderId, role: 'LEADER', joinedAt: new Date() }],
+        rosterVersion: 1,
+        fencingToken: 0,
       });
       await teamRepo.save(team);
       await teamRepo.saveActiveMembership({

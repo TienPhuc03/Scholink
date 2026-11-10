@@ -15,4 +15,10 @@ export {
   ForgotPasswordDto,
   ResetPasswordDtoSchema,
   ResetPasswordDto,
+  SnapshotRetentionDecisionSchema,
+  SnapshotRetentionDecision,
+  RequestAccountDeletionDtoSchema,
+  RequestAccountDeletionDto,
+  GetDeletionTrackingDtoSchema,
+  GetDeletionTrackingDto,
 } from '@shared';

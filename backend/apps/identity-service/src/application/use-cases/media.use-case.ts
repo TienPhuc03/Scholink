@@ -124,10 +124,6 @@ export class MediaUseCase {
     for (const id of uniqueIds) {
       const asset = assetMap.get(id);
       if (!asset) {
-        // Hỗ trợ ngược các mã mock tĩnh `asset_*` của bộ kịch bản F04 cũ nếu chưa tạo bản ghi MediaAsset
-        if (id.startsWith('asset_')) {
-          continue;
-        }
         throw DomainException.conflict(
           ErrorCode.ASSET_NOT_AVAILABLE,
           `Tệp minh chứng (${id}) không tồn tại hoặc chưa được tải lên hệ thống`,

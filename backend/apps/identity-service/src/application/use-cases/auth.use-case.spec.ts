@@ -62,6 +62,7 @@ describe('AuthUseCase Integration Test (Authentication & Security Rules)', () =>
       });
 
       expect(result.role).toBe('STUDENT');
+      expect(result.status).toBe('PENDING_VERIFICATION');
       expect(mockUserRepo.save).toHaveBeenCalledTimes(1);
       expect(mockPassportRepo.save).toHaveBeenCalledTimes(1);
     });
@@ -124,6 +125,105 @@ describe('AuthUseCase Integration Test (Authentication & Security Rules)', () =>
           password: 'WrongPassword@2026',
         }),
       ).rejects.toThrow(DomainException);
+    });
+  });
+
+  describe('Session tokens (FR-AUTH-04)', () => {
+    it('marks the access and refresh tokens with their own type', async () => {
+      const passwordHash = await bcrypt.hash('ValidPassword@2026', 4);
+      mockUserRepo.findByEmail.mockResolvedValue({
+        id: 'u1',
+        email: 'test@scholink.edu.vn',
+        fullName: 'Nguyen Van A',
+        role: 'STUDENT',
+        status: 'ACTIVE',
+        passwordHash,
+        sessionVersion: 1,
+      } as any);
+
+      const tokens = await authUseCase.login({ email: 'test@scholink.edu.vn', password: 'ValidPassword@2026' });
+
+      expect(jwtService.decode(tokens.accessToken)).toMatchObject({ typ: 'access' });
+      expect(jwtService.decode(tokens.refreshToken)).toMatchObject({ typ: 'refresh' });
+    });
+
+    it('logout revokes the whole token family of the device', async () => {
+      await authUseCase.logout('u1', 'sess1', 'fam1');
+
+      expect(mockUserRepo.revokeSessionFamily).toHaveBeenCalledWith('fam1', 'USER_LOGOUT');
+    });
+  });
+
+  describe('Refresh rotation under concurrency (FR-AUTH-04)', () => {
+    it('treats the request that loses the claim as a replay and issues nothing', async () => {
+      const refreshToken = jwtService.sign({ sub: 'u1', sessionVersion: 1, typ: 'refresh' });
+      mockUserRepo.findSessionByTokenHash.mockResolvedValue({
+        id: 's1',
+        userId: 'u1',
+        tokenHash: 'h',
+        familyId: 'fam1',
+        isUsed: false,
+        isRevoked: false,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      mockUserRepo.findById.mockResolvedValue({ id: 'u1', status: 'ACTIVE', sessionVersion: 1 } as any);
+      mockUserRepo.markSessionUsed.mockResolvedValue(false);
+
+      await expect(authUseCase.refresh({ refreshToken })).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHENTICATED,
+      });
+
+      expect(mockUserRepo.revokeSessionFamily).toHaveBeenCalledWith('fam1', 'REFRESH_TOKEN_REPLAY_OR_REVOKED');
+      expect(mockUserRepo.saveSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Password reset does not reveal accounts (FR-AUTH-03)', () => {
+    const activeUser = { id: 'u1', email: 'a@uit.edu.vn', status: 'ACTIVE' } as any;
+
+    it('answers a real and an unknown email identically', async () => {
+      mockUserRepo.findByEmail.mockResolvedValueOnce(activeUser).mockResolvedValueOnce(null);
+
+      const known = await authUseCase.forgotPassword({ email: 'a@uit.edu.vn' });
+      const unknown = await authUseCase.forgotPassword({ email: 'a@uit.edu.vn' });
+
+      expect({ ...unknown, devOtpPreview: '' }).toEqual({ ...known, devOtpPreview: '' });
+      expect(unknown.devOtpPreview).toBe('');
+      expect(mockUserRepo.saveOtpRecord).toHaveBeenCalledTimes(2);
+    });
+
+    it('applies the cooldown to an unknown email too', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.findOtpRecord.mockResolvedValue({
+        assertCanResend: () => {
+          throw new DomainException(ErrorCode.OTP_COOLDOWN, 'Vui lòng chờ 60 giây', 429);
+        },
+      } as any);
+
+      await expect(authUseCase.forgotPassword({ email: 'ghost@uit.edu.vn' })).rejects.toMatchObject({
+        code: ErrorCode.OTP_COOLDOWN,
+      });
+    });
+
+    it('rejects a reset for an unknown email with the OTP error, not 404', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.findOtpRecord.mockResolvedValue(null);
+      const noCode = authUseCase.resetPassword({
+        email: 'ghost@uit.edu.vn',
+        otpCode: '123456',
+        newPassword: 'ValidPassword@2026',
+      });
+      await expect(noCode).rejects.toMatchObject({ code: ErrorCode.OTP_INVALID, statusCode: 400 });
+
+      mockUserRepo.findOtpRecord.mockResolvedValue({
+        verifyAttempt: () => ({ matched: true, updatedRecord: {} }),
+      } as any);
+      const matchedCode = authUseCase.resetPassword({
+        email: 'ghost@uit.edu.vn',
+        otpCode: '123456',
+        newPassword: 'ValidPassword@2026',
+      });
+      await expect(matchedCode).rejects.toMatchObject({ code: ErrorCode.OTP_INVALID, statusCode: 400 });
     });
   });
 

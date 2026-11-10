@@ -116,9 +116,8 @@ export const CompleteUploadDtoSchema = z.object({
   fileHeaderHex: z
     .string()
     .trim()
-    .regex(/^[a-fA-F0-9]{8,64}$/, 'fileHeaderHex phải là chuỗi hex hợp lệ (tối thiểu 4 byte đầu)')
-    .optional(),
-  sampleContent: z.string().max(4096).optional(),
+    .regex(/^[a-fA-F0-9]{8,64}$/, 'fileHeaderHex phải là chuỗi hex hợp lệ (tối thiểu 4 byte đầu)'),
+  sampleContent: z.string().max(4096),
   actualSizeBytes: z.number().int().positive().optional(),
 });
 
@@ -147,6 +146,12 @@ export type CertificateInput = z.infer<typeof CertificateInputSchema>;
 
 export const UpdatePassportDtoSchema = z.object({
   expectedVersion: z.number().int().min(1, 'expectedVersion phải >= 1').optional(),
+  // FR-PROF-05: stored on the account; empty string removes it.
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(\+?[0-9][0-9 .-]{7,18}[0-9])?$/, 'Số điện thoại không hợp lệ')
+    .optional(),
   fullName: z.string().transform(sanitizePlainText).pipe(z.string().min(2).max(100)).optional(),
   bio: z.string().transform(sanitizePlainText).pipe(z.string().max(500)).optional(),
   avatarAssetId: z.string().trim().max(120).optional(),
@@ -184,6 +189,22 @@ export const UpdatePassportDtoSchema = z.object({
 
 export type UpdatePassportDto = z.infer<typeof UpdatePassportDtoSchema>;
 
+/** FR-PROF-05: `PUT /profiles/me/privacy`. Unknown fields are rejected by the Identity service. */
+export const UpdateFieldPrivacyDtoSchema = z.object({
+  fieldPrivacy: z.record(z.string(), z.enum(['PRIVATE', 'TEAMMATES', 'PUBLIC'])),
+});
+
+export type UpdateFieldPrivacyDto = z.infer<typeof UpdateFieldPrivacyDtoSchema>;
+
+export const ProfileViewQueryDtoSchema = z.object({
+  audience: z.enum(['PUBLIC', 'TEAMMATES']).default('PUBLIC'),
+});
+
+export type ProfileViewQueryDto = z.infer<typeof ProfileViewQueryDtoSchema>;
+
+export const ConsentScopeSchema = z.enum(['SNAPSHOT', 'ATTACHMENTS']);
+export type ConsentScope = z.infer<typeof ConsentScopeSchema>;
+
 export const CreateConsentDtoSchema = z.object({
   previewId: z.string().trim().min(1),
   snapshotId: z.string().trim().min(1),
@@ -193,6 +214,40 @@ export const CreateConsentDtoSchema = z.object({
   ruleVersion: z.number().int().min(1),
   payloadHash: z.string().trim().length(64, 'payloadHash phải là chuỗi SHA-256 64 ký tự hex'),
   manifestHash: z.string().trim().length(64, 'manifestHash phải là chuỗi SHA-256 64 ký tự hex'),
+  scope: z
+    .array(ConsentScopeSchema)
+    .min(1, 'Phạm vi đồng ý (scope) phải có ít nhất 1 mục')
+    .default(['SNAPSHOT', 'ATTACHMENTS']),
 });
 
 export type CreateConsentDto = z.infer<typeof CreateConsentDtoSchema>;
+
+/**
+ * F40 Backend — FR-AUTH-08, Mục 28, Mục 29, D06 & E13 SRS:
+ * Yêu cầu xóa tài khoản (bắt buộc xác thực lại mật khẩu hiện tại),
+ * lựa chọn quyết định giữ/xóa Snapshot ứng tuyển (RETAIN | PURGE) và tra cứu mã theo dõi (trackingId).
+ */
+export const SnapshotRetentionDecisionSchema = z.enum(['RETAIN', 'PURGE']);
+export type SnapshotRetentionDecision = z.infer<typeof SnapshotRetentionDecisionSchema>;
+
+export const RequestAccountDeletionDtoSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, 'Bắt buộc nhập mật khẩu hiện tại để xác thực lại trước khi xóa tài khoản')
+    .max(128),
+  snapshotDecision: SnapshotRetentionDecisionSchema.default('RETAIN'),
+  reason: z
+    .string()
+    .transform(sanitizePlainText)
+    .pipe(z.string().max(500))
+    .optional(),
+});
+
+export type RequestAccountDeletionDto = z.infer<typeof RequestAccountDeletionDtoSchema>;
+
+export const GetDeletionTrackingDtoSchema = z.object({
+  trackingId: z.string().trim().min(1, 'trackingId không được để trống').max(120),
+});
+
+export type GetDeletionTrackingDto = z.infer<typeof GetDeletionTrackingDtoSchema>;
+

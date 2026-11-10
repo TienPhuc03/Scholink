@@ -11,6 +11,7 @@ export interface ConsentProps {
   readonly ruleVersion: number;
   readonly manifestHash: string;
   readonly payloadHash: string;
+  readonly scope?: readonly string[];
   readonly expiresAt: Date;
   readonly createdAt?: Date;
 }
@@ -20,7 +21,14 @@ export class Consent extends Entity<string> {
 
   constructor(id: string, props: ConsentProps) {
     super(id, 1, props.createdAt || new Date(), props.createdAt || new Date());
-    this._props = Object.freeze({ ...props });
+    const normalizedScope =
+      props.scope && props.scope.length > 0
+        ? Object.freeze([...new Set(props.scope)])
+        : Object.freeze(['SNAPSHOT', 'ATTACHMENTS']);
+    this._props = Object.freeze({
+      ...props,
+      scope: normalizedScope,
+    });
   }
 
   get actorId(): string {
@@ -55,6 +63,10 @@ export class Consent extends Entity<string> {
     return this._props.ruleVersion;
   }
 
+  get scope(): readonly string[] {
+    return this._props.scope ?? Object.freeze(['SNAPSHOT', 'ATTACHMENTS']);
+  }
+
   get expiresAt(): Date {
     return this._props.expiresAt;
   }
@@ -68,7 +80,7 @@ export class Consent extends Entity<string> {
   }
 
   /**
-   * Mục 26 SRS: Kiểm tra hiệu lực Consent tại thời điểm Commit Application
+   * Mục 26 SRS: Kiểm tra hiệu lực Consent và phạm vi dữ liệu (scope) tại thời điểm Commit Application
    */
   public verifyForSubmission(params: {
     studentId: string;
@@ -78,6 +90,7 @@ export class Consent extends Entity<string> {
     currentProfileVersion: number;
     expectedRuleVersion: number;
     expectedPayloadHash: string;
+    requiredScope?: readonly string[];
   }): void {
     if (this.actorId !== params.studentId) {
       throw DomainException.forbidden('Consent không thuộc quyền sở hữu của sinh viên hiện tại');
@@ -108,6 +121,16 @@ export class Consent extends Entity<string> {
       throw DomainException.conflict(
         ErrorCode.CONSENT_MISMATCH,
         'Nội dung chữ ký Consent không khớp với bản chụp Preview hoặc phiên bản điều kiện',
+      );
+    }
+
+    const requiredScope = params.requiredScope ?? ['SNAPSHOT'];
+    const missingScopes = requiredScope.filter((item) => !this.scope.includes(item));
+    if (missingScopes.length > 0) {
+      throw DomainException.unprocessable(
+        ErrorCode.CONSENT_REQUIRED,
+        `Phạm vi đồng ý (scope) của Consent còn thiếu: ${missingScopes.join(', ')}`,
+        missingScopes,
       );
     }
   }

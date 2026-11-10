@@ -19,6 +19,7 @@ export interface AuthenticatedUser {
   readonly email: string;
   readonly role: 'STUDENT' | 'ORGANIZER' | 'ADMIN';
   readonly sessionId?: string;
+  readonly familyId?: string;
   readonly organizationId?: string;
 }
 
@@ -65,7 +66,10 @@ export class JwtAuthGuard implements CanActivate {
         email: string;
         role: 'STUDENT' | 'ORGANIZER' | 'ADMIN';
         sessionId?: string;
+        familyId?: string;
         organizationId?: string;
+        iat?: number;
+        typ?: string;
       }>(token);
 
       const authenticatedUser: AuthenticatedUser = Object.freeze({
@@ -73,17 +77,18 @@ export class JwtAuthGuard implements CanActivate {
         email: payload.email,
         role: payload.role,
         sessionId: payload.sessionId,
+        familyId: payload.familyId,
         organizationId: payload.organizationId,
       });
 
-      if (!authenticatedUser.userId || !authenticatedUser.role) {
+      if (!authenticatedUser.userId || !authenticatedUser.role || payload.typ !== 'access') {
         throw new Error('Invalid token claims');
       }
 
       // SCHOL-14: Kiểm tra trạng thái thu hồi phiên hoặc quyền tài khoản từ Redis nếu khả dụng
       if (this.redisService?.isAvailable) {
-        if (authenticatedUser.sessionId) {
-          const isRevoked = await this.redisService.get(`revoked_session:${authenticatedUser.sessionId}`);
+        if (authenticatedUser.familyId) {
+          const isRevoked = await this.redisService.get(`revoked_family:${authenticatedUser.familyId}`);
           if (isRevoked) {
             throw new DomainException(
               ErrorCode.UNAUTHENTICATED,
@@ -93,8 +98,10 @@ export class JwtAuthGuard implements CanActivate {
           }
         }
         if (authenticatedUser.userId) {
-          const isUserRevoked = await this.redisService.get(`revoked_user:${authenticatedUser.userId}`);
-          if (isUserRevoked) {
+          // Only tokens issued before the revocation are rejected, so logging in again still works.
+          // iat has 1 s precision: a login in the same second as the revocation stays valid.
+          const revokedBefore = await this.redisService.get(`revoked_before:${authenticatedUser.userId}`);
+          if (revokedBefore && !(Number(payload.iat) >= Number(revokedBefore))) {
             throw new DomainException(
               ErrorCode.UNAUTHENTICATED,
               'Quyền hoặc thành viên của tài khoản đã bị thu hồi, vui lòng đăng nhập lại',

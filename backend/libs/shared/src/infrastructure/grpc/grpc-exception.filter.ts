@@ -1,7 +1,8 @@
 import { Catch, RpcExceptionFilter, ArgumentsHost, Logger } from '@nestjs/common';
-import { Observable, throwError } from 'rxjs';
+import { EMPTY, Observable, throwError } from 'rxjs';
 import { RpcException } from '@nestjs/microservices';
 import { DomainException, ErrorCode } from '../../domain/domain.exception';
+import { GlobalExceptionFilter } from '../filters/http-exception.filter';
 
 export interface SerializedRpcError {
   readonly isDomainException: true;
@@ -14,8 +15,20 @@ export interface SerializedRpcError {
 @Catch()
 export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
   private readonly logger = new Logger(GrpcExceptionFilter.name);
+  private readonly httpFilter = new GlobalExceptionFilter();
 
-  catch(exception: unknown, _host: ArgumentsHost): Observable<never> {
+  /**
+   * This filter is put on controllers that serve BOTH gRPC methods and HTTP routes. On an HTTP
+   * request an Observable error is never turned into a response, so the client hung until its
+   * timeout (e.g. 409/404 from POST /opportunities/:id/external-mark). HTTP errors therefore go
+   * through the normal HTTP error mapping; gRPC keeps the serialized RpcException.
+   */
+  catch(exception: unknown, host: ArgumentsHost): Observable<never> {
+    if (host.getType() === 'http') {
+      this.httpFilter.catch(exception, host);
+      return EMPTY as Observable<never>;
+    }
+
     if (exception instanceof DomainException) {
       const payload: SerializedRpcError = {
         isDomainException: true,
@@ -31,6 +44,11 @@ export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
       return throwError(() => exception);
     }
 
+    const forwarded = this.domainErrorFromDownstream(exception);
+    if (forwarded) {
+      return throwError(() => new RpcException(forwarded));
+    }
+
     const internalMessage =
       exception instanceof Error ? exception.message : 'Unknown gRPC service error';
     const internalStack = exception instanceof Error ? exception.stack : undefined;
@@ -43,5 +61,20 @@ export class GrpcExceptionFilter implements RpcExceptionFilter<unknown> {
       statusCode: 500,
     };
     return throwError(() => new RpcException(JSON.stringify(scrubbedPayload)));
+  }
+
+  /**
+   * A service calling another service over gRPC receives the callee's serialized DomainException
+   * in `details`. Returns that payload so its code and status reach the original caller.
+   */
+  private domainErrorFromDownstream(exception: unknown): string | null {
+    const details = (exception as { details?: unknown } | null | undefined)?.details;
+    if (typeof details !== 'string') return null;
+    try {
+      const parsed = JSON.parse(details) as Partial<SerializedRpcError>;
+      return parsed?.isDomainException && parsed.code && parsed.message ? details : null;
+    } catch {
+      return null;
+    }
   }
 }

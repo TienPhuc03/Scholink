@@ -1,14 +1,15 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type NotificationDocument = NotificationModel & Document;
 export type ReminderDocument = ReminderModel & Document;
-export type NotificationPreferenceDocument = NotificationPreferenceModel & Document;
+export type NotificationPreferenceDocument = NotificationPreferenceModel &
+  Document;
 
 /**
  * Mục 20 & 27 SRS: Collection notifications (unique userId/businessKey)
  */
-@Schema({ collection: 'notifications', timestamps: true })
+@Schema({ collection: "notifications", timestamps: true })
 export class NotificationModel {
   @Prop({ required: true, unique: true, index: true })
   id: string;
@@ -36,17 +37,24 @@ export class NotificationModel {
 
   @Prop()
   readAt?: Date;
+
+  @Prop()
+  reason?: string;
 }
 
-export const NotificationSchema = SchemaFactory.createForClass(NotificationModel);
+export const NotificationSchema =
+  SchemaFactory.createForClass(NotificationModel);
 NotificationSchema.index({ userId: 1, createdAt: -1 });
-NotificationSchema.index({ userId: 1, businessKey: 1 }, { unique: true, sparse: true });
+NotificationSchema.index(
+  { userId: 1, businessKey: 1 },
+  { unique: true, sparse: true },
+);
 
 /**
  * Mục 12D, 20 & 27 SRS: Collection reminders
  * Unique (userId, source, milestoneId, offset, deadlineVersion)
  */
-@Schema({ collection: 'reminders', timestamps: true })
+@Schema({ collection: "reminders", timestamps: true })
 export class ReminderModel {
   @Prop({ required: true, unique: true })
   id: string;
@@ -66,14 +74,41 @@ export class ReminderModel {
   @Prop({ required: true, default: 1 })
   deadlineVersion: number;
 
+  @Prop({ required: true, default: 1 })
+  preferenceVersion: number;
+
   @Prop({ required: true })
   dueAt: Date;
 
   @Prop({ required: true, index: true })
   plannedSendAt: Date;
 
-  @Prop({ required: true, enum: ['SCHEDULED', 'SENT', 'SUPPRESSED_QUIET_DEADLINE', 'CANCELLED'], default: 'SCHEDULED' })
+  @Prop({
+    required: true,
+    enum: ["SCHEDULED", "SENT", "SUPPRESSED_QUIET_DEADLINE", "CANCELLED"],
+    default: "SCHEDULED",
+  })
   status: string;
+
+  @Prop({ required: true })
+  reason: string;
+
+  /** Deadline the offsets are counted from; kept so reminders can be re-planned when the
+   * user changes timezone (NOTI-03) without asking the Opportunity Service again. */
+  @Prop()
+  deadlineAt?: Date;
+
+  /** Opportunity title shown in the inbox message. */
+  @Prop()
+  title?: string;
+
+  /** Timezone the quiet hours were applied in. */
+  @Prop()
+  timezone?: string;
+
+  /** Push outcome, kept apart from the inbox one (F26): PENDING, PENDING_RETRY, SENT, FAILED, SKIPPED. */
+  @Prop()
+  pushStatus?: string;
 }
 
 export const ReminderSchema = SchemaFactory.createForClass(ReminderModel);
@@ -85,18 +120,18 @@ ReminderSchema.index(
 /**
  * Mục 12D & 27 SRS: Collection preferences (Quiet hours [22:00, 07:00) theo timezone người dùng)
  */
-@Schema({ collection: 'preferences', timestamps: true })
+@Schema({ collection: "preferences", timestamps: true })
 export class NotificationPreferenceModel {
   @Prop({ required: true, unique: true, index: true })
   userId: string;
 
-  @Prop({ default: 'Asia/Ho_Chi_Minh' })
+  @Prop({ default: "Asia/Ho_Chi_Minh" })
   timezone: string;
 
-  @Prop({ default: '22:00' })
+  @Prop({ default: "22:00" })
   quietStart: string;
 
-  @Prop({ default: '07:00' })
+  @Prop({ default: "07:00" })
   quietEnd: string;
 
   @Prop({ default: true })

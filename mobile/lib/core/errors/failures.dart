@@ -57,3 +57,10 @@ class CacheFailure extends Failure {
     super.code = 'CACHE_ERROR',
   });
 }
+
+class PermissionDeniedFailure extends Failure {
+  const PermissionDeniedFailure({
+    super.message = 'Quyền truy cập thông báo hoặc lịch thiết bị bị từ chối.',
+    super.code = 'PERMISSION_DENIED',
+  });
+}

@@ -37,7 +37,7 @@ export class OpportunityGrpcClient implements IOpportunityClientPort, OnModuleIn
   }): Promise<AbortIntentResult> {
     if (this.grpcService && typeof this.grpcService.abortSubmissionIntent === 'function') {
       try {
-        const res = await firstValueFrom(
+        const res: any = await firstValueFrom(
           this.grpcService.abortSubmissionIntent({
             team_id: params.teamId,
             reservation_id: params.reservationId,

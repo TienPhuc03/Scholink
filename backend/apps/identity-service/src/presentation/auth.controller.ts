@@ -9,6 +9,7 @@ import {
   VerifyOtpDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestAccountDeletionDto,
 } from '../application/dtos/auth.dto';
 import { GrpcExceptionFilter } from '@shared';
 
@@ -33,8 +34,8 @@ export class AuthController {
   }
 
   @GrpcMethod('IdentityGrpcService', 'Logout')
-  async logout(data: { userId: string; sessionId?: string }) {
-    return this.authUseCase.logout(data.userId, data.sessionId);
+  async logout(data: { userId: string; sessionId?: string; familyId?: string }) {
+    return this.authUseCase.logout(data.userId, data.sessionId, data.familyId);
   }
 
   @GrpcMethod('IdentityGrpcService', 'SendOtp')
@@ -55,5 +56,21 @@ export class AuthController {
   @GrpcMethod('IdentityGrpcService', 'ResetPassword')
   async resetPassword(dto: ResetPasswordDto) {
     return this.authUseCase.resetPassword(dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'RequestAccountDeletion')
+  async requestAccountDeletion(data: RequestAccountDeletionDto & { userId: string }) {
+    const { userId, ...dto } = data;
+    return this.authUseCase.requestAccountDeletion(userId, dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'GetDeletionTracking')
+  async getDeletionTracking(data: { userId: string; trackingId: string }) {
+    return this.authUseCase.getDeletionTracking(data.userId, data.trackingId);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'ExportPersonalData')
+  async exportPersonalData(data: { userId: string }) {
+    return this.authUseCase.exportPersonalData(data.userId);
   }
 }
