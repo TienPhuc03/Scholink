@@ -74,14 +74,23 @@ class ScreeningPill extends StatelessWidget {
   Widget build(BuildContext context) => Pill(text: screening.label, color: screeningColor(screening));
 }
 
-/// White bordered card with an icon title, matching the Passport screens.
+/// Card shadow of the application frames (357:*): `drop-shadow 0 1 1 rgba(0,0,0,.05)`.
+const List<BoxShadow> cardShadow = <BoxShadow>[
+  BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 1),
+];
+
+/// Info/ID strip background used inside cards (#F2F3FF).
+BoxDecoration get tintBox =>
+    BoxDecoration(color: AppColors.cardInfoBackground, borderRadius: BorderRadius.circular(8));
+
+/// White card with an optional icon title, as in the Figma application frames.
 class SectionCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final Widget child;
   final Widget? trailing;
 
-  const SectionCard({super.key, required this.icon, required this.title, required this.child, this.trailing});
+  const SectionCard({super.key, this.icon, required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -90,22 +99,22 @@ class SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderLight),
+        boxShadow: cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 8),
+              if (icon != null) ...<Widget>[Icon(icon, size: 18, color: AppColors.primary), const SizedBox(width: 8)],
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
                     fontFamily: 'Be Vietnam Pro',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    height: 24 / 18,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -113,8 +122,67 @@ class SectionCard extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Small rounded badge such as "Bước 3 / 4" or "Đã khóa".
+class SmallBadge extends StatelessWidget {
+  final String text;
+  final Color color;
+  final Color background;
+  final IconData? icon;
+
+  const SmallBadge(this.text, {super.key, required this.color, required this.background, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(4)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (icon != null) ...<Widget>[Icon(icon, size: 14, color: color), const SizedBox(width: 4)],
+          Text(text, style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Grey-blue note with an info icon (frame 357:373 "Policy / Conditions Note").
+class InfoNote extends StatelessWidget {
+  final String text;
+  final Key? textKey;
+
+  const InfoNote(this.text, {super.key, this.textKey});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: tintBox,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.info_outline_rounded, size: 15, color: AppColors.textSecondary),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              key: textKey,
+              style: const TextStyle(
+                  fontFamily: 'Be Vietnam Pro', fontSize: 12, height: 19.5 / 12, color: AppColors.textSecondary),
+            ),
+          ),
         ],
       ),
     );
