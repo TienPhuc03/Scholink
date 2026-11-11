@@ -36,12 +36,13 @@ void main() {
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
 
+    final List<String> opened = <String>[];
     final ApplyHarness h = ApplyHarness()..now = DateTime.now();
     await tester.pumpWidget(MaterialApp(
       home: ApplyView(
         viewModel: h.build(),
         onEditPassport: () async {},
-        onOpenApplication: (String id, {required bool justSubmitted}) {},
+        onOpenApplication: (String id, {required bool justSubmitted}) => opened.add('$id:$justSubmitted'),
       ),
     ));
     await tester.pump();
@@ -62,6 +63,14 @@ void main() {
     await tester.tap(find.byKey(const Key('apply_consent')));
     await tester.pump();
     expect(submit().onPressed, isNotNull);
+
+    // A successful submit shows the success screen; the detail opens only from its button.
+    await tester.tap(find.byKey(const Key('apply_submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nộp thành công!'), findsOneWidget);
+    expect(opened, isEmpty);
+    await tester.tap(find.byKey(const Key('apply_success_view')));
+    expect(opened, <String>['app_1:true']);
 
     // Stop the countdown timer before the test ends.
     await tester.pumpWidget(const SizedBox());

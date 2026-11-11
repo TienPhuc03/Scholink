@@ -259,7 +259,8 @@ void main() {
           statusJson(consents: <Map<String, dynamic>>[consentJson(leader, DateTime.now())]));
       await pumpView(tester, h);
 
-      expect(find.text('Đồng ý của thành viên (1/2)'), findsOneWidget);
+      expect(find.text('Đồng thuận nhóm'), findsOneWidget);
+      expect(find.text('1/2'), findsOneWidget);
       expect(find.text('Chưa đồng ý'), findsOneWidget);
       final ElevatedButton submit = tester.widget<ElevatedButton>(
           find.descendant(of: find.byKey(const Key('team_submit')), matching: find.byType(ElevatedButton)));
