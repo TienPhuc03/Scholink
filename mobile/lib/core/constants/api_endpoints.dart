@@ -72,6 +72,6 @@ abstract final class ApiEndpoints {
       '/api/v1/teams/join-requests/$requestId/withdraw';
 
   // Chat routes
-  static const String chatRooms = '/api/v1/chat/rooms';
-  static String chatMessages(String roomId) => '/api/v1/chat/rooms/$roomId/messages';
+  static const String chatRooms = '/api/v1/chats/rooms';
+  static String chatMessages(String roomId) => '/api/v1/chats/rooms/$roomId/messages';
 }
