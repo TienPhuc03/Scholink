@@ -82,6 +82,27 @@ class PassportRepository {
     });
   }
 
+  /// Autocomplete for the Passport form. [field] is `region`, `institution` or `major`;
+  /// [institution] puts that school's majors first.
+  Future<Result<List<ProfileSuggestion>, Failure>> suggest(String field, String query, {String? institution}) {
+    return _guard(() async {
+      final Response<dynamic> response = await _apiClient.get<dynamic>(
+        ApiEndpoints.profileSuggestions,
+        queryParameters: <String, dynamic>{
+          'field': field,
+          'q': query,
+          if (institution != null && institution.trim().isNotEmpty) 'institution': institution.trim(),
+        },
+      );
+      final dynamic data = response.data;
+      final dynamic body = data is Map<String, dynamic> ? (data['data'] ?? data) : null;
+      final dynamic list = body is Map<String, dynamic> ? body['suggestions'] : null;
+      return list is List
+          ? list.whereType<Map<String, dynamic>>().map(ProfileSuggestion.fromJson).toList()
+          : <ProfileSuggestion>[];
+    });
+  }
+
   PassportModel _parse(dynamic resData) {
     final dynamic payload = resData is Map<String, dynamic> ? (resData['data'] ?? resData) : resData;
     if (payload is Map<String, dynamic>) return PassportModel.fromJson(payload);

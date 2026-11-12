@@ -57,6 +57,28 @@ abstract final class PassportValidators {
     );
   }
 
+  /// Usual length of a bachelor's programme, used to pre-fill the end year.
+  static const int defaultStudyYears = 4;
+
+  /// End year to pre-fill for [startYear], or null while it is not a valid year yet.
+  static String? defaultEndYear(String startYear) {
+    final int? start = int.tryParse(startYear.trim());
+    return start == null || start < 2000 || start > 2100 ? null : '${start + defaultStudyYears}';
+  }
+
+  /// GPA [text] on the [from] scale (4 or 10) converted linearly to the other one (× or ÷ 2.5),
+  /// rounded to 2 decimals. Null when [text] is empty or not a GPA on [from].
+  static String? convertGpa(String text, {required double from}) {
+    final double? v = double.tryParse(text.trim().replaceAll(',', '.'));
+    if (v == null || v <= 0 || v > from) return null;
+    final double converted = from == 4 ? v * 2.5 : v / 2.5;
+    return formatGpa(converted);
+  }
+
+  /// 2 decimals at most, no trailing zeros: 8.75, 3.28, 9.
+  static String formatGpa(double v) =>
+      v.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+
   static String? newSkill(String v, List<String> existing) {
     final String s = v.trim();
     if (s.isEmpty) return 'Nhập tên kỹ năng.';

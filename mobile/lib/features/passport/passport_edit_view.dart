@@ -7,6 +7,7 @@ import '../auth/widgets/auth_widgets.dart';
 import 'passport_model.dart';
 import 'passport_validators.dart';
 import 'passport_viewmodel.dart';
+import 'suggest_field.dart';
 
 /// Passport edit form (F10 / FR-PROF-01). No Figma frame exists yet, so it reuses the
 /// input, label and button styles of the Register frame. Pops with `true` after a save.
@@ -31,10 +32,18 @@ class _PassportEditViewState extends State<PassportEditView> {
   final TextEditingController _major = TextEditingController();
   final TextEditingController _startYear = TextEditingController();
   final TextEditingController _endYear = TextEditingController();
-  final TextEditingController _gpa = TextEditingController();
+  final TextEditingController _gpa4 = TextEditingController();
+  final TextEditingController _gpa10 = TextEditingController();
   final TextEditingController _newSkill = TextEditingController();
   final TextEditingController _newAchievement = TextEditingController();
+
+  /// The scale the GPA is saved on: the field the user typed in last.
   double _gpaScale = 4;
+
+  /// Once the user edits the end year themselves, a new start year no longer overwrites it.
+  bool _endYearTouched = false;
+
+  TextEditingController get _gpa => _gpaScale == 4 ? _gpa4 : _gpa10;
 
   Map<String, String?> _errors = <String, String?>{};
 
@@ -55,8 +64,12 @@ class _PassportEditViewState extends State<PassportEditView> {
     _major.text = edu?.major ?? '';
     _startYear.text = edu != null ? '${edu.startYear}' : '';
     _endYear.text = edu?.endYear?.toString() ?? '';
-    _gpa.text = edu?.gpa?.toString() ?? '';
-    _gpaScale = edu?.gpaScale ?? 4;
+    // A saved end year that is not the default (or a saved "still studying") is the user's choice.
+    _endYearTouched = edu != null && _endYear.text != PassportValidators.defaultEndYear(_startYear.text);
+    _gpaScale = edu?.gpaScale == 10 ? 10 : 4;
+    final String gpa = edu?.gpa != null ? PassportValidators.formatGpa(edu!.gpa!) : '';
+    _gpa.text = gpa;
+    _syncGpa(gpa);
     _syncDraftFromFields();
     _initialSnapshot = _snapshot();
   }
@@ -72,7 +85,8 @@ class _PassportEditViewState extends State<PassportEditView> {
       _major,
       _startYear,
       _endYear,
-      _gpa,
+      _gpa4,
+      _gpa10,
       _newSkill,
       _newAchievement,
     ]) {
@@ -99,6 +113,27 @@ class _PassportEditViewState extends State<PassportEditView> {
             gpaScale: _gpaScale,
           )
         : null;
+  }
+
+  /// Writes the converted value into the other GPA field. Setting `.text` does not fire
+  /// `onChanged`, so the two fields never update each other in a loop.
+  void _syncGpa(String text) {
+    final TextEditingController other = _gpaScale == 4 ? _gpa10 : _gpa4;
+    other.text = PassportValidators.convertGpa(text, from: _gpaScale) ?? '';
+  }
+
+  void _onGpaChanged(double scale, String text) {
+    setState(() {
+      _gpaScale = scale;
+      _errors['gpa'] = null;
+      _syncGpa(text);
+    });
+  }
+
+  void _onStartYearChanged(String text) {
+    if (_endYearTouched) return;
+    final String? end = PassportValidators.defaultEndYear(text);
+    if (end != null) _endYear.text = end;
   }
 
   String _snapshot() => jsonEncode(<String, dynamic>{
@@ -333,13 +368,15 @@ class _PassportEditViewState extends State<PassportEditView> {
           textInputAction: TextInputAction.newline,
           errorText: _errors['bio'],
         ),
-        AuthTextField(
+        SuggestField(
+          key: const Key('passport_region'),
           label: 'Khu vực',
-          hint: 'VD: VN-HN, VN-SG',
+          hint: 'Nhập tỉnh/thành, VD: Hà Nội',
           icon: Icons.place_outlined,
           controller: _region,
           maxLength: 20,
           errorText: _errors['region'],
+          load: (String q) => widget.viewModel.suggest('region', q),
         ),
         AuthTextField(
           key: const Key('passport_phone'),
@@ -364,19 +401,24 @@ class _PassportEditViewState extends State<PassportEditView> {
       icon: Icons.school_outlined,
       subtitle: 'Không bắt buộc. Đã nhập thì cần đủ trường, ngành và năm bắt đầu.',
       children: <Widget>[
-        AuthTextField(
+        SuggestField(
+          key: const Key('passport_institution'),
           label: 'Trường',
-          hint: 'VD: Đại học Bách Khoa TP.HCM',
+          hint: 'Nhập tên hoặc viết tắt, VD: UIT',
           icon: Icons.account_balance_outlined,
           controller: _institution,
           errorText: _errors['institution'],
+          load: (String q) => widget.viewModel.suggest('institution', q),
         ),
-        AuthTextField(
+        SuggestField(
+          key: const Key('passport_major'),
           label: 'Chuyên ngành',
-          hint: 'VD: Khoa học Máy tính',
+          hint: 'VD: Khoa học máy tính',
           icon: Icons.menu_book_outlined,
           controller: _major,
           errorText: _errors['major'],
+          suggestWhenEmpty: true,
+          load: (String q) => widget.viewModel.suggest('major', q, institution: _institution.text),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,6 +431,7 @@ class _PassportEditViewState extends State<PassportEditView> {
                 keyboardType: TextInputType.number,
                 inputFormatters: yearOnly,
                 errorText: _errors['startYear'],
+                onChanged: _onStartYearChanged,
               ),
             ),
             const SizedBox(width: 12),
@@ -400,48 +443,41 @@ class _PassportEditViewState extends State<PassportEditView> {
                 keyboardType: TextInputType.number,
                 inputFormatters: yearOnly,
                 errorText: _errors['endYear'],
+                onChanged: (_) => _endYearTouched = true,
               ),
             ),
           ],
         ),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Expanded(
-              child: AuthTextField(
-                label: 'GPA',
-                hint: _gpaScale == 4 ? 'VD: 3.5' : 'VD: 8.2',
-                controller: _gpa,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                errorText: _errors['gpa'],
-              ),
-            ),
+            Expanded(child: _gpaField(4, _gpa4, 'VD: 3.5')),
             const SizedBox(width: 12),
-            Padding(
-              padding: EdgeInsets.only(bottom: _errors['gpa'] != null ? 22 : 0),
-              child: SegmentedButton<double>(
-                segments: const <ButtonSegment<double>>[
-                  ButtonSegment<double>(value: 4, label: Text('Hệ 4')),
-                  ButtonSegment<double>(value: 10, label: Text('Hệ 10')),
-                ],
-                selected: <double>{_gpaScale},
-                showSelectedIcon: false,
-                style: SegmentedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  selectedBackgroundColor: AppColors.primaryLight,
-                  selectedForegroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.border),
-                ),
-                onSelectionChanged: (Set<double> s) => setState(() => _gpaScale = s.first),
-              ),
-            ),
+            Expanded(child: _gpaField(10, _gpa10, 'VD: 8.75')),
           ],
+        ),
+        Text(
+          'Nhập một hệ, hệ kia tự quy đổi (hệ 10 = hệ 4 × 2,5). '
+          'GPA được lưu theo hệ bạn nhập (đang dùng hệ ${_gpaScale.toStringAsFixed(0)}).',
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
         ),
       ],
     );
   }
+
+  Widget _gpaField(double scale, TextEditingController controller, String hint) => AuthTextField(
+        key: Key('passport_gpa_${scale.toStringAsFixed(0)}'),
+        label: 'GPA hệ ${scale.toStringAsFixed(0)}${_gpaScale == scale ? ' (đang dùng)' : ''}',
+        hint: hint,
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: <TextInputFormatter>[
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          LengthLimitingTextInputFormatter(5),
+        ],
+        errorText: _gpaScale == scale ? _errors['gpa'] : null,
+        onChanged: (String v) => _onGpaChanged(scale, v),
+      );
 
   Widget _buildSkills() {
     return _Section(

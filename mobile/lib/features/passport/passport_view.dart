@@ -5,6 +5,7 @@ import '../../core/widgets/refresh_error_banner.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
+import 'profile_view_screen.dart';
 
 /// Passport tab: profile summary, edit entry point and account actions (logout).
 class PassportView extends StatefulWidget {
@@ -410,14 +411,7 @@ class _PassportViewState extends State<PassportView> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  passport.fullName.isNotEmpty ? passport.fullName[0].toUpperCase() : 'S',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary),
-                ),
-              ),
+              PassportAvatar(key: const Key('passport_avatar'), name: passport.fullName, url: passport.avatarUrl, radius: 26),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -609,6 +603,8 @@ class _PassportViewState extends State<PassportView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           row(PassportDocument.cv, passport.cvAssetId),
+          if (passport.cvFile != null)
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: FileLinkTile(file: passport.cvFile!, refresh: vm.freshCvLink)),
           row(PassportDocument.avatar, passport.avatarAssetId),
           const Text(
             'Tệp được lưu riêng tư, tối đa 5 MB và được quét trước khi dùng.',
