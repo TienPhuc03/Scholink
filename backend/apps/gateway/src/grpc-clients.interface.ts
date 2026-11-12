@@ -47,6 +47,12 @@ export interface IdentityGrpcClient {
     fieldPrivacy: Record<string, string>;
   }): Observable<Record<string, unknown>>;
   getProfileView(data: { studentId: string; audience: string }): Observable<Record<string, unknown>>;
+  suggestProfileValues(data: {
+    field: string;
+    query: string;
+    institution?: string;
+    limit: number;
+  }): Observable<{ suggestions?: Array<{ value: string; detail: string }> }>;
   updateMyPassport(
     data: UpdatePassportDto & { studentId: string; clearFields?: string[] },
   ): Observable<Record<string, unknown>>;
