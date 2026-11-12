@@ -137,6 +137,29 @@ export class MediaUseCase {
   }
 
   /**
+   * A READY file of a Passport with short-lived links, for a caller that is already allowed to
+   * see it (the owner, or a viewer the field visibility lets in). Links are empty without a
+   * bucket, since then no bytes were stored.
+   */
+  async fileLink(assetId?: string) {
+    if (!assetId) return undefined;
+    const asset = await this.passportRepo.findMediaAssetById(assetId);
+    if (!asset || asset.status !== 'READY') return undefined;
+    // A file "uploaded" while storage was simulated has no bytes in the bucket: no link to a 404.
+    const stored = Boolean(this.storage?.enabled) && (await this.storage.exists(asset.objectKey));
+    const link = (inline: boolean) =>
+      stored ? this.storage.presignDownload(asset.objectKey, DOWNLOAD_URL_TTL_SECONDS, asset.fileName, inline) : '';
+    return Object.freeze({
+      assetId: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      viewUrl: link(true),
+      downloadUrl: link(false),
+    });
+  }
+
+  /**
    * BR15 & Tiêu chí nghiệm thu F13:
    * Xác minh danh sách assetId đều tồn tại, thuộc quyền sở hữu của `studentId`
    * và đã ở trạng thái `READY`.

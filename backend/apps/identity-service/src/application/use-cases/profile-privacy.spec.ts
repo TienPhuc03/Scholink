@@ -56,7 +56,12 @@ describe('Passport field privacy (FR-PROF-05)', () => {
         user = u;
       }),
     };
-    const media = { verifyAssetsUsableByStudent: jest.fn(async () => undefined) };
+    const media = {
+      verifyAssetsUsableByStudent: jest.fn(async () => undefined),
+      fileLink: jest.fn(async (assetId?: string) =>
+        assetId ? { assetId, fileName: `${assetId}.pdf`, viewUrl: `https://files/${assetId}?inline` } : undefined,
+      ),
+    };
     const useCase = new PassportUseCase(
       passportRepo as never,
       media as never,
@@ -81,10 +86,11 @@ describe('Passport field privacy (FR-PROF-05)', () => {
     expect(view.fullName).toBe('Nguyễn Văn A');
     expect(view.avatarAssetId).toBe('ast_avatar');
     expect(view).toEqual(expect.objectContaining({ bio: 'Yêu AI', regionCode: 'VN-SG', skills: ['Dart'] }));
-    for (const hidden of ['email', 'phone', 'education', 'certificates', 'achievements', 'cvAssetId']) {
+    for (const hidden of ['email', 'phone', 'education', 'certificates', 'achievements', 'cvAssetId', 'cvFile']) {
       expect(view).not.toHaveProperty(hidden);
     }
     expect(view.visibleFields).toEqual(['bio', 'regionCode', 'skills']);
+    expect(view.avatarUrl).toBe('https://files/ast_avatar?inline');
   });
 
   it('teammates also see TEAMMATES fields but never PRIVATE ones', async () => {
@@ -95,6 +101,8 @@ describe('Passport field privacy (FR-PROF-05)', () => {
     );
     expect(view.certificates?.[0].issuedDate).toBe('2025-01-01T00:00:00.000Z');
     expect(view).not.toHaveProperty('email');
+    // The CV is visible to teammates, so they get the file and its link.
+    expect(view).toEqual(expect.objectContaining({ cvFile: expect.objectContaining({ assetId: 'ast_cv' }) }));
   });
 
   it('changing visibility keeps the profile version, so open previews stay valid', async () => {

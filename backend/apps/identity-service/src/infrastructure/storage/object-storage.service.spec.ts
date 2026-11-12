@@ -1,4 +1,4 @@
-import { presignS3Url } from './object-storage.service';
+import { ObjectStorageService, presignS3Url } from './object-storage.service';
 
 describe('presignS3Url (SigV4 query-string signing for MinIO)', () => {
   it('matches the published AWS SigV4 presigned GET example', () => {
@@ -33,5 +33,16 @@ describe('presignS3Url (SigV4 query-string signing for MinIO)', () => {
     expect(url.pathname).toBe('/scholink-documents/uploads/usr_1/cv/ast_1-cv.pdf');
     expect(url.searchParams.get('X-Amz-Expires')).toBe('900');
     expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('download links can open inline and keep the file name header ASCII', () => {
+    const storage = new ObjectStorageService();
+    const disposition = (inline: boolean) =>
+      new URL(storage.presignDownload('k/cv.pdf', 300, 'CV "Nguyễn".pdf', inline)).searchParams.get(
+        'response-content-disposition',
+      );
+
+    expect(disposition(true)).toBe('inline; filename="CV _Nguy_n_.pdf"');
+    expect(disposition(false)).toBe('attachment; filename="CV _Nguy_n_.pdf"');
   });
 });
