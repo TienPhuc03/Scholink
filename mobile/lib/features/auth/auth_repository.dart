@@ -188,6 +188,22 @@ class AuthRepository {
     }
   }
 
+  /// F40 / FR-AUTH-08: deletes the account after re-entering the password. The server revokes every
+  /// session, so local tokens are cleared on success. [purgeSnapshots] asks to purge submitted
+  /// application snapshots instead of keeping them under the retention policy.
+  Future<Result<void, Failure>> deleteAccount({required String currentPassword, bool purgeSnapshots = false}) {
+    return _run(() async {
+      await _apiClient.post<dynamic>(
+        ApiEndpoints.deleteAccount,
+        data: <String, dynamic>{
+          'currentPassword': currentPassword,
+          'snapshotDecision': purgeSnapshots ? 'PURGE' : 'RETAIN',
+        },
+      );
+      await _secureStorage.clear();
+    });
+  }
+
   Future<bool> isAuthenticated() async {
     final String? token = await _secureStorage.getAccessToken();
     return token != null && token.isNotEmpty;

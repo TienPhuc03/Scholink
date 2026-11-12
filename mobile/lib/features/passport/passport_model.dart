@@ -305,7 +305,7 @@ class PassportDraft {
 
   /// Body for `PUT /api/v1/profiles/me`. Sends [expectedVersion] for optimistic locking
   /// (409 VERSION_MISMATCH when someone else saved first).
-  Map<String, dynamic> toUpdateJson({required int expectedVersion}) {
+  Map<String, dynamic> toUpdateJson({required int expectedVersion, Map<String, String>? assets}) {
     final String bioTrim = bio.trim();
     final String regionTrim = regionCode.trim();
     return <String, dynamic>{
@@ -321,6 +321,7 @@ class PassportDraft {
       'isOpenForScholarship': isOpenForScholarship,
       'isOpenForMentoring': isOpenForMentoring,
       'phone': phone.trim(),
+      ...?assets,
     };
   }
 }

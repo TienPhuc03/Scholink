@@ -34,11 +34,12 @@ class PassportRepository {
   Future<Result<PassportModel, Failure>> updateMyPassport(
     PassportDraft draft, {
     required int expectedVersion,
+    Map<String, String>? assets,
   }) {
     return _guard(() async {
       final Response<dynamic> response = await _apiClient.put<dynamic>(
         ApiEndpoints.passport,
-        data: draft.toUpdateJson(expectedVersion: expectedVersion),
+        data: draft.toUpdateJson(expectedVersion: expectedVersion, assets: assets),
       );
       return _parse(response.data);
     });
