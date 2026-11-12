@@ -43,6 +43,16 @@ export class OutboxModel {
 
   @Prop({ index: true })
   sentAt?: Date;
+
+  /** Relay bookkeeping: failed deliveries are retried with backoff after `nextAttemptAt`. */
+  @Prop({ default: 0 })
+  attempts?: number;
+
+  @Prop()
+  nextAttemptAt?: Date;
+
+  @Prop()
+  lastError?: string;
 }
 
 export const OutboxSchema = SchemaFactory.createForClass(OutboxModel);
