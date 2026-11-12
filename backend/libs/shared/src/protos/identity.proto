@@ -173,6 +173,7 @@ message MediaAssetResponse {
   string objectKey = 8;
   string status = 9;
   int32 version = 10;
+  string downloadUrl = 11;
 }
 
 message GetMyPassportRequest {

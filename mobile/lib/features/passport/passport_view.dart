@@ -19,12 +19,16 @@ class PassportView extends StatefulWidget {
   /// FR-PROF-05: shows the Passport as other people see it.
   final VoidCallback? onPreviewProfile;
 
+  /// F40: deletes the account; returns an error message, or null once the app has signed out.
+  final Future<String?> Function(String currentPassword, {required bool purgeSnapshots})? onDeleteAccount;
+
   const PassportView({
     super.key,
     required this.viewModel,
     required this.onLogout,
     this.onOpenMyApplications,
     this.onPreviewProfile,
+    this.onDeleteAccount,
   });
 
   @override
@@ -55,6 +59,29 @@ class _PassportViewState extends State<PassportView> {
         const SnackBar(content: Text('Đã lưu Passport.'), backgroundColor: AppColors.success),
       );
     }
+  }
+
+  Future<void> _uploadDocument(PassportDocument doc) async {
+    final bool ok = await widget.viewModel.uploadDocument(doc);
+    if (!mounted) return;
+    final String? error = widget.viewModel.documentError;
+    if (ok || error != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(ok ? 'Đã cập nhật ${doc.label}.' : error!),
+          backgroundColor: ok ? AppColors.success : AppColors.error,
+        ));
+    }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final Future<String?> Function(String, {required bool purgeSnapshots})? delete = widget.onDeleteAccount;
+    if (delete == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) => _DeleteAccountDialog(onDelete: delete),
+    );
   }
 
   Future<void> _confirmLogout() async {
@@ -195,6 +222,10 @@ class _PassportViewState extends State<PassportView> {
                       children: passport.certificates.map(_buildCertificateRow).toList(),
                     ),
                   ),
+                ],
+                if (vm.canUploadDocuments) ...<Widget>[
+                  const SizedBox(height: 16),
+                  _buildDocumentsCard(passport, vm),
                 ],
                 const SizedBox(height: 16),
                 _buildPreferencesCard(passport),
@@ -534,11 +565,77 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
+  /// FR-PROF-04: CV and avatar kept on the Passport. Files stay private; only the owner uploads.
+  Widget _buildDocumentsCard(PassportModel passport, PassportViewModel vm) {
+    Widget row(PassportDocument doc, String? assetId) {
+      final bool busy = vm.uploading == doc;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              doc == PassportDocument.cv ? Icons.description_outlined : Icons.account_circle_outlined,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(doc.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(
+                    assetId == null ? 'Chưa có tệp' : 'Đã tải lên',
+                    style: TextStyle(fontSize: 12, color: assetId == null ? AppColors.textMuted : AppColors.success),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              key: Key('passport_upload_${doc.name}'),
+              onPressed: vm.uploading != null || vm.isSaving ? null : () => _uploadDocument(doc),
+              child: busy
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(assetId == null ? 'Tải lên' : 'Thay tệp'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _card(
+      icon: Icons.folder_open_outlined,
+      title: 'Tài liệu hồ sơ',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          row(PassportDocument.cv, passport.cvAssetId),
+          row(PassportDocument.avatar, passport.avatarAssetId),
+          const Text(
+            'Tệp được lưu riêng tư, tối đa 5 MB và được quét trước khi dùng.',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccountSection() {
     return _card(
       icon: Icons.manage_accounts_outlined,
       title: 'Tài khoản',
-      child: _buildLogoutButton(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _buildLogoutButton(),
+          if (widget.onDeleteAccount != null)
+            TextButton(
+              key: const Key('delete_account_button'),
+              onPressed: _loggingOut ? null : _confirmDeleteAccount,
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Xoá tài khoản'),
+            ),
+        ],
+      ),
     );
   }
 
@@ -557,6 +654,102 @@ class _PassportViewState extends State<PassportView> {
         minimumSize: const Size.fromHeight(44),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),
+    );
+  }
+}
+
+/// F40 / FR-AUTH-08: re-enter the password, choose what happens to submitted snapshots, confirm.
+class _DeleteAccountDialog extends StatefulWidget {
+  final Future<String?> Function(String currentPassword, {required bool purgeSnapshots}) onDelete;
+
+  const _DeleteAccountDialog({required this.onDelete});
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final TextEditingController _password = TextEditingController();
+  bool _purge = false;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_password.text.isEmpty) {
+      setState(() => _error = 'Nhập mật khẩu hiện tại để xác nhận.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final String? error = await widget.onDelete(_password.text, purgeSnapshots: _purge);
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Xoá tài khoản?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'Tài khoản bị khoá ngay, mọi phiên đăng nhập bị thu hồi và dữ liệu cá nhân được xoá sau 30 ngày. '
+              'Không thể hoàn tác.',
+              style: TextStyle(height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('delete_account_password'),
+              controller: _password,
+              obscureText: true,
+              enabled: !_busy,
+              decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+            ),
+            CheckboxListTile(
+              key: const Key('delete_account_purge'),
+              contentPadding: EdgeInsets.zero,
+              value: _purge,
+              onChanged: _busy ? null : (bool? v) => setState(() => _purge = v ?? false),
+              title: const Text('Xoá cả bản hồ sơ đã nộp', style: TextStyle(fontSize: 14)),
+              subtitle: const Text(
+                'Nếu không chọn, bản đã nộp được giữ theo chính sách lưu trữ để đơn vị tổ chức xét duyệt.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+            if (_error != null)
+              Text(_error!, key: const Key('delete_account_error'), style: const TextStyle(color: AppColors.error)),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Huỷ')),
+        TextButton(
+          key: const Key('delete_account_confirm'),
+          onPressed: _busy ? null : _submit,
+          style: TextButton.styleFrom(foregroundColor: AppColors.error),
+          child: _busy
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Xoá vĩnh viễn'),
+        ),
+      ],
     );
   }
 }

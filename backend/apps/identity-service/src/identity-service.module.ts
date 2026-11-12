@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { join } from 'path';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
   SharedModule,
@@ -42,6 +44,11 @@ import { AuthUseCase } from './application/use-cases/auth.use-case';
 import { PassportUseCase } from './application/use-cases/passport.use-case';
 import { OrganizationUseCase } from './application/use-cases/organization.use-case';
 import { MediaUseCase } from './application/use-cases/media.use-case';
+import { ObjectStorageService } from './infrastructure/storage/object-storage.service';
+import {
+  IdentityOutboxRelayService,
+  IDENTITY_OPPORTUNITY_GRPC,
+} from './infrastructure/workers/identity-outbox-relay.service';
 import { AuthController } from './presentation/auth.controller';
 import { ProfileController } from './presentation/profile.controller';
 import { AdminOrganizationController } from './presentation/admin-organization.controller';
@@ -55,6 +62,22 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
     }),
     DatabaseModule.forService('IDENTITY_DB_NAME', 'scholink_identity'),
     SharedModule,
+    // F40: the outbox relay hands `user.deleted` to Opportunity for snapshot retention.
+    ClientsModule.registerAsync([
+      {
+        name: IDENTITY_OPPORTUNITY_GRPC,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'scholink.opportunity',
+            protoPath: join(process.cwd(), 'libs/shared/src/protos/opportunity.proto'),
+            url: config.get<string>('OPPORTUNITY_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+      },
+    ]),
     MongooseModule.forFeature([
       { name: UserModel.name, schema: UserSchema },
       { name: SessionModel.name, schema: SessionSchema },
@@ -74,6 +97,8 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
   providers: [
     AuthUseCase,
     MediaUseCase,
+    ObjectStorageService,
+    IdentityOutboxRelayService,
     PassportUseCase,
     OrganizationUseCase,
     {

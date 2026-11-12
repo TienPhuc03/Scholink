@@ -10,6 +10,7 @@ abstract final class ApiEndpoints {
   static const String register = '/api/v1/auth/register';
   static const String refreshToken = '/api/v1/auth/refresh';
   static const String logout = '/api/v1/auth/logout';
+  static const String deleteAccount = '/api/v1/auth/delete-account';
   static const String sendOtp = '/api/v1/auth/send-otp';
   static const String verifyOtp = '/api/v1/auth/verify-otp';
   static const String forgotPassword = '/api/v1/auth/forgot-password';

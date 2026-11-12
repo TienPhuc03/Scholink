@@ -898,7 +898,8 @@ export class MongooseApplicationRepository implements IApplicationRepository {
     }));
 
     try {
-      await this.memberModel.create(docs, session ? { session } : undefined);
+      // Mongoose refuses a multi-document create() inside a transaction unless it is ordered.
+      await this.memberModel.create(docs, session ? { session, ordered: true } : undefined);
     } catch (err: unknown) {
       if (isDuplicateKeyError(err)) {
         throw DomainException.conflict(
