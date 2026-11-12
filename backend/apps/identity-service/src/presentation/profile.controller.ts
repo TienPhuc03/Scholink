@@ -9,6 +9,7 @@ import {
   CompleteUploadDto,
 } from '../application/dtos/passport.dto';
 import { GrpcExceptionFilter } from '@shared';
+import { SuggestionField, suggestProfileValues } from '../domain/profile-suggestions';
 
 const CLEARABLE_LIST_FIELDS = ['skills', 'achievements', 'certificates'] as const;
 
@@ -43,6 +44,16 @@ export class ProfileController {
   @GrpcMethod('IdentityGrpcService', 'GetProfileView')
   async getProfileView(data: { studentId: string; audience: string }) {
     return this.passportUseCase.getProfileView(data.studentId, data.audience as 'PUBLIC' | 'TEAMMATES');
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'SuggestProfileValues')
+  suggestProfileValues(data: { field: SuggestionField; query?: string; institution?: string; limit?: number }) {
+    return {
+      suggestions: suggestProfileValues(data.field, data.query ?? '', {
+        institution: data.institution,
+        limit: data.limit || undefined,
+      }),
+    };
   }
 
   @GrpcMethod('IdentityGrpcService', 'CreateConsent')

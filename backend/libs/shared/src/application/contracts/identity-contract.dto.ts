@@ -202,6 +202,16 @@ export const ProfileViewQueryDtoSchema = z.object({
 
 export type ProfileViewQueryDto = z.infer<typeof ProfileViewQueryDtoSchema>;
 
+/** `GET /profiles/suggestions`: Passport autocomplete for region, institution and major. */
+export const ProfileSuggestionQueryDtoSchema = z.object({
+  field: z.enum(['region', 'institution', 'major']),
+  q: z.string().trim().max(100).default(''),
+  institution: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
+export type ProfileSuggestionQueryDto = z.infer<typeof ProfileSuggestionQueryDtoSchema>;
+
 export const ConsentScopeSchema = z.enum(['SNAPSHOT', 'ATTACHMENTS']);
 export type ConsentScope = z.infer<typeof ConsentScopeSchema>;
 

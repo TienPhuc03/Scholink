@@ -21,6 +21,7 @@ abstract final class ApiEndpoints {
   // FR-PROF-05: field visibility and profile views
   static const String passportPrivacy = '/api/v1/profiles/me/privacy';
   static const String passportView = '/api/v1/profiles/me/view';
+  static const String profileSuggestions = '/api/v1/profiles/suggestions';
   static String publicProfile(String studentId) => '/api/v1/profiles/$studentId';
   static String teammateProfile(String teamId, String studentId) =>
       '/api/v1/teams/$teamId/members/$studentId/profile';
@@ -72,6 +73,6 @@ abstract final class ApiEndpoints {
       '/api/v1/teams/join-requests/$requestId/withdraw';
 
   // Chat routes
-  static const String chatRooms = '/api/v1/chat/rooms';
-  static String chatMessages(String roomId) => '/api/v1/chat/rooms/$roomId/messages';
+  static const String chatRooms = '/api/v1/chats/rooms';
+  static String chatMessages(String roomId) => '/api/v1/chats/rooms/$roomId/messages';
 }

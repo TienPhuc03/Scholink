@@ -130,13 +130,22 @@ export class ObjectStorageService implements OnModuleInit {
     return this.sign('PUT', this.publicOrigin, objectKey, ttlSeconds);
   }
 
-  presignDownload(objectKey: string, ttlSeconds: number, fileName: string): string {
+  /** `inline` lets a browser or viewer show the file; otherwise it is saved as a download. */
+  presignDownload(objectKey: string, ttlSeconds: number, fileName: string, inline = false): string {
+    // Header values must be ASCII, so accents and quotes in the name become "_".
+    const safeName = fileName.replace(/[^\x20-\x7E]|"/g, '_');
     return this.sign('GET', this.publicOrigin, objectKey, ttlSeconds, {
-      'response-content-disposition': `attachment; filename="${fileName}"`,
+      'response-content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
     });
   }
 
   /** Reads the uploaded object (at most `maxBytes`); `null` when nothing was uploaded. */
+  /** False only when the bucket says the object is missing (e.g. uploaded before storage was on). */
+  async exists(objectKey: string): Promise<boolean> {
+    const res = await fetch(this.sign('HEAD', this.internalOrigin, objectKey, 60), { method: 'HEAD' });
+    return res.status !== 404;
+  }
+
   async read(objectKey: string, maxBytes: number): Promise<StoredObject | null> {
     const res = await fetch(this.sign('GET', this.internalOrigin, objectKey, 60), {
       headers: { Range: `bytes=0-${maxBytes - 1}` },

@@ -108,7 +108,18 @@ export class PassportUseCase {
     if (!passport) {
       throw DomainException.notFound('Hồ sơ');
     }
-    return buildProfileView(passport, { email: user?.email, phone: user?.phone }, audience);
+    const view = buildProfileView(passport, { email: user?.email, phone: user?.phone }, audience);
+    // The CV link only goes to audiences the `cv` visibility already lets see the file.
+    return Object.freeze({ ...view, ...(await this.fileLinks(passport, Boolean(view.cvAssetId))) });
+  }
+
+  /** Avatar (always visible) and, when [withCv], the CV with short-lived links. */
+  private async fileLinks(passport: Passport, withCv: boolean) {
+    const [avatar, cv] = await Promise.all([
+      this.mediaUseCase.fileLink(passport.props.avatarAssetId),
+      withCv ? this.mediaUseCase.fileLink(passport.props.cvAssetId) : undefined,
+    ]);
+    return { avatarUrl: avatar?.viewUrl ?? '', ...(cv ? { cvFile: cv } : {}) };
   }
 
   /**
@@ -367,9 +378,10 @@ export class PassportUseCase {
   }
 
   /** Owner's own view: every field, the resolved visibility settings and the contact details. */
-  private toResponse(passport: Passport, contact: ProfileContact = {}) {
+  private async toResponse(passport: Passport, contact: ProfileContact = {}) {
     return Object.freeze({
       ...passport.props,
+      ...(await this.fileLinks(passport, true)),
       fieldPrivacy: resolveFieldPrivacy(passport.props.fieldPrivacy),
       email: contact.email ?? '',
       phone: contact.phone ?? '',

@@ -153,6 +153,22 @@ class PassportViewModel extends BaseViewModel {
     return false;
   }
 
+  /// Autocomplete for the edit form (region, institution, major).
+  Future<Result<List<ProfileSuggestion>, Failure>> suggest(String field, String query, {String? institution}) =>
+      _repository.suggest(field, query, institution: institution);
+
+  /// Reloads the Passport quietly (no spinner) and returns the CV with new 5-minute links.
+  /// Leaves the cached copy alone while an upload or save is writing it.
+  Future<FileLink?> freshCvLink() async {
+    final PassportModel? p = (await _repository.getMyPassport()).dataOrNull;
+    if (p == null) return null;
+    if (_uploading == null && !_isSaving) {
+      _passport = p;
+      notifyListeners();
+    }
+    return p.cvFile;
+  }
+
   Future<void> loadPassport() async {
     setLoading();
 

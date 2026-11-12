@@ -21,6 +21,7 @@ service IdentityGrpcService {
   rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
   rpc UpdateFieldPrivacy (UpdateFieldPrivacyRequest) returns (PassportResponse);
   rpc GetProfileView (GetProfileViewRequest) returns (ProfileViewResponse);
+  rpc SuggestProfileValues (SuggestProfileValuesRequest) returns (SuggestProfileValuesResponse);
   rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
   rpc CreateUploadUrl (CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
   rpc CompleteUpload (CompleteUploadRequest) returns (MediaAssetResponse);
@@ -263,6 +264,35 @@ message ProfileViewResponse {
   repeated string achievements = 13;
   string cvAssetId = 14;
   string pitchVideoAssetId = 15;
+  string avatarUrl = 16;
+  FileLinkMessage cvFile = 17;
+}
+
+// A Passport file the caller may open. URLs live 5 minutes and are empty without object storage.
+message FileLinkMessage {
+  string assetId = 1;
+  string fileName = 2;
+  string mimeType = 3;
+  int32 sizeBytes = 4;
+  string viewUrl = 5;
+  string downloadUrl = 6;
+}
+
+// Passport autocomplete. field: region | institution | major; institution ranks majors.
+message SuggestProfileValuesRequest {
+  string field = 1;
+  string query = 2;
+  string institution = 3;
+  int32 limit = 4;
+}
+
+message ProfileSuggestionMessage {
+  string value = 1;
+  string detail = 2;
+}
+
+message SuggestProfileValuesResponse {
+  repeated ProfileSuggestionMessage suggestions = 1;
 }
 
 message PassportResponse {
@@ -289,6 +319,8 @@ message PassportResponse {
   map<string, string> fieldPrivacy = 21;
   string email = 22;
   string phone = 23;
+  string avatarUrl = 24;
+  FileLinkMessage cvFile = 25;
 }
 
 message CreateConsentRequest {
