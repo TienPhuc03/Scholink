@@ -16,6 +16,7 @@ import moment = require('moment-timezone');
 import { BookmarkListener } from './application/use-cases/listeners/bookmark.listener';
 import { QuietHoursService } from './application/use-cases/services/quiet-hours.service';
 import { ReminderWorker } from './application/use-cases/workers/reminder.worker';
+import { NotificationController } from './presentation/notification.controller';
 import {
   NotificationPreferenceUseCase,
   UpdateNotificationPreferenceSchema,
@@ -386,6 +387,118 @@ describe('F41 fixes - Notification reminders, inbox dedup and preferences (NOTI-
     expect(res.ignored).toBe('STALE_VERSION');
     expect(reminders.size).toBe(before);
     expect(Array.from(reminders.values()).some((r) => r.deadlineVersion === 2)).toBe(false);
+  });
+
+  describe('N1: transactional notifications are pushed realtime', () => {
+    function controllerWith(publisher: any, prefs: Record<string, any> = {}) {
+      const saved: any[] = [];
+      const model: any = function (this: any, data: any) {
+        Object.assign(this, data);
+        this.save = async () => {
+          // unique index (userId, businessKey), like Mongo
+          if (saved.some((n) => n.userId === this.userId && n.businessKey === this.businessKey)) {
+            throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+          }
+          saved.push(this);
+        };
+      };
+      model.findOne = jest.fn(async (q: any) =>
+        saved.find((n) => n.userId === q.userId && n.businessKey === q.businessKey) ?? null,
+      );
+      const prefModel: any = { findOne: (q: any) => ({ lean: async () => prefs[q.userId] ?? null }) };
+      const ctrl = new NotificationController({} as any, listener, reminderModel, model, publisher, prefModel);
+      return { ctrl, saved };
+    }
+    const body = {
+      userId: 'u_leader',
+      businessKey: 'join_request:req_1:created',
+      type: 'TEAM_JOIN_REQUEST',
+      title: 'Có người xin vào đội BK AI',
+      body: 'Nguyễn Văn A muốn gia nhập đội.',
+      refUrl: '/teams/team_1/join-requests',
+    };
+    const flush = () => new Promise((r) => setImmediate(r));
+
+    it('pushes a new notification once, with its id as key', async () => {
+      const publisher = { publishToUser: jest.fn().mockResolvedValue(undefined) };
+      const { ctrl } = controllerWith(publisher);
+
+      const notif: any = await ctrl.createTransactional(body);
+      await ctrl.createTransactional(body); // same businessKey: dedup, no second push
+      await flush();
+
+      expect(publisher.publishToUser).toHaveBeenCalledTimes(1);
+      expect(publisher.publishToUser).toHaveBeenCalledWith(
+        'u_leader',
+        expect.objectContaining({ kind: 'notification', notificationKey: notif.id, title: body.title, refUrl: body.refUrl }),
+      );
+    });
+
+    it('a broker failure does not fail the request; the notification stays saved', async () => {
+      const publisher = { publishToUser: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) };
+      const { ctrl, saved } = controllerWith(publisher);
+
+      const notif: any = await ctrl.createTransactional(body);
+      await flush();
+
+      expect(notif.title).toBe(body.title);
+      expect(saved).toHaveLength(1);
+    });
+
+    it('a user who turned push off gets the inbox item but no push', async () => {
+      const publisher = { publishToUser: jest.fn().mockResolvedValue(undefined) };
+      const { ctrl, saved } = controllerWith(publisher, { u_leader: { userId: 'u_leader', pushEnabled: false } });
+
+      await ctrl.createTransactional(body);
+      await flush();
+
+      expect(saved).toHaveLength(1);
+      expect(publisher.publishToUser).not.toHaveBeenCalled();
+    });
+
+    it('two concurrent calls with the same businessKey: one record, one push, no 500', async () => {
+      const publisher = { publishToUser: jest.fn().mockResolvedValue(undefined) };
+      const { ctrl, saved } = controllerWith(publisher);
+
+      const [a, b]: any[] = await Promise.all([ctrl.createTransactional(body), ctrl.createTransactional(body)]);
+      await flush();
+
+      expect(saved).toHaveLength(1);
+      expect(a.id).toBe(b.id);
+      expect(publisher.publishToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('a duplicate-key error that is not this businessKey fails loudly instead of returning nothing', async () => {
+      const publisher = { publishToUser: jest.fn() };
+      const { ctrl } = controllerWith(publisher);
+      const model: any = (ctrl as any).notificationModel;
+      const Original = model;
+      const failing: any = function (this: any, data: any) {
+        Original.call(this, data);
+        this.save = async () => {
+          throw Object.assign(new Error('E11000 dup key: id'), { code: 11000 });
+        };
+      };
+      failing.findOne = Original.findOne;
+      (ctrl as any).notificationModel = failing;
+
+      await expect(ctrl.createTransactional(body)).rejects.toThrow('E11000');
+      expect(publisher.publishToUser).not.toHaveBeenCalled();
+    });
+
+    it('new ids are unique even within the same millisecond', async () => {
+      const { ctrl, saved } = controllerWith(null);
+      await Promise.all(
+        Array.from({ length: 200 }, (_, i) => ctrl.createTransactional({ ...body, businessKey: `k${i}` })),
+      );
+      expect(new Set(saved.map((n) => n.id)).size).toBe(200);
+    });
+
+    it('works with push turned off (MQTT_PUSH_ENABLED=false gives no publisher)', async () => {
+      const { ctrl, saved } = controllerWith(null);
+      await ctrl.createTransactional(body);
+      expect(saved).toHaveLength(1);
+    });
   });
 
   it('a leftover job without its reminder record sends nothing', async () => {

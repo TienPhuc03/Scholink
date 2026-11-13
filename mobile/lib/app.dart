@@ -138,6 +138,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _onAppResumed() {
     if (_isAuthenticated && !_isGuest) {
       unawaited(_tabs.notification.loadNotifications());
+      unawaited(_startPush()); // N2: reconnect realtime if the connection was lost in background
       unawaited(_openLaunchTarget());
     }
   }
@@ -379,7 +380,11 @@ class _ScholinkAppState extends State<ScholinkApp> {
       );
       return;
     }
-    if (noti.teamId != null) setState(() => _currentTabIndex = AppTabs.teams);
+    if (noti.teamId != null) {
+      // Tapped from the system tray while another screen was open: show the tab, not a hidden switch.
+      _nav.popUntil((Route<dynamic> r) => r.isFirst);
+      setState(() => _currentTabIndex = AppTabs.teams);
+    }
   }
 
   // ---------- Auth flows (F10) ----------

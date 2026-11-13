@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, Req, UseGuards, Logger, Optional } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
+import { randomUUID } from 'crypto';
 import { Model } from 'mongoose';
 import { NotificationUseCase } from '../application/use-cases/notification.use-case';
 import { BookmarkListener } from '../application/use-cases/listeners/bookmark.listener';
@@ -10,7 +11,10 @@ import {
   ReminderDocument,
   NotificationModel,
   NotificationDocument,
+  NotificationPreferenceModel,
+  NotificationPreferenceDocument,
 } from '../infrastructure/persistence/notification.schema';
+import { MqttPushPublisher, PushMessage } from '../infrastructure/push/mqtt-push.publisher';
 
 @ApiTags('Notifications (Notification Microservice)')
 @UseGuards(JwtAuthGuard)
@@ -23,7 +27,15 @@ export class NotificationController {
     private readonly reminderModel: Model<ReminderDocument>,
     @InjectModel(NotificationModel.name)
     private readonly notificationModel: Model<NotificationDocument>,
+    // null when MQTT_PUSH_ENABLED=false (see module factory)
+    @Optional()
+    private readonly pushPublisher?: MqttPushPublisher | null,
+    @Optional()
+    @InjectModel(NotificationPreferenceModel.name)
+    private readonly preferenceModel?: Model<NotificationPreferenceDocument>,
   ) {}
+
+  private readonly logger = new Logger(NotificationController.name);
 
   @Get()
   @ApiBearerAuth()
@@ -153,7 +165,7 @@ export class NotificationController {
     }
 
     const notif = new this.notificationModel({
-      id: `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      id: `notif_${randomUUID()}`, // Date.now()+random(1000) collided under bursts (unique index on id)
       userId: body.userId,
       businessKey: body.businessKey,
       type: body.type,
@@ -162,8 +174,36 @@ export class NotificationController {
       refUrl: body.refUrl,
       isRead: false,
     });
-    await notif.save();
+    try {
+      await notif.save();
+    } catch (err: any) {
+      // Two callers raced on the same businessKey: the unique index kept one, return it (no 2nd push).
+      if (err?.code !== 11000) throw err;
+      const winner = await this.notificationModel.findOne({ userId: body.userId, businessKey: body.businessKey });
+      if (!winner) throw err;
+      return winner;
+    }
+
+    // N1: realtime push, best-effort and not awaited so callers (outbox workers) are not slowed;
+    // the message is already in the inbox if the broker is down.
+    this.pushTransactional(body.userId, {
+      kind: 'notification',
+      notificationKey: notif.id,
+      title: body.title,
+      body: body.body,
+      refUrl: body.refUrl,
+      sentAt: new Date().toISOString(),
+    }).catch((e: Error) => this.logger.warn(`Push thất bại, vẫn có trong Hộp thư: ${e.message}`));
+
     return notif;
+  }
+
+  private async pushTransactional(userId: string, payload: PushMessage): Promise<void> {
+    if (!this.pushPublisher) return;
+    // Same rule as reminders: a user who turned push off still gets the inbox item, no system notification.
+    const pref = await this.preferenceModel?.findOne({ userId }).lean();
+    if (pref?.pushEnabled === false) return;
+    await this.pushPublisher.publishToUser(userId, payload);
   }
 
   @Public()
