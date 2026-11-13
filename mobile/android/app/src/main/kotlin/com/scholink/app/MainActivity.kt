@@ -68,11 +68,10 @@ class MainActivity : FlutterActivity() {
     private fun showNotification(call: MethodCall): Boolean {
         if (!notificationsAllowed()) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(PUSH_CHANNEL_ID) == null) {
-            val channel = NotificationChannel(PUSH_CHANNEL_ID, "Nhắc hạn và cập nhật", NotificationManager.IMPORTANCE_HIGH)
-            channel.description = "Nhắc hạn đăng ký 7/3/1 ngày và cập nhật hồ sơ từ Scholink"
-            manager.createNotificationChannel(channel)
-        }
+        // Called every time so an existing channel picks up the new name (importance is kept by Android).
+        val channel = NotificationChannel(PUSH_CHANNEL_ID, "Thông báo Scholink", NotificationManager.IMPORTANCE_HIGH)
+        channel.description = "Nhắc hạn đăng ký, cập nhật hồ sơ, đội thi và tin nhắn từ Scholink"
+        manager.createNotificationChannel(channel)
         val key = call.argument<String>("id") ?: System.currentTimeMillis().toString()
         val title = call.argument<String>("title") ?: "Scholink"
         val body = call.argument<String>("body") ?: ""
@@ -95,7 +94,7 @@ class MainActivity : FlutterActivity() {
         val summary = Notification.Builder(this, PUSH_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle("Scholink")
-            .setContentText("Bạn có nhắc hạn mới trong Hộp thư")
+            .setContentText("Bạn có thông báo mới trong Hộp thư")
             .setGroup(PUSH_GROUP)
             .setGroupSummary(true)
             .setAutoCancel(true)

@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@ne
 import { Worker, Job } from 'bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import {
   NotificationModel,
@@ -297,7 +298,7 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.notificationModel.create({
-        id: `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        id: `notif_${randomUUID()}`,
         type: 'DEADLINE_REMINDER',
         userId: input.userId,
         businessKey,

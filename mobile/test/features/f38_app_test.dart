@@ -131,6 +131,64 @@ void main() {
     expect(api.callsTo(ApiEndpoints.notificationRead('n_app')), hasLength(1));
   });
 
+  Map<String, dynamic> unread(String id) => <String, dynamic>{
+        'id': id,
+        'type': 'TEAM_JOIN_REQUEST',
+        'title': 'Có người xin vào đội $id',
+        'body': 'Yêu cầu mới',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
+
+  testWidgets('N2: after login the inbox and badge load without opening the inbox', (WidgetTester tester) async {
+    phone(tester);
+    await boot(signedIn: false);
+    api
+      ..reply(ApiEndpoints.login, <String, dynamic>{
+        'accessToken': 'access_a',
+        'refreshToken': 'refresh_a',
+        'user': <String, dynamic>{'id': 'stu_a', 'email': 'sv@uit.edu.vn', 'fullName': 'Sinh viên A'},
+      })
+      ..reply(ApiEndpoints.notifications, <dynamic>[unread('n1'), unread('n2')]);
+
+    await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: false));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'sv@uit.edu.vn');
+    await tester.enterText(find.byType(TextField).at(1), 'Matkhau@123');
+    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+    await tester.pumpAndSettle();
+
+    expect(api.callsTo(ApiEndpoints.notifications), isNotEmpty);
+    expect(find.text('2'), findsOneWidget, reason: 'badge on the Thông báo tab right after login');
+  });
+
+  testWidgets('N2: coming back to the foreground reloads the inbox and the badge', (WidgetTester tester) async {
+    phone(tester);
+    await boot(signedIn: true);
+    api.reply(ApiEndpoints.notifications, <dynamic>[unread('n1')]);
+    await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: true));
+    await tester.pumpAndSettle();
+    expect(find.text('1'), findsOneWidget);
+    final int before = api.callsTo(ApiEndpoints.notifications).length;
+
+    // A new notification arrives while the app is in the background (no MQTT then).
+    api.reply(ApiEndpoints.notifications, <dynamic>[unread('n1'), unread('n2'), unread('n3')]);
+    for (final AppLifecycleState s in <AppLifecycleState>[
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(s);
+    }
+    await tester.pumpAndSettle();
+
+    expect(api.callsTo(ApiEndpoints.notifications).length, before + 1);
+    expect(find.text('3'), findsOneWidget);
+  });
+
   testWidgets('the Thông báo tab shows the unread count and refreshes when opened again', (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: true);

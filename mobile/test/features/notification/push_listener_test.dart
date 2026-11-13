@@ -112,6 +112,18 @@ void main() {
     expect(listener.isListening, isFalse);
   });
 
+  test('N2: starting again for the same user reconnects a dropped connection, once', () async {
+    await listener.start('u1');
+    mqtt.connected = false; // socket lost while the app was in background
+    await listener.start('u1');
+    await listener.start('u1'); // already connected again: no extra connect
+
+    expect(mqtt.connectedAs, <String>['u1', 'u1']);
+    mqtt.deliver('users/u1/notifications', push('after-resume'));
+    await flush();
+    expect(notifier.shown.single['id'], 'after-resume', reason: 'still one listener, no duplicate');
+  });
+
   test('switching account reconnects as the new user', () async {
     await listener.start('u1');
     await listener.start('u2');

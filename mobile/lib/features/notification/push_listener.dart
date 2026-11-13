@@ -32,6 +32,8 @@ class PushListener {
   Future<void> start(String userId, {void Function()? onReceived}) async {
     if (_userId == userId && _sub != null) {
       _onReceived = onReceived ?? _onReceived;
+      // N2: back in the foreground after the socket dropped (or the first connect failed).
+      if (!_mqtt.isConnected) await _mqtt.connect(userId);
       return;
     }
     await stop();
