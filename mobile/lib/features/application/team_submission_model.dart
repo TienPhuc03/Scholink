@@ -131,6 +131,15 @@ class TeamSubmissionStatus {
   bool allReady(DateTime now) =>
       members.isNotEmpty && members.every((String m) => stateOf(m, now) == MemberConsentState.given);
 
+  List<String> missingMembers(DateTime now) =>
+      members.where((String m) => stateOf(m, now) == MemberConsentState.missing).toList();
+
+  List<String> staleMembers(DateTime now) =>
+      members.where((String m) => stateOf(m, now) == MemberConsentState.needsRenewal).toList();
+
+  List<String> readyMembers(DateTime now) =>
+      members.where((String m) => stateOf(m, now) == MemberConsentState.given).toList();
+
   /// Exact body for `POST /api/v1/applications` (TEAM). Stored with its Idempotency-Key so a
   /// retry after a lost response resends the same request (Q17).
   Map<String, dynamic> buildSubmitBody({required int expectedRuleVersion}) => <String, dynamic>{

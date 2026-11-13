@@ -162,19 +162,40 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
 
   Widget _buildTeamCard(TeamSubmissionStatus s) {
     final int memberCount = s.members.isNotEmpty ? s.members.length : (vm.team?.memberCount ?? 0);
+    final int minSize = vm.team?.minSize ?? 1;
+    final int maxSize = vm.team?.maxSize ?? 5;
+    final bool sizeValid = memberCount >= minSize && memberCount <= maxSize;
+    final int rosterVer = s.rosterVersion > 0 ? s.rosterVersion : 1;
+
     return SectionCard(
       icon: Icons.groups_outlined,
       title: vm.team?.name ?? 'Đội của bạn',
       trailing: Pill(text: vm.isLeader ? 'Trưởng đội' : 'Thành viên', color: AppColors.primary),
-      child: Text(
-        '$memberCount thành viên · ${_teamStatusLabel(s)}',
-        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '$memberCount thành viên (Min: $minSize, Max: $maxSize) · Roster v$rosterVer · ${_teamStatusLabel(s)}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          if (!sizeValid) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              memberCount < minSize
+                  ? '⚠️ Đội chưa đủ số lượng tối thiểu ($minSize thành viên).'
+                  : '⚠️ Đội vượt quá số lượng tối đa ($maxSize thành viên).',
+              style: const TextStyle(fontSize: 12, color: AppColors.error),
+            ),
+          ],
+        ],
       ),
     );
   }
 
   String _teamStatusLabel(TeamSubmissionStatus s) {
-    if (s.isSubmitted) return 'Đã nộp hồ sơ';
+    if (s.isSubmitted) return 'Đã nộp hồ sơ (COMMITTED)';
+    if (vm.canRetrySubmit || vm.hasUnconfirmedAttempt) return 'Đang chờ máy chủ (PENDING ACK)';
+    if (vm.busy) return 'Đang xử lý (SUBMITTING)';
     if (vm.isLeaseOver) return 'Phiên nộp đã hết hạn';
     if (vm.isSessionOpen) return 'Đang thu thập đồng ý';
     return 'Chưa bắt đầu nộp';
@@ -221,6 +242,28 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
               ? 'Phiên nộp đã hết hạn 10 phút. Bấm "Bắt đầu lại" để mở phiên mới; mọi thành viên cần đồng ý lại.'
               : 'Phiên nộp đã hết hạn. Chờ trưởng đội bắt đầu lại rồi đồng ý lần nữa.',
         ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.cardInfoBackground,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(Icons.shield_outlined, size: 16, color: AppColors.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cơ chế bảo vệ: Đội KHÔNG tự động mở khoá khi timeout trên máy khách cho đến khi máy chủ xác minh để ngăn ngừa xung đột dữ liệu (split-brain).',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         _buildMembers(s),
       ];
@@ -229,6 +272,10 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       _buildCountdown(),
       const SizedBox(height: 12),
       _buildMembers(s),
+      if (vm.isLeader) ...<Widget>[
+        const SizedBox(height: 12),
+        _buildLeaderSummary(s),
+      ],
       const SizedBox(height: 12),
       _buildMyPart(),
     ];
@@ -260,7 +307,15 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
         children: <Widget>[
           const Icon(Icons.lock_clock_outlined, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          const Expanded(child: Text('Đội đang được khoá để nộp', style: TextStyle(fontSize: 13))),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Đội đang được khoá để nộp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('Không thể thay đổi đội hình trong phiên', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
           Text(
             formatCountdown(vm.leaseSecondsLeft),
             key: const Key('team_countdown'),
@@ -278,32 +333,200 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       icon: Icons.how_to_reg_outlined,
       title: 'Đồng ý của thành viên ($ready/${s.members.length})',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          for (final String m in s.members)
-            InkWell(
-              key: Key('team_member_$m'),
-              onTap: m == vm.userId || widget.onOpenMemberProfile == null ? null : () => widget.onOpenMemberProfile!(m),
-              child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      <String>[
-                        m == vm.userId ? 'Bạn' : m,
-                        if (m == s.leaderId) '(trưởng đội)',
-                      ].join(' '),
-                      style: const TextStyle(fontSize: 14),
-                      overflow: TextOverflow.ellipsis,
+          for (final String m in s.members) ...<Widget>[
+            Builder(
+              builder: (BuildContext context) {
+                final MemberConsentState state = s.stateOf(m, now);
+                final bool isMe = m == vm.userId;
+                final bool isLeader = m == s.leaderId;
+                final String actionNeeded = switch (state) {
+                  MemberConsentState.given => 'Đã hoàn tất xác nhận',
+                  MemberConsentState.missing =>
+                    isMe ? '👉 Bạn cần xem trước và bấm đồng ý bên dưới' : '👉 Cần thành viên mở app xem snapshot và đồng ý',
+                  MemberConsentState.needsRenewal =>
+                    isMe ? '👉 Hồ sơ đổi phiên bản hoặc hết hạn 10 phút. Bấm xem lại bên dưới' : '👉 Cần thành viên ký lại do đổi phiên bản hồ sơ hoặc hết hạn',
+                };
+
+                return InkWell(
+                  key: Key('team_member_$m'),
+                  onTap: isMe || widget.onOpenMemberProfile == null ? null : () => widget.onOpenMemberProfile!(m),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                <String>[
+                                  isMe ? 'Bạn' : m,
+                                  if (isLeader) '(trưởng đội)',
+                                ].join(' '),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            _consentPill(state),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                actionNeeded,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: state == MemberConsentState.given ? AppColors.textSecondary : AppColors.warning,
+                                ),
+                              ),
+                            ),
+                            if (!isMe && widget.onOpenMemberProfile != null)
+                              const Text(
+                                'Xem hồ sơ chia sẻ ›',
+                                style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  _consentPill(s.stateOf(m, now)),
-                ],
-              ),
-              ),
+                );
+              },
             ),
+          ],
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.cardInfoBackground,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(Icons.privacy_tip_outlined, size: 15, color: AppColors.textSecondary),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Quyền riêng tư (FR-PROF-05): Trưởng đội chỉ xem hồ sơ chia sẻ công khai/nội bộ đội. Bản snapshot đầy đủ chỉ thành viên sở hữu mới có quyền xem trước và ký xác nhận.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.3),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLeaderSummary(TeamSubmissionStatus s) {
+    final DateTime now = vm.now;
+    final bool allReady = s.allReady(now);
+    return SectionCard(
+      icon: Icons.checklist_rtl_rounded,
+      title: 'Tổng hợp hồ sơ nộp đội (Fencing Token #${s.fencingToken})',
+      trailing: Pill(
+        text: allReady ? 'SẴN SÀNG NỘP' : 'CHỜ THÀNH VIÊN',
+        color: allReady ? AppColors.success : AppColors.warning,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _summaryRow('Mã giữ chỗ (Reservation):', s.reservationId.isNotEmpty ? s.reservationId : 'Chưa cấp'),
+          const SizedBox(height: 4),
+          _summaryRow('Fencing Token:', '#${s.fencingToken} (Bảo vệ tính toàn vẹn)'),
+          const SizedBox(height: 4),
+          _summaryRow('Phiên bản đội hình:', 'v${s.rosterVersion}'),
+          const SizedBox(height: 4),
+          _summaryRow('Quy mô đội:', '${s.members.length} người (Min: ${vm.team?.minSize ?? 1}, Max: ${vm.team?.maxSize ?? 5})'),
+          const Divider(height: 16),
+          const Text(
+            'Danh sách ID đồng ý đã chốt (Member Consents):',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 6),
+          for (final String m in s.members) ...<Widget>[
+            Builder(
+              builder: (BuildContext context) {
+                final TeamMemberConsentInfo? c = s.consentOf(m);
+                final bool isReady = c != null && c.isUsableAt(now);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isReady ? AppColors.surface : AppColors.cardInfoBackground,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: isReady ? AppColors.borderLight : AppColors.warning.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Icon(isReady ? Icons.check_circle_outline : Icons.pending_outlined,
+                              size: 15, color: isReady ? AppColors.success : AppColors.warning),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              m == vm.userId ? 'Bạn ($m)' : m,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          Text(
+                            isReady ? 'Profile v${c.profileVersion}' : 'Chưa có consent',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                      if (isReady) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text('• Consent ID: ${c.identityConsentId}',
+                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                        Text('• Preview ID: ${c.previewId}',
+                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                        Text('• Hash: ${c.payloadHash.length > 16 ? c.payloadHash.substring(0, 16) + '...' : c.payloadHash}',
+                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+          if (!allReady) ...<Widget>[
+            const SizedBox(height: 4),
+            const Text(
+              '⚠️ Chưa thể nộp hồ sơ do còn thành viên chưa ký hoặc consent hết hạn. Nút nộp sẽ tự động mở khi tất cả thành viên hoàn tất.',
+              style: TextStyle(fontSize: 12, color: AppColors.warning, height: 1.3),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value) {
+    return Row(
+      children: <Widget>[
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

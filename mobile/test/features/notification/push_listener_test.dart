@@ -35,10 +35,19 @@ class FakeMqtt implements MqttManager {
   Stream<Map<String, String>> get messageStream => ctrl.stream;
 
   @override
+  Stream<bool> get connectionStatusStream => const Stream<bool>.empty();
+
+  @override
+  void Function()? onAutoReconnected;
+
+  @override
   void publish(String topic, String message) {}
 
   @override
   void subscribe(String topic) {}
+
+  @override
+  void unsubscribe(String topic) {}
 }
 
 class RecordingNotifier implements LocalNotifier {
