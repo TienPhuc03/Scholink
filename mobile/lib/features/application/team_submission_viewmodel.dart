@@ -115,7 +115,16 @@ class TeamSubmissionViewModel extends BaseViewModel {
   MemberConsentState get myConsentState =>
       (_status != null && _userId != null) ? _status!.stateOf(_userId!, now) : MemberConsentState.missing;
 
-  bool get canSubmit => isLeader && isSessionOpen && (_status?.allReady(now) ?? false) && !_busy;
+  bool get isTeamSizeValid {
+    final int count = _status?.members.isNotEmpty == true
+        ? _status!.members.length
+        : (_team?.memberCount ?? 0);
+    final int min = _team?.minSize ?? 1;
+    final int max = _team?.maxSize ?? 99;
+    return count >= min && count <= max;
+  }
+
+  bool get canSubmit => isLeader && isSessionOpen && isTeamSizeValid && (_status?.allReady(now) ?? false) && !_busy;
 
   String get opportunityId => _status?.competitionId.isNotEmpty == true ? _status!.competitionId : (_team?.competitionId ?? '');
 
@@ -358,11 +367,13 @@ class TeamSubmissionViewModel extends BaseViewModel {
   }
 
   String _messageFor(Failure f) => switch (f.code) {
-        'HOLD_EXPIRED' => 'Phiên nộp đã hết hạn. Trưởng đội cần bắt đầu lại và mọi người đồng ý lại.',
+        'HOLD_EXPIRED' => 'Phiên nộp đã hết hạn trên máy chủ. Trưởng đội cần bắt đầu lại và mọi người đồng ý lại.',
         'PREVIEW_EXPIRED' || 'CONSENT_MISMATCH' || 'SNAPSHOT_STALE' =>
-          'Đồng ý của một thành viên không còn hiệu lực. Thành viên đó cần đồng ý lại trước khi nộp.',
-        'VERSION_MISMATCH' => 'Đội hình hoặc điều kiện cuộc thi đã thay đổi. Hãy bắt đầu lại phiên nộp.',
+          'Đồng ý hoặc bản xem trước của một thành viên không còn hiệu lực do đổi hồ sơ hoặc hết hạn. Thành viên đó cần đồng ý lại.',
+        'VERSION_MISMATCH' => 'Đội hình hoặc điều kiện cuộc thi đã thay đổi phiên bản. Hãy bắt đầu lại phiên nộp.',
         'PROFILE_INCOMPLETE' => 'Passport của một thành viên còn thiếu trường bắt buộc: ${f.message}',
+        'TEAM_LOCKED' => 'Đội đang trong phiên nộp hoặc bị khóa, không thể chỉnh sửa đội hình.',
+        'SLOT_FULL' => 'Đội đã đầy hoặc cuộc thi đã hết chỉ tiêu nhận hồ sơ.',
         _ => f.message,
       };
 

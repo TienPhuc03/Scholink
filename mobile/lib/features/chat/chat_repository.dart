@@ -40,15 +40,19 @@ class ChatRepository {
     }
   }
 
-  Future<Result<List<ChatMessageModel>, Failure>> getMessages(String roomId) async {
+  Future<Result<List<ChatMessageModel>, Failure>> getMessages(
+    String roomId, {
+    int? afterSeq,
+    int limit = 50,
+  }) async {
     try {
       final Response<dynamic> response = await _apiClient.get<dynamic>(
-        ApiEndpoints.chatMessages(roomId),
+        ApiEndpoints.chatMessages(roomId, afterSeq: afterSeq, limit: limit),
       );
 
       final dynamic resData = response.data;
       final dynamic payload = (resData is Map<String, dynamic>)
-          ? (resData['data'] ?? resData['messages'] ?? resData)
+          ? (resData['messages'] ?? resData['data'] ?? resData)
           : resData;
 
       List<dynamic> rawList = <dynamic>[];
@@ -72,6 +76,7 @@ class ChatRepository {
   Future<Result<ChatMessageModel, Failure>> sendMessage({
     required String roomId,
     required String content,
+    required String clientMsgId,
     String? assetId,
   }) async {
     final String trimmed = content.trim();
@@ -86,6 +91,7 @@ class ChatRepository {
         ApiEndpoints.chatMessages(roomId),
         data: <String, dynamic>{
           'content': trimmed,
+          'clientMsgId': clientMsgId,
           if (assetId != null) 'assetId': assetId,
         },
       );
@@ -106,6 +112,22 @@ class ChatRepository {
       return FailureResult<ChatMessageModel, Failure>(failure);
     } catch (e) {
       return FailureResult<ChatMessageModel, Failure>(ServerFailure(message: e.toString()));
+    }
+  }
+
+  Future<Result<void, Failure>> markAsRead(String roomId, int lastReadSeq) async {
+    try {
+      await _apiClient.post<dynamic>(
+        ApiEndpoints.markChatRead(roomId),
+        data: <String, dynamic>{
+          'lastReadSeq': lastReadSeq,
+        },
+      );
+      return const SuccessResult<void, Failure>(null);
+    } on Failure catch (failure) {
+      return FailureResult<void, Failure>(failure);
+    } catch (e) {
+      return FailureResult<void, Failure>(ServerFailure(message: e.toString()));
     }
   }
 }

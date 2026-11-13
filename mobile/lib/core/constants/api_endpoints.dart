@@ -72,7 +72,14 @@ abstract final class ApiEndpoints {
   static String withdrawJoinRequest(String requestId) =>
       '/api/v1/teams/join-requests/$requestId/withdraw';
 
-  // Chat routes
+  // Chat routes (Collaboration Service SCHOL-26)
   static const String chatRooms = '/api/v1/chats/rooms';
-  static String chatMessages(String roomId) => '/api/v1/chats/rooms/$roomId/messages';
+  static String chatMessages(String roomId, {int? afterSeq, int limit = 50}) {
+    if (afterSeq != null && afterSeq > 0) {
+      return '/api/v1/chats/rooms/$roomId/messages?afterSeq=$afterSeq&limit=$limit';
+    }
+    return '/api/v1/chats/rooms/$roomId/messages?limit=$limit';
+  }
+  static String markChatRead(String roomId) => '/api/v1/chats/rooms/$roomId/read';
+  static const String directChatRoom = '/api/v1/chats/direct-rooms';
 }

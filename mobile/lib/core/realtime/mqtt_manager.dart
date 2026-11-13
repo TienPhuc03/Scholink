@@ -9,9 +9,12 @@ abstract interface class MqttManager {
   Future<bool> connect(String userId);
   void disconnect();
   void subscribe(String topic);
+  void unsubscribe(String topic);
   void publish(String topic, String message);
   Stream<Map<String, String>> get messageStream;
+  Stream<bool> get connectionStatusStream;
   bool get isConnected;
+  VoidCallback? onAutoReconnected;
 }
 
 /// Concrete implementation of MqttManager utilizing mqtt_server_client.
@@ -21,6 +24,13 @@ class MqttManagerImpl implements MqttManager {
   MqttServerClient? _client;
   final StreamController<Map<String, String>> _messageController =
       StreamController<Map<String, String>>.broadcast();
+  final StreamController<bool> _statusController =
+      StreamController<bool>.broadcast();
+
+  final Set<String> _subscribedTopics = <String>{};
+
+  @override
+  VoidCallback? onAutoReconnected;
 
   MqttManagerImpl({
     String? server,
@@ -34,6 +44,9 @@ class MqttManagerImpl implements MqttManager {
 
   @override
   Stream<Map<String, String>> get messageStream => _messageController.stream;
+
+  @override
+  Stream<bool> get connectionStatusStream => _statusController.stream;
 
   String? _userId;
   Future<bool>? _pending;
@@ -64,6 +77,35 @@ class MqttManagerImpl implements MqttManager {
     client.keepAlivePeriod = 20;
     client.autoReconnect = true;
 
+    // Callbacks for connection monitoring
+    client.onConnected = () {
+      debugPrint('[MQTT] onConnected triggered');
+      _statusController.add(true);
+    };
+
+    client.onDisconnected = () {
+      debugPrint('[MQTT] onDisconnected triggered');
+      _statusController.add(false);
+    };
+
+    client.onAutoReconnect = () {
+      debugPrint('[MQTT] onAutoReconnect triggered - re-subscribing topics');
+    };
+
+    client.onAutoReconnected = () {
+      debugPrint('[MQTT] onAutoReconnected successfully completed');
+      _statusController.add(true);
+
+      // Re-subscribe to all active topics after reconnect
+      for (final String topic in _subscribedTopics) {
+        client.subscribe(topic, MqttQos.atLeastOnce);
+        debugPrint('[MQTT] Re-subscribed to topic: $topic');
+      }
+
+      // Trigger catch-up callback for chat gap-recovery
+      onAutoReconnected?.call();
+    };
+
     final MqttConnectMessage connMessage = MqttConnectMessage()
         .withClientIdentifier(clientId)
         .startClean()
@@ -74,6 +116,7 @@ class MqttManagerImpl implements MqttManager {
       final MqttClientConnectionStatus? status = await client.connect();
       if (status?.state == MqttConnectionState.connected) {
         debugPrint('[MQTT] Connected successfully to $_server:$_port');
+        _statusController.add(true);
 
         // Subscribe to user private notification & chat topics
         subscribe('users/$userId/notifications');
@@ -96,6 +139,7 @@ class MqttManagerImpl implements MqttManager {
       }
     } catch (e) {
       debugPrint('[MQTT] Connection failed: $e');
+      _statusController.add(false);
       client.disconnect();
     }
     return false;
@@ -103,9 +147,19 @@ class MqttManagerImpl implements MqttManager {
 
   @override
   void subscribe(String topic) {
+    _subscribedTopics.add(topic);
     if (_client != null && isConnected) {
       _client!.subscribe(topic, MqttQos.atLeastOnce);
       debugPrint('[MQTT] Subscribed to topic: $topic');
+    }
+  }
+
+  @override
+  void unsubscribe(String topic) {
+    _subscribedTopics.remove(topic);
+    if (_client != null && isConnected) {
+      _client!.unsubscribe(topic);
+      debugPrint('[MQTT] Unsubscribed from topic: $topic');
     }
   }
 
@@ -120,9 +174,11 @@ class MqttManagerImpl implements MqttManager {
 
   @override
   void disconnect() {
+    _subscribedTopics.clear();
     _client?.disconnect();
     _client = null;
     _userId = null;
     _pending = null;
+    _statusController.add(false);
   }
 }

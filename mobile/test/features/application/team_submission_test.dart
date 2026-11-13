@@ -305,5 +305,48 @@ void main() {
       expect(find.byKey(const Key('team_submit')).hitTestable(), findsOneWidget);
       expect(find.byKey(const Key('team_cancel')).hitTestable(), findsOneWidget);
     });
+
+    testWidgets('displays roster version, min/max team size, and leader summary with fencing token', (WidgetTester tester) async {
+      final TeamHarness h = TeamHarness();
+      final DateTime at = DateTime.now();
+      h.api.reply(ApiEndpoints.teamSubmission(teamId),
+          statusJson(consents: <Map<String, dynamic>>[consentJson(leader, at), consentJson(member, at)]));
+      await pumpView(tester, h);
+
+      expect(find.textContaining('Roster v2'), findsOneWidget);
+      expect(find.textContaining('Min: 2, Max: 4'), findsWidgets);
+      expect(find.text('Tổng hợp hồ sơ nộp đội (Fencing Token #3)'), findsOneWidget);
+      expect(find.textContaining('#3 (Bảo vệ tính toàn vẹn)'), findsOneWidget);
+      expect(find.text('SẴN SÀNG NỘP'), findsOneWidget);
+
+      final ElevatedButton submit = tester.widget<ElevatedButton>(
+          find.descendant(of: find.byKey(const Key('team_submit')), matching: find.byType(ElevatedButton)));
+      expect(submit.onPressed, isNotNull);
+    });
+
+    testWidgets('shows stale consent warning and explicit action needed', (WidgetTester tester) async {
+      final TeamHarness h = TeamHarness();
+      final DateTime now = DateTime.now();
+      h.api.reply(ApiEndpoints.teamSubmission(teamId),
+          statusJson(consents: <Map<String, dynamic>>[
+            consentJson(leader, now),
+            consentJson(member, now.subtract(const Duration(minutes: 11))),
+          ]));
+      await pumpView(tester, h);
+
+      expect(find.text('Cần đồng ý lại'), findsOneWidget);
+      expect(find.textContaining('Cần thành viên ký lại'), findsOneWidget);
+      expect(find.text('CHỜ THÀNH VIÊN'), findsOneWidget);
+    });
+
+    testWidgets('lease timeout displays server verification notice preventing split-brain unlock', (WidgetTester tester) async {
+      final TeamHarness h = TeamHarness();
+      h.api.reply(ApiEndpoints.teamSubmission(teamId),
+          statusJson(active: true, leaseEnd: DateTime.now().subtract(const Duration(minutes: 1))));
+      await pumpView(tester, h);
+
+      expect(find.byKey(const Key('team_lease_over')), findsOneWidget);
+      expect(find.textContaining('Đội KHÔNG tự động mở khoá'), findsOneWidget);
+    });
   });
 }

@@ -36,9 +36,15 @@ class SilentMqtt implements MqttManager {
   @override
   Stream<Map<String, String>> get messageStream => _messages.stream;
   @override
+  Stream<bool> get connectionStatusStream => const Stream<bool>.empty();
+  @override
+  VoidCallback? onAutoReconnected;
+  @override
   void publish(String topic, String message) {}
   @override
   void subscribe(String topic) {}
+  @override
+  void unsubscribe(String topic) {}
 }
 
 class ThrowingPicker implements AttachmentPicker {
