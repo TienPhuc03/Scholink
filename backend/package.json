@@ -25,6 +25,7 @@
     "test:security": "ts-node scripts/security-test.ts",
     "test:load": "ts-node scripts/load-test.ts",
     "test:regression": "ts-node scripts/regression-test.ts",
+    "test:race": "jest --testRegex f34-race.e2e-spec.ts$ --runInBand",
     "test:all": "jest && ts-node scripts/test-e2e.ts && ts-node scripts/security-test.ts && ts-node scripts/regression-test.ts",
     "lint": "eslint \"{apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

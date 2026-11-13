@@ -34,11 +34,12 @@ class PassportRepository {
   Future<Result<PassportModel, Failure>> updateMyPassport(
     PassportDraft draft, {
     required int expectedVersion,
+    Map<String, String>? assets,
   }) {
     return _guard(() async {
       final Response<dynamic> response = await _apiClient.put<dynamic>(
         ApiEndpoints.passport,
-        data: draft.toUpdateJson(expectedVersion: expectedVersion),
+        data: draft.toUpdateJson(expectedVersion: expectedVersion, assets: assets),
       );
       return _parse(response.data);
     });
@@ -78,6 +79,27 @@ class PassportRepository {
       final Response<dynamic> response =
           await _apiClient.get<dynamic>(ApiEndpoints.teammateProfile(teamId, studentId));
       return _parseView(response.data);
+    });
+  }
+
+  /// Autocomplete for the Passport form. [field] is `region`, `institution` or `major`;
+  /// [institution] puts that school's majors first.
+  Future<Result<List<ProfileSuggestion>, Failure>> suggest(String field, String query, {String? institution}) {
+    return _guard(() async {
+      final Response<dynamic> response = await _apiClient.get<dynamic>(
+        ApiEndpoints.profileSuggestions,
+        queryParameters: <String, dynamic>{
+          'field': field,
+          'q': query,
+          if (institution != null && institution.trim().isNotEmpty) 'institution': institution.trim(),
+        },
+      );
+      final dynamic data = response.data;
+      final dynamic body = data is Map<String, dynamic> ? (data['data'] ?? data) : null;
+      final dynamic list = body is Map<String, dynamic> ? body['suggestions'] : null;
+      return list is List
+          ? list.whereType<Map<String, dynamic>>().map(ProfileSuggestion.fromJson).toList()
+          : <ProfileSuggestion>[];
     });
   }
 

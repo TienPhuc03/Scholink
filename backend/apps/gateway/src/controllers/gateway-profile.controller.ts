@@ -37,6 +37,8 @@ import {
   UpdateFieldPrivacyDtoSchema,
   ProfileViewQueryDto,
   ProfileViewQueryDtoSchema,
+  ProfileSuggestionQueryDto,
+  ProfileSuggestionQueryDtoSchema,
 } from '@shared';
 import {
   GATEWAY_IDENTITY_GRPC,
@@ -250,6 +252,28 @@ export class GatewayProfileController implements OnModuleInit {
         studentId: req.user.userId,
       }),
     );
+  }
+
+  @Get('suggestions')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Gợi ý khu vực, trường, chuyên ngành khi nhập Passport (autocomplete)' })
+  @ApiQuery({ name: 'field', required: true, enum: ['region', 'institution', 'major'] })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'institution', required: false, description: 'Trường đã chọn, để ưu tiên ngành của trường' })
+  @ApiResponse({ status: 200, description: '{ suggestions: [{ value, detail }] }' })
+  async suggestProfileValues(
+    @Query(new ZodValidationPipe(ProfileSuggestionQueryDtoSchema)) query: ProfileSuggestionQueryDto,
+  ) {
+    const res = await firstValueFrom(
+      this.identityService.suggestProfileValues({
+        field: query.field,
+        query: query.q,
+        institution: query.institution,
+        limit: query.limit,
+      }),
+    );
+    // gRPC leaves out an empty list.
+    return { suggestions: res.suggestions ?? [] };
   }
 
   /** FR-PROF-05: public view of another student's Passport. Declared last so `me/...` routes win. */

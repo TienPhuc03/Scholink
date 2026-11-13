@@ -166,6 +166,63 @@ Map<String, FieldVisibility> resolveFieldPrivacy(dynamic raw) => <String, FieldV
         f.key: (raw is Map ? FieldVisibility.parse(raw[f.key]) : null) ?? f.byDefault,
     };
 
+/// One autocomplete entry from `GET /profiles/suggestions`: [value] goes into the field.
+class ProfileSuggestion {
+  final String value;
+  final String? detail;
+
+  const ProfileSuggestion(this.value, [this.detail]);
+
+  factory ProfileSuggestion.fromJson(Map<String, dynamic> json) =>
+      ProfileSuggestion((json['value'] ?? '').toString(), _nonEmpty(json['detail']));
+}
+
+/// A Passport file the caller may open (`cvFile`). The links live 5 minutes and are empty when
+/// the backend has no object storage, so a view must fetch the profile again before reopening.
+class FileLink {
+  final String assetId;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+  final String? viewUrl;
+  final String? downloadUrl;
+
+  const FileLink({
+    required this.assetId,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    this.viewUrl,
+    this.downloadUrl,
+  });
+
+  bool get isPdf => mimeType == 'application/pdf';
+  bool get canOpen => viewUrl != null;
+
+  /// "PDF · 245 KB"
+  String get summary {
+    final String type = fileName.contains('.') ? fileName.split('.').last.toUpperCase() : mimeType;
+    final String size = sizeBytes >= 1024 * 1024
+        ? '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB'
+        : '${(sizeBytes / 1024).ceil()} KB';
+    return '$type · $size';
+  }
+
+  static FileLink? fromJsonOrNull(dynamic raw) {
+    if (raw is! Map) return null;
+    final String? id = _nonEmpty(raw['assetId']);
+    if (id == null) return null;
+    return FileLink(
+      assetId: id,
+      fileName: _nonEmpty(raw['fileName']) ?? 'Tệp',
+      mimeType: _nonEmpty(raw['mimeType']) ?? '',
+      sizeBytes: (raw['sizeBytes'] as num?)?.toInt() ?? 0,
+      viewUrl: _nonEmpty(raw['viewUrl']),
+      downloadUrl: _nonEmpty(raw['downloadUrl']),
+    );
+  }
+}
+
 /// Unified Passport Model for MVVM Architecture.
 class PassportModel {
   final String studentId;
@@ -174,6 +231,10 @@ class PassportModel {
   final String? regionCode;
   final String? avatarAssetId;
   final String? cvAssetId;
+
+  /// Short-lived link to the avatar image; null without object storage.
+  final String? avatarUrl;
+  final FileLink? cvFile;
   final int completionScore;
   final int profileVersion;
   final EducationModel? education;
@@ -196,6 +257,8 @@ class PassportModel {
     this.regionCode,
     this.avatarAssetId,
     this.cvAssetId,
+    this.avatarUrl,
+    this.cvFile,
     required this.completionScore,
     required this.profileVersion,
     this.education,
@@ -231,6 +294,8 @@ class PassportModel {
       regionCode: _nonEmpty(map['regionCode']),
       avatarAssetId: _nonEmpty(map['avatarAssetId']),
       cvAssetId: _nonEmpty(map['cvAssetId']),
+      avatarUrl: _nonEmpty(map['avatarUrl']),
+      cvFile: FileLink.fromJsonOrNull(map['cvFile']),
       completionScore: ((map['completionScore'] as num?)?.toInt() ?? 0).clamp(0, 100),
       profileVersion: _positiveInt(map['profileVersion']) ?? _positiveInt(map['version']) ?? 1,
       education: EducationModel.fromJsonOrNull(map['education']),
@@ -305,7 +370,7 @@ class PassportDraft {
 
   /// Body for `PUT /api/v1/profiles/me`. Sends [expectedVersion] for optimistic locking
   /// (409 VERSION_MISMATCH when someone else saved first).
-  Map<String, dynamic> toUpdateJson({required int expectedVersion}) {
+  Map<String, dynamic> toUpdateJson({required int expectedVersion, Map<String, String>? assets}) {
     final String bioTrim = bio.trim();
     final String regionTrim = regionCode.trim();
     return <String, dynamic>{
@@ -321,6 +386,7 @@ class PassportDraft {
       'isOpenForScholarship': isOpenForScholarship,
       'isOpenForMentoring': isOpenForMentoring,
       'phone': phone.trim(),
+      ...?assets,
     };
   }
 }
@@ -344,6 +410,10 @@ class ProfileView {
   final List<String> achievements;
   final String? cvAssetId;
   final String? pitchVideoAssetId;
+  final String? avatarUrl;
+
+  /// The CV with its links, only when the viewer may see it.
+  final FileLink? cvFile;
 
   const ProfileView({
     required this.studentId,
@@ -361,6 +431,8 @@ class ProfileView {
     this.achievements = const <String>[],
     this.cvAssetId,
     this.pitchVideoAssetId,
+    this.avatarUrl,
+    this.cvFile,
   });
 
   bool shows(String field) => visibleFields.contains(field);
@@ -388,6 +460,8 @@ class ProfileView {
       achievements: visible.contains('achievements') ? _stringList(map['achievements']) : const <String>[],
       cvAssetId: visible.contains('cv') ? _nonEmpty(map['cvAssetId']) : null,
       pitchVideoAssetId: visible.contains('pitchVideo') ? _nonEmpty(map['pitchVideoAssetId']) : null,
+      avatarUrl: _nonEmpty(map['avatarUrl']),
+      cvFile: visible.contains('cv') ? FileLink.fromJsonOrNull(map['cvFile']) : null,
     );
   }
 }

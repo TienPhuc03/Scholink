@@ -193,7 +193,7 @@ void registerDependencies({
   );
 
   sl.registerFactory<PassportViewModel>(
-    () => PassportViewModel(sl<PassportRepository>()),
+    () => PassportViewModel(sl<PassportRepository>(), media: sl<MediaRepository>()),
   );
 
   sl.registerFactory<NotificationViewModel>(

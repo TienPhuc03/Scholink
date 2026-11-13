@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import * as crypto from 'crypto';
 import {
   DomainException,
@@ -9,14 +9,19 @@ import {
 } from '@shared';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
 import { MediaAsset } from '../../domain/media-asset.entity';
+import { ObjectStorageService } from '../../infrastructure/storage/object-storage.service';
 
 const UPLOAD_URL_TTL_SECONDS = 900; // 15 phút theo SRS FR-PROF-04
+const DOWNLOAD_URL_TTL_SECONDS = 300;
+// Largest category limit (PITCH_VIDEO 20MB) plus one byte, so an oversized upload is still detected.
+const MAX_SCAN_BYTES = 20 * 1024 * 1024 + 1;
 
 @Injectable()
 export class MediaUseCase {
   constructor(
     @Inject(PASSPORT_REPOSITORY) private readonly passportRepo: IPassportRepository,
     private readonly cryptoService: CryptoService,
+    @Optional() private readonly storage?: ObjectStorageService,
   ) {}
 
   /**
@@ -45,7 +50,10 @@ export class MediaUseCase {
     const uploadToken = this.cryptoService
       .sha256(`${asset.id}:${asset.ownerId}:${asset.objectKey}:${expiresAtEpoch}`)
       .slice(0, 32);
-    const uploadUrl = `https://storage.scholink.edu.vn/${asset.objectKey}?token=${uploadToken}&expires=${expiresAtEpoch}`;
+    // Without a configured bucket (unit tests) the URL is a placeholder and nothing is stored.
+    const uploadUrl = this.storage?.enabled
+      ? this.storage.presignUpload(asset.objectKey, UPLOAD_URL_TTL_SECONDS)
+      : `https://storage.scholink.edu.vn/${asset.objectKey}?token=${uploadToken}&expires=${expiresAtEpoch}`;
 
     return Object.freeze({
       assetId: asset.id,
@@ -72,11 +80,28 @@ export class MediaUseCase {
       throw DomainException.notFound('MediaAsset');
     }
 
+    // With real storage the scan runs on the stored bytes, never on what the client reports.
+    let scan = dto;
+    if (this.storage?.enabled && asset.ownerId === ownerId && asset.status === 'UPLOADING') {
+      const stored = await this.storage.read(asset.objectKey, MAX_SCAN_BYTES);
+      if (!stored) {
+        throw DomainException.conflict(
+          ErrorCode.ASSET_NOT_AVAILABLE,
+          'Chưa nhận được tệp trên kho lưu trữ. Hãy tải tệp lên bằng uploadUrl rồi xác nhận lại.',
+        );
+      }
+      scan = {
+        fileHeaderHex: stored.bytes.subarray(0, 16).toString('hex'),
+        sampleContent: stored.bytes.toString('latin1'),
+        actualSizeBytes: stored.sizeBytes,
+      };
+    }
+
     const { updatedAsset, rejectionReason } = asset.inspectAndComplete({
       actorId: ownerId,
-      fileHeaderHex: dto.fileHeaderHex,
-      sampleContent: dto.sampleContent,
-      actualSizeBytes: dto.actualSizeBytes,
+      fileHeaderHex: scan.fileHeaderHex,
+      sampleContent: scan.sampleContent,
+      actualSizeBytes: scan.actualSizeBytes,
     });
 
     await this.passportRepo.updateMediaAsset(updatedAsset);
@@ -101,7 +126,37 @@ export class MediaUseCase {
       throw DomainException.forbidden('Bạn không có quyền truy cập tệp minh chứng của người khác');
     }
 
-    return this.toResponse(asset);
+    return Object.freeze({
+      ...this.toResponse(asset),
+      // Short-lived link for the owner only; empty until the file passed the scan.
+      downloadUrl:
+        this.storage?.enabled && asset.status === 'READY'
+          ? this.storage.presignDownload(asset.objectKey, DOWNLOAD_URL_TTL_SECONDS, asset.fileName)
+          : '',
+    });
+  }
+
+  /**
+   * A READY file of a Passport with short-lived links, for a caller that is already allowed to
+   * see it (the owner, or a viewer the field visibility lets in). Links are empty without a
+   * bucket, since then no bytes were stored.
+   */
+  async fileLink(assetId?: string) {
+    if (!assetId) return undefined;
+    const asset = await this.passportRepo.findMediaAssetById(assetId);
+    if (!asset || asset.status !== 'READY') return undefined;
+    // A file "uploaded" while storage was simulated has no bytes in the bucket: no link to a 404.
+    const stored = Boolean(this.storage?.enabled) && (await this.storage.exists(asset.objectKey));
+    const link = (inline: boolean) =>
+      stored ? this.storage.presignDownload(asset.objectKey, DOWNLOAD_URL_TTL_SECONDS, asset.fileName, inline) : '';
+    return Object.freeze({
+      assetId: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      viewUrl: link(true),
+      downloadUrl: link(false),
+    });
   }
 
   /**

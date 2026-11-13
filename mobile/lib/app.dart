@@ -244,9 +244,24 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _showMessage('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', color: AppColors.error);
   }
 
+  /// F40: on success the server already revoked every session; leave the app like a logout.
+  Future<String?> _handleDeleteAccount(String currentPassword, {required bool purgeSnapshots}) async {
+    final Failure? failure = (await sl<AuthRepository>()
+            .deleteAccount(currentPassword: currentPassword, purgeSnapshots: purgeSnapshots))
+        .errorOrNull;
+    if (failure != null) return failure.message;
+    if (!mounted) return null;
+    _signOutLocally('Tài khoản đã được xoá. Dữ liệu cá nhân sẽ được xoá theo chính sách lưu trữ.');
+    return null;
+  }
+
   Future<void> _handleLogout() async {
     await sl<AuthRepository>().logout();
     if (!mounted) return;
+    _signOutLocally('Bạn đã đăng xuất.');
+  }
+
+  void _signOutLocally(String message) {
     _closeAccountScreensAndData();
     setState(() {
       _isAuthenticated = false;
@@ -256,7 +271,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _pendingBookmark = null;
       _currentTabIndex = AppTabs.opportunities;
     });
-    _showMessage('Bạn đã đăng xuất.');
+    _showMessage(message);
   }
 
   /// Guests are asked to log in before opening account-only tabs.
@@ -725,6 +740,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
             PassportView(
               viewModel: _tabs.passport,
               onLogout: _handleLogout,
+              onDeleteAccount: _handleDeleteAccount,
               onOpenMyApplications: _openMyApplications,
               onPreviewProfile: _openMyProfilePreview,
             ),

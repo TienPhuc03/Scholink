@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { join } from "path";
+import { ApplicationOutboxRelayService } from "./infrastructure/workers/application-outbox-relay.service";
 import {
   SharedModule,
   DatabaseModule,
@@ -141,6 +142,7 @@ import { COLLABORATION_GRPC_CLIENT } from "./application/use-cases/collaboration
     ApplicationUseCase,
     BookmarkUseCase,
     CrawlerUseCase,
+    ApplicationOutboxRelayService,
     {
       provide: OPPORTUNITY_REPOSITORY,
       useClass: MongooseOpportunityRepository,

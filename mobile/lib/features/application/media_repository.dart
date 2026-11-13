@@ -9,26 +9,46 @@ import '../../core/network/api_client.dart';
 import 'application_model.dart';
 import 'attachment_model.dart';
 
-/// Media upload (F13 backend) for application attachments.
+/// Uploads a file to the bucket at a presigned URL. Separate from [ApiClient] on purpose: the
+/// presigned URL carries its own signature and must not get the app's Bearer header.
+typedef PresignedPut = Future<void> Function(String url, List<int> bytes, String mimeType);
+
+Future<void> _dioPut(String url, List<int> bytes, String mimeType) async {
+  await Dio().put<dynamic>(
+    url,
+    data: Stream<List<int>>.value(bytes),
+    options: Options(headers: <String, dynamic>{
+      Headers.contentTypeHeader: mimeType,
+      Headers.contentLengthHeader: bytes.length,
+    }),
+  );
+}
+
+/// Media upload (F13 backend): `upload-url` → PUT bytes to the presigned URL → `complete`.
 ///
-/// The backend storage is simulated: `upload-url` returns a placeholder URL on a host that does
-/// not exist, and `complete` inspects the file header and a text sample to mark the asset
-/// READY or REJECTED. So the byte upload step is skipped for now; once real object storage is
-/// wired in, PUT the bytes to `uploadUrl` between the two calls.
+/// When the backend has no object storage it returns a placeholder URL on
+/// `storage.scholink.edu.vn`; then no bytes are sent and `complete` scans the header and text
+/// sample the app reports. With MinIO the backend scans the stored bytes itself.
 class MediaRepository {
   final ApiClient _api;
+  final PresignedPut _put;
 
-  MediaRepository(this._api);
+  MediaRepository(this._api, {PresignedPut? put}) : _put = put ?? _dioPut;
+
+  static bool _isPlaceholder(String url) => url.isEmpty || Uri.tryParse(url)?.host == 'storage.scholink.edu.vn';
 
   /// Returns the READY asset id. A rejected scan comes back as a ServerFailure
   /// (code MALICIOUS_FILE_DETECTED or a validation error) with the backend's reason.
-  Future<Result<String, Failure>> uploadAttachment(PickedAttachment file) async {
+  Future<Result<String, Failure>> uploadAttachment(PickedAttachment file) => upload(file, category: 'ATTACHMENT');
+
+  /// [category] is one of the backend MediaCategory values (ATTACHMENT, CV, AVATAR, ...).
+  Future<Result<String, Failure>> upload(PickedAttachment file, {required String category, String? mimeType}) async {
     try {
-      final String mime = AttachmentRules.mimeForExtension(file.name) ?? 'application/octet-stream';
+      final String mime = mimeType ?? AttachmentRules.mimeForExtension(file.name) ?? 'application/octet-stream';
       final Response<dynamic> created = await _api.post<dynamic>(
         ApiEndpoints.mediaUploadUrl,
         data: <String, dynamic>{
-          'category': 'ATTACHMENT',
+          'category': category,
           'fileName': file.name,
           'mimeType': mime,
           'sizeBytes': file.bytes.length,
@@ -39,6 +59,18 @@ class MediaRepository {
       final String assetId = (asset['assetId'] ?? asset['id'] ?? '').toString();
       if (assetId.isEmpty) {
         throw const ServerFailure(message: 'Máy chủ không trả về mã tệp.');
+      }
+      final String uploadUrl = (asset['uploadUrl'] ?? '').toString();
+      if (!_isPlaceholder(uploadUrl)) {
+        try {
+          await _put(uploadUrl, file.bytes, mime);
+        } on DioException catch (e) {
+          throw ServerFailure(
+            message: 'Không tải được tệp lên kho lưu trữ. Kiểm tra mạng rồi thử lại.',
+            code: 'UPLOAD_FAILED',
+            statusCode: e.response?.statusCode,
+          );
+        }
       }
 
       final int headerLen = file.bytes.length < 16 ? file.bytes.length : 16;
