@@ -26,7 +26,8 @@ class PassportRepository {
 
   Future<Result<PassportModel, Failure>> getMyPassport() {
     return _guard(() async {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.passport);
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.passport);
       return _parse(response.data);
     });
   }
@@ -39,23 +40,27 @@ class PassportRepository {
     return _guard(() async {
       final Response<dynamic> response = await _apiClient.put<dynamic>(
         ApiEndpoints.passport,
-        data: draft.toUpdateJson(expectedVersion: expectedVersion, assets: assets),
+        data: draft.toUpdateJson(
+            expectedVersion: expectedVersion, assets: assets),
       );
       return _parse(response.data);
     });
   }
 
   /// Saves who may see each field. The profile version does not change.
-  Future<Result<PassportModel, Failure>> updateFieldPrivacy(PassportDraft draft) {
+  Future<Result<PassportModel, Failure>> updateFieldPrivacy(
+      PassportDraft draft) {
     return _guard(() async {
-      final Response<dynamic> response =
-          await _apiClient.put<dynamic>(ApiEndpoints.passportPrivacy, data: draft.toPrivacyJson());
+      final Response<dynamic> response = await _apiClient.put<dynamic>(
+          ApiEndpoints.passportPrivacy,
+          data: draft.toPrivacyJson());
       return _parse(response.data);
     });
   }
 
   /// The signed-in student's Passport as [audience] would see it.
-  Future<Result<ProfileView, Failure>> previewMyProfile(ProfileAudience audience) {
+  Future<Result<ProfileView, Failure>> previewMyProfile(
+      ProfileAudience audience) {
     return _guard(() async {
       final Response<dynamic> response = await _apiClient.get<dynamic>(
         ApiEndpoints.passportView,
@@ -68,50 +73,64 @@ class PassportRepository {
   /// Public view of another student.
   Future<Result<ProfileView, Failure>> getPublicProfile(String studentId) {
     return _guard(() async {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.publicProfile(studentId));
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.publicProfile(studentId));
       return _parseView(response.data);
     });
   }
 
   /// Teammate view; the server checks that both students are in [teamId].
-  Future<Result<ProfileView, Failure>> getTeammateProfile({required String teamId, required String studentId}) {
+  Future<Result<ProfileView, Failure>> getTeammateProfile(
+      {required String teamId, required String studentId}) {
     return _guard(() async {
-      final Response<dynamic> response =
-          await _apiClient.get<dynamic>(ApiEndpoints.teammateProfile(teamId, studentId));
+      final Response<dynamic> response = await _apiClient
+          .get<dynamic>(ApiEndpoints.teammateProfile(teamId, studentId));
       return _parseView(response.data);
     });
   }
 
   /// Autocomplete for the Passport form. [field] is `region`, `institution` or `major`;
   /// [institution] puts that school's majors first.
-  Future<Result<List<ProfileSuggestion>, Failure>> suggest(String field, String query, {String? institution}) {
+  Future<Result<List<ProfileSuggestion>, Failure>> suggest(
+      String field, String query,
+      {String? institution}) {
     return _guard(() async {
       final Response<dynamic> response = await _apiClient.get<dynamic>(
         ApiEndpoints.profileSuggestions,
         queryParameters: <String, dynamic>{
           'field': field,
           'q': query,
-          if (institution != null && institution.trim().isNotEmpty) 'institution': institution.trim(),
+          if (institution != null && institution.trim().isNotEmpty)
+            'institution': institution.trim(),
         },
       );
       final dynamic data = response.data;
-      final dynamic body = data is Map<String, dynamic> ? (data['data'] ?? data) : null;
-      final dynamic list = body is Map<String, dynamic> ? body['suggestions'] : null;
+      final dynamic body =
+          data is Map<String, dynamic> ? (data['data'] ?? data) : null;
+      final dynamic list =
+          body is Map<String, dynamic> ? body['suggestions'] : null;
       return list is List
-          ? list.whereType<Map<String, dynamic>>().map(ProfileSuggestion.fromJson).toList()
+          ? list
+              .whereType<Map<String, dynamic>>()
+              .map(ProfileSuggestion.fromJson)
+              .toList()
           : <ProfileSuggestion>[];
     });
   }
 
   PassportModel _parse(dynamic resData) {
-    final dynamic payload = resData is Map<String, dynamic> ? (resData['data'] ?? resData) : resData;
+    final dynamic payload = resData is Map<String, dynamic>
+        ? (resData['data'] ?? resData)
+        : resData;
     if (payload is Map<String, dynamic>) return PassportModel.fromJson(payload);
-    throw const ServerFailure(message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.');
+    throw const ServerFailure(
+        message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.');
   }
 
   ProfileView _parseView(dynamic resData) {
     if (resData is Map<String, dynamic>) return ProfileView.fromJson(resData);
-    throw const ServerFailure(message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.');
+    throw const ServerFailure(
+        message: 'Phản hồi hồ sơ từ máy chủ không hợp lệ.');
   }
 
   Future<Result<T, Failure>> _guard<T>(Future<T> Function() action) async {

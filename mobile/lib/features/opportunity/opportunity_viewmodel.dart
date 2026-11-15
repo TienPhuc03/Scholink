@@ -19,7 +19,8 @@ class OpportunityViewModel extends BaseViewModel {
   final Duration _searchDebounce;
 
   List<OpportunityModel> _items = <OpportunityModel>[];
-  String _selectedTypeFilter = 'ALL'; // 'ALL', 'SCHOLARSHIP', 'COMPETITION', 'BOOKMARKED'
+  String _selectedTypeFilter =
+      'ALL'; // 'ALL', 'SCHOLARSHIP', 'COMPETITION', 'BOOKMARKED'
   String _selectedApplyMode = 'ALL'; // 'ALL', 'IN_APP', 'EXTERNAL'
   String _searchQuery = '';
 
@@ -39,10 +40,12 @@ class OpportunityViewModel extends BaseViewModel {
   bool _disposed = false;
   OpportunityModel? _selectedOpportunity;
 
-  OpportunityViewModel(this._repository, {Duration searchDebounce = const Duration(milliseconds: 400)})
+  OpportunityViewModel(this._repository,
+      {Duration searchDebounce = const Duration(milliseconds: 400)})
       : _searchDebounce = searchDebounce;
 
-  List<OpportunityModel> get items => List<OpportunityModel>.unmodifiable(_items);
+  List<OpportunityModel> get items =>
+      List<OpportunityModel>.unmodifiable(_items);
   String get selectedTypeFilter => _selectedTypeFilter;
   String get selectedApplyMode => _selectedApplyMode;
   String get searchQuery => _searchQuery;
@@ -61,7 +64,9 @@ class OpportunityViewModel extends BaseViewModel {
   bool get isLoadingMore => _isLoadingMore;
   String? get loadMoreError => _loadMoreError;
   bool get hasActiveFilters =>
-      _selectedTypeFilter != 'ALL' || _selectedApplyMode != 'ALL' || _searchQuery.trim().isNotEmpty;
+      _selectedTypeFilter != 'ALL' ||
+      _selectedApplyMode != 'ALL' ||
+      _searchQuery.trim().isNotEmpty;
   OpportunityModel? get selectedOpportunity => _selectedOpportunity;
 
   OpportunityQuery get _query => OpportunityQuery(
@@ -78,7 +83,8 @@ class OpportunityViewModel extends BaseViewModel {
     if (!_disposed) notifyListeners();
   }
 
-  static String _fmt(DateTime t) => DateFormat('dd/MM/yyyy HH:mm').format(t.toLocal());
+  static String _fmt(DateTime t) =>
+      DateFormat('dd/MM/yyyy HH:mm').format(t.toLocal());
 
   Future<void> loadOpportunities({bool forceRefresh = false}) async {
     _debounce?.cancel();
@@ -91,8 +97,10 @@ class OpportunityViewModel extends BaseViewModel {
       setLoading();
     }
 
-    final Result<OpportunityPage, Failure> result = await _repository.fetchPage(_query);
-    if (_disposed || generation != _generation) return; // a newer filter/search took over
+    final Result<OpportunityPage, Failure> result =
+        await _repository.fetchPage(_query);
+    if (_disposed || generation != _generation)
+      return; // a newer filter/search took over
 
     _isRefreshing = false;
     _loadMoreError = null;
@@ -104,7 +112,8 @@ class OpportunityViewModel extends BaseViewModel {
         _showingCache = page.fromCache;
         _isOffline = page.refreshFailure is NetworkFailure;
         _refreshError = page.refreshFailure?.message;
-        _lastUpdatedAtText = page.cachedAt != null ? _fmt(page.cachedAt!) : null;
+        _lastUpdatedAtText =
+            page.cachedAt != null ? _fmt(page.cachedAt!) : null;
         setSuccess();
       },
       onFailure: (Failure failure) {
@@ -144,12 +153,14 @@ class OpportunityViewModel extends BaseViewModel {
     _loadMoreError = null;
     _notify();
 
-    final Result<OpportunityPage, Failure> result = await _repository.fetchPage(_query, cursor: cursor);
+    final Result<OpportunityPage, Failure> result =
+        await _repository.fetchPage(_query, cursor: cursor);
     if (_disposed || generation != _generation) return;
     _isLoadingMore = false;
     result.fold<void>(
       onSuccess: (OpportunityPage page) {
-        final Set<String> seen = _items.map((OpportunityModel o) => o.id).toSet();
+        final Set<String> seen =
+            _items.map((OpportunityModel o) => o.id).toSet();
         _items.addAll(page.items.where((OpportunityModel o) => seen.add(o.id)));
         _nextCursor = page.nextCursor;
         _hasMore = page.hasMore;
@@ -207,7 +218,8 @@ class OpportunityViewModel extends BaseViewModel {
   }
 
   void _replace(OpportunityModel updated) {
-    final int index = _items.indexWhere((OpportunityModel o) => o.id == updated.id);
+    final int index =
+        _items.indexWhere((OpportunityModel o) => o.id == updated.id);
     if (index != -1) _items[index] = updated;
     if (_selectedOpportunity?.id == updated.id) _selectedOpportunity = updated;
   }
@@ -220,7 +232,8 @@ class OpportunityViewModel extends BaseViewModel {
     _replace(before.copyWith(isBookmarked: bookmarked));
     _notify();
 
-    final Result<bool, Failure> result = await _repository.setBookmark(opp.id, bookmarked);
+    final Result<bool, Failure> result =
+        await _repository.setBookmark(opp.id, bookmarked);
     if (_disposed) return result.errorOrNull;
     return result.fold(
       onSuccess: (bool saved) {
@@ -247,7 +260,8 @@ class OpportunityViewModel extends BaseViewModel {
   /// FR-APP-04: Self-mark External Registration (no Application is created).
   Future<Failure?> setExternalMark(OpportunityModel opp, bool marked) async {
     final OpportunityModel before = findById(opp.id) ?? opp;
-    final Result<bool, Failure> result = await _repository.setExternalMark(opp.id, marked);
+    final Result<bool, Failure> result =
+        await _repository.setExternalMark(opp.id, marked);
     if (_disposed) return result.errorOrNull;
     return result.fold(
       onSuccess: (bool saved) {
@@ -266,7 +280,8 @@ class OpportunityViewModel extends BaseViewModel {
 
   /// Reloads one opportunity for its detail screen and keeps the list in step with it.
   Future<Result<OpportunityDetail, Failure>> refreshDetail(String id) async {
-    final Result<OpportunityDetail, Failure> res = await _repository.getDetail(id);
+    final Result<OpportunityDetail, Failure> res =
+        await _repository.getDetail(id);
     final OpportunityDetail? detail = res.dataOrNull;
     if (detail != null && !_disposed) {
       _selectedOpportunity = detail.item;

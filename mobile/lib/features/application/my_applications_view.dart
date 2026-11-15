@@ -9,7 +9,8 @@ class MyApplicationsView extends StatefulWidget {
   final MyApplicationsViewModel viewModel;
   final ValueChanged<String> onOpenApplication;
 
-  const MyApplicationsView({super.key, required this.viewModel, required this.onOpenApplication});
+  const MyApplicationsView(
+      {super.key, required this.viewModel, required this.onOpenApplication});
 
   @override
   State<MyApplicationsView> createState() => _MyApplicationsViewState();
@@ -21,7 +22,8 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => widget.viewModel.load());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => widget.viewModel.load());
   }
 
   @override
@@ -51,12 +53,14 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
         listenable: widget.viewModel,
         builder: (BuildContext context, Widget? child) {
           final MyApplicationsViewModel vm = widget.viewModel;
-          if (vm.isLoading && vm.items.isEmpty) return const Center(child: CircularProgressIndicator());
+          if (vm.isLoading && vm.items.isEmpty)
+            return const Center(child: CircularProgressIndicator());
           if (vm.hasError && vm.items.isEmpty) {
             return _Message(
               icon: Icons.cloud_off_rounded,
               text: vm.errorMessage ?? 'Không tải được danh sách hồ sơ.',
-              action: OutlinedButton(onPressed: vm.load, child: const Text('Thử lại')),
+              action: OutlinedButton(
+                  onPressed: vm.load, child: const Text('Thử lại')),
             );
           }
           if (vm.items.isEmpty) {
@@ -67,39 +71,58 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
                   SizedBox(height: 80),
                   _Message(
                     icon: Icons.inbox_outlined,
-                    text: 'Bạn chưa nộp hồ sơ nào.\nHãy mở một học bổng hoặc cuộc thi và chọn "Nộp hồ sơ trực tuyến".',
+                    text:
+                        'Bạn chưa nộp hồ sơ nào.\nHãy mở một học bổng hoặc cuộc thi và chọn "Nộp hồ sơ trực tuyến".',
                   ),
                 ],
               ),
             );
           }
           final bool stale = vm.hasError;
-          final List<ApplicationSummary> shown =
-              _filter == null ? vm.items : vm.items.where((ApplicationSummary a) => _group(a.status) == _filter).toList();
-          int count(_Group g) => vm.items.where((ApplicationSummary a) => _group(a.status) == g).length;
+          final List<ApplicationSummary> shown = _filter == null
+              ? vm.items
+              : vm.items
+                  .where((ApplicationSummary a) => _group(a.status) == _filter)
+                  .toList();
+          int count(_Group g) => vm.items
+              .where((ApplicationSummary a) => _group(a.status) == g)
+              .length;
           return RefreshIndicator(
             onRefresh: vm.load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: <Widget>[
-                if (stale) ...<Widget>[RefreshErrorBanner(message: vm.errorMessage, onRetry: vm.load), const SizedBox(height: 12)],
-                _SummaryBar(total: vm.items.length, inProgress: count(_Group.reviewing)),
+                if (stale) ...<Widget>[
+                  RefreshErrorBanner(
+                      message: vm.errorMessage, onRetry: vm.load),
+                  const SizedBox(height: 12)
+                ],
+                _SummaryBar(
+                    total: vm.items.length,
+                    inProgress: count(_Group.reviewing)),
                 const SizedBox(height: 16),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: <Widget>[
-                      _FilterChip('Tất cả (${vm.items.length})', _filter == null, () => setState(() => _filter = null)),
+                      _FilterChip(
+                          'Tất cả (${vm.items.length})',
+                          _filter == null,
+                          () => setState(() => _filter = null)),
                       for (final _Group g in _Group.values)
-                        _FilterChip('${g.label} (${count(g)})', _filter == g, () => setState(() => _filter = g)),
+                        _FilterChip('${g.label} (${count(g)})', _filter == g,
+                            () => setState(() => _filter = g)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
                 if (shown.isEmpty)
-                  const _Message(icon: Icons.filter_alt_off_outlined, text: 'Không có đơn nào ở trạng thái này.'),
+                  const _Message(
+                      icon: Icons.filter_alt_off_outlined,
+                      text: 'Không có đơn nào ở trạng thái này.'),
                 for (final ApplicationSummary a in shown) ...<Widget>[
-                  _ApplicationCard(a, onTap: () => widget.onOpenApplication(a.id)),
+                  _ApplicationCard(a,
+                      onTap: () => widget.onOpenApplication(a.id)),
                   const SizedBox(height: 16),
                 ],
               ],
@@ -129,7 +152,9 @@ _Group? _group(ApplicationStatus s) => switch (s) {
       ApplicationStatus.interview =>
         _Group.reviewing,
       ApplicationStatus.accepted => _Group.accepted,
-      ApplicationStatus.rejected || ApplicationStatus.ineligible => _Group.rejected,
+      ApplicationStatus.rejected ||
+      ApplicationStatus.ineligible =>
+        _Group.rejected,
       _ => null,
     };
 
@@ -149,10 +174,13 @@ class _SummaryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(color: AppColors.cardInfoBackground, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+          color: AppColors.cardInfoBackground,
+          borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.fact_check_outlined, size: 16, color: AppColors.primary),
+          const Icon(Icons.fact_check_outlined,
+              size: 16, color: AppColors.primary),
           const SizedBox(width: 4),
           Expanded(
             child: Text.rich(
@@ -166,20 +194,27 @@ class _SummaryBar extends StatelessWidget {
                 ],
               ),
               style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary),
             ),
           ),
           if (inProgress > 0) ...<Widget>[
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(color: Color(0xFF006E4B), shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                  color: Color(0xFF006E4B), shape: BoxShape.circle),
             ),
             const SizedBox(width: 4),
             Text(
               '$inProgress đang xử lý',
               style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF005338)),
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF005338)),
             ),
           ],
         ],
@@ -200,7 +235,8 @@ class _FilterChip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
-        color: selected ? const Color(0xFF4F46E5) : AppColors.cardInfoBackground,
+        color:
+            selected ? const Color(0xFF4F46E5) : AppColors.cardInfoBackground,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -213,7 +249,9 @@ class _FilterChip extends StatelessWidget {
                 fontFamily: 'Inter',
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: selected ? AppColors.textOnPrimary : AppColors.textSecondary,
+                color: selected
+                    ? AppColors.textOnPrimary
+                    : AppColors.textSecondary,
               ),
             ),
           ),
@@ -224,9 +262,15 @@ class _FilterChip extends StatelessWidget {
 }
 
 /// Card look per status, from the four sample cards of frame 357:215.
-({Color bg, Color fg, IconData? icon, String footer, String link, Color linkColor, bool dim}) _cardStyle(
-        ApplicationStatus s) =>
-    switch (s) {
+({
+  Color bg,
+  Color fg,
+  IconData? icon,
+  String footer,
+  String link,
+  Color linkColor,
+  bool dim
+}) _cardStyle(ApplicationStatus s) => switch (s) {
       ApplicationStatus.accepted => (
           bg: const Color(0xFF6FFBBE),
           fg: const Color(0xFF005236),
@@ -279,7 +323,10 @@ class _ApplicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = _cardStyle(a.status);
-    const TextStyle meta = TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary);
+    const TextStyle meta = TextStyle(
+        fontFamily: 'Be Vietnam Pro',
+        fontSize: 12,
+        color: AppColors.textSecondary);
     final List<String> details = <String>[
       if (a.typeLabel.isNotEmpty) a.typeLabel,
       a.isTeam ? 'Nộp theo đội' : 'Cá nhân',
@@ -306,8 +353,11 @@ class _ApplicationCard extends StatelessWidget {
                     Row(
                       children: <Widget>[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: style.bg, borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: style.bg,
+                              borderRadius: BorderRadius.circular(8)),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
@@ -317,13 +367,18 @@ class _ApplicationCard extends StatelessWidget {
                                 Container(
                                   width: 6,
                                   height: 6,
-                                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                  decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle),
                                 ),
                               const SizedBox(width: 4),
                               Text(
                                 a.status.label,
                                 style: TextStyle(
-                                    fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: style.fg),
+                                    fontFamily: 'Inter',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: style.fg),
                               ),
                             ],
                           ),
@@ -350,20 +405,27 @@ class _ApplicationCard extends StatelessWidget {
               ),
               Container(
                 color: AppColors.cardInfoBackground.withValues(alpha: 0.6),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: <Widget>[
                     Expanded(
                       child: Text(
                         style.footer,
                         style: TextStyle(
-                            fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w500, color: style.fg),
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: style.fg),
                       ),
                     ),
                     Text(
                       style.link,
                       style: TextStyle(
-                          fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: style.linkColor),
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: style.linkColor),
                     ),
                     Icon(Icons.arrow_forward, size: 12, color: style.linkColor),
                   ],
@@ -394,8 +456,13 @@ class _Message extends StatelessWidget {
           children: <Widget>[
             Icon(icon, size: 48, color: AppColors.textMuted),
             const SizedBox(height: 12),
-            Text(text, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
-            if (action != null) ...<Widget>[const SizedBox(height: 16), action!],
+            Text(text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary)),
+            if (action != null) ...<Widget>[
+              const SizedBox(height: 16),
+              action!
+            ],
           ],
         ),
       ),

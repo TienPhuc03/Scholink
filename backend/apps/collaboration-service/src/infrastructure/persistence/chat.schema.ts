@@ -17,6 +17,9 @@ export class ChatRoomModel {
   @Prop({ index: true })
   refId?: string;
 
+  @Prop()
+  name?: string;
+
   @Prop({ type: [String], required: true, index: true })
   participants: string[];
 

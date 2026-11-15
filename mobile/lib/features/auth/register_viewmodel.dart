@@ -22,7 +22,11 @@ class RegisterFieldErrors {
   });
 
   bool get isEmpty =>
-      fullName == null && email == null && password == null && confirmPassword == null && consent == null;
+      fullName == null &&
+      email == null &&
+      password == null &&
+      confirmPassword == null &&
+      consent == null;
 }
 
 /// Outcome handed to the view so it can open the OTP screen.
@@ -34,7 +38,11 @@ class RegisterOutcome {
   final OtpTicket? ticket;
   final String? otpError;
 
-  const RegisterOutcome({required this.email, required this.password, this.ticket, this.otpError});
+  const RegisterOutcome(
+      {required this.email,
+      required this.password,
+      this.ticket,
+      this.otpError});
 }
 
 /// FR-AUTH-02: register the account, then immediately request an email-verification OTP.
@@ -57,8 +65,11 @@ class RegisterViewModel extends BaseViewModel {
       fullName: AuthValidators.fullName(fullName),
       email: AuthValidators.email(email),
       password: AuthValidators.newPassword(password),
-      confirmPassword: AuthValidators.confirmPassword(password, confirmPassword),
-      consent: acceptedTerms ? null : 'Bạn cần đồng ý Điều khoản sử dụng và Chính sách bảo mật.',
+      confirmPassword:
+          AuthValidators.confirmPassword(password, confirmPassword),
+      consent: acceptedTerms
+          ? null
+          : 'Bạn cần đồng ý Điều khoản sử dụng và Chính sách bảo mật.',
     );
   }
 
@@ -106,8 +117,11 @@ class RegisterViewModel extends BaseViewModel {
     );
     final Failure? registerError = registered.errorOrNull;
     if (registerError != null) {
-      if (registerError.code == 'EMAIL_ALREADY_EXISTS' || registerError.code == 'CONFLICT') {
-        _fieldErrors = const RegisterFieldErrors(email: 'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.');
+      if (registerError.code == 'EMAIL_ALREADY_EXISTS' ||
+          registerError.code == 'CONFLICT') {
+        _fieldErrors = const RegisterFieldErrors(
+            email:
+                'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.');
         setIdle();
       } else {
         setError(registerError.message);
@@ -115,7 +129,8 @@ class RegisterViewModel extends BaseViewModel {
       return null;
     }
 
-    final Result<OtpTicket, Failure> otp = await _repository.sendOtp(email: normalizedEmail);
+    final Result<OtpTicket, Failure> otp =
+        await _repository.sendOtp(email: normalizedEmail);
     setSuccess();
     return RegisterOutcome(
       email: normalizedEmail,

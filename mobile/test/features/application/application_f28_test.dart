@@ -17,7 +17,8 @@ import 'apply_test_support.dart';
 
 const String appId = 'app_1';
 
-Map<String, dynamic> revisionJson(int n, {Map<String, dynamic>? snapshot, List<dynamic>? manifest}) =>
+Map<String, dynamic> revisionJson(int n,
+        {Map<String, dynamic>? snapshot, List<dynamic>? manifest}) =>
     <String, dynamic>{
       'id': 'rev_$n',
       'revision': n,
@@ -29,7 +30,11 @@ Map<String, dynamic> revisionJson(int n, {Map<String, dynamic>? snapshot, List<d
       'screening': 'ELIGIBLE',
       'submittedAt': '2026-11-0${n}T02:00:00.000Z',
       'snapshotJson': jsonEncode(snapshot ??
-          <String, dynamic>{'studentId': 'stu_1', 'fullName': 'Nguyễn Văn A lần $n', 'completionScore': 80}),
+          <String, dynamic>{
+            'studentId': 'stu_1',
+            'fullName': 'Nguyễn Văn A lần $n',
+            'completionScore': 80
+          }),
       'manifestJson': jsonEncode(manifest ?? <dynamic>[]),
       'screeningReasons': <dynamic>[],
     };
@@ -59,7 +64,10 @@ Map<String, dynamic> detailJson({
       'viewerIsOwner': viewerIsOwner,
       'canWithdraw': canWithdraw,
       'canResubmit': canResubmit,
-      'revisions': revisions ?? <Map<String, dynamic>>[for (int i = 1; i <= revision; i++) revisionJson(i)],
+      'revisions': revisions ??
+          <Map<String, dynamic>>[
+            for (int i = 1; i <= revision; i++) revisionJson(i)
+          ],
       'events': events ?? <Map<String, dynamic>>[],
     };
 
@@ -79,26 +87,33 @@ void main() {
         ],
       ));
 
-      expect(d.revisions.map((ApplicationRevision r) => r.revision), <int>[2, 1]);
+      expect(
+          d.revisions.map((ApplicationRevision r) => r.revision), <int>[2, 1]);
       expect(d.revisions.first.passport!.fullName, 'Nguyễn Văn A lần 2');
       expect(d.revisions.last.passport!.fullName, 'Nguyễn Văn A lần 1');
       expect(d.revisions.first.attachmentIds, <String>['ast_cv', 'ast_ielts']);
       expect(d.revisionNumber(1)!.snapshotId, 'snap_1');
       expect(d.canWithdraw, isTrue);
       expect(d.canResubmit, isFalse);
-      expect(d.registrationDeadline, DateTime.parse('2026-12-01T16:59:59.000Z').toLocal());
+      expect(d.registrationDeadline,
+          DateTime.parse('2026-12-01T16:59:59.000Z').toLocal());
     });
 
     test('a purged revision is marked redacted and exposes no content', () {
       final ApplicationRevision r = ApplicationRevision.fromJson(revisionJson(1,
-          snapshot: <String, dynamic>{'studentId': 'stu_1', 'redacted': true, 'trackingId': null}));
+          snapshot: <String, dynamic>{
+            'studentId': 'stu_1',
+            'redacted': true,
+            'trackingId': null
+          }));
 
       expect(r.isRedacted, isTrue);
       expect(r.passport, isNull);
       expect(r.isTeam, isFalse);
     });
 
-    test('a team revision lists every member with the leader and their files', () {
+    test('a team revision lists every member with the leader and their files',
+        () {
       final ApplicationRevision r = ApplicationRevision.fromJson(revisionJson(
         1,
         snapshot: <String, dynamic>{
@@ -132,14 +147,20 @@ void main() {
       expect(r.isTeam, isTrue);
       expect(r.rosterVersion, 3);
       expect(r.leaderId, 'stu_1');
-      expect(r.members.map((TeamMemberSnapshot m) => m.displayName), <String>['Trưởng Đội', 'stu_2']);
+      expect(r.members.map((TeamMemberSnapshot m) => m.displayName),
+          <String>['Trưởng Đội', 'stu_2']);
       expect(r.members.first.attachmentIds, <String>['ast_a']);
       expect(r.attachmentCount, 1);
     });
 
     test('timeline reasons are translated and organizer notes kept', () {
-      ApplicationEvent e(String? reason) => ApplicationEvent.fromJson(
-          <String, dynamic>{'id': 'e', 'toStatus': 'SUBMITTED', 'revision': 1, 'reason': reason ?? ''});
+      ApplicationEvent e(String? reason) =>
+          ApplicationEvent.fromJson(<String, dynamic>{
+            'id': 'e',
+            'toStatus': 'SUBMITTED',
+            'revision': 1,
+            'reason': reason ?? ''
+          });
 
       expect(e('STUDENT_WITHDRAWN').reasonLabel, 'Bạn đã rút hồ sơ');
       expect(e('STUDENT_RESUBMITTED').reasonLabel, 'Nộp lại');
@@ -168,13 +189,19 @@ void main() {
     });
 
     test('success reloads the detail and tells other screens', () async {
-      final ApplicationDetailViewModel vm = ApplicationDetailViewModel(repo, applicationId: appId);
+      final ApplicationDetailViewModel vm =
+          ApplicationDetailViewModel(repo, applicationId: appId);
       final MyApplicationsViewModel list = MyApplicationsViewModel(repo);
       api.reply(ApiEndpoints.myApplications, <dynamic>[]);
       await vm.load();
       api.handlers[ApiEndpoints.withdrawApplication(appId)] = (_) {
         status = 'WITHDRAWN';
-        return <String, dynamic>{'applicationId': appId, 'status': 'WITHDRAWN', 'revision': 1, 'version': 2};
+        return <String, dynamic>{
+          'applicationId': appId,
+          'status': 'WITHDRAWN',
+          'revision': 1,
+          'version': 2
+        };
       };
 
       final String? message = await vm.withdraw();
@@ -183,17 +210,22 @@ void main() {
       expect(message, isNull);
       expect(vm.detail!.summary.status, ApplicationStatus.withdrawn);
       expect(vm.detail!.canResubmit, isTrue);
-      expect(api.callsTo(ApiEndpoints.myApplications), hasLength(1), reason: 'cached list reloads');
+      expect(api.callsTo(ApiEndpoints.myApplications), hasLength(1),
+          reason: 'cached list reloads');
       list.dispose();
       vm.dispose();
     });
 
     test('409 because it was already withdrawn counts as done (Q3)', () async {
-      final ApplicationDetailViewModel vm = ApplicationDetailViewModel(repo, applicationId: appId);
+      final ApplicationDetailViewModel vm =
+          ApplicationDetailViewModel(repo, applicationId: appId);
       await vm.load();
       api.handlers[ApiEndpoints.withdrawApplication(appId)] = (_) {
         status = 'WITHDRAWN';
-        return const ServerFailure(message: 'Không thể rút hồ sơ đã ở trạng thái WITHDRAWN', code: 'STATE_CONFLICT', statusCode: 409);
+        return const ServerFailure(
+            message: 'Không thể rút hồ sơ đã ở trạng thái WITHDRAWN',
+            code: 'STATE_CONFLICT',
+            statusCode: 409);
       };
 
       expect(await vm.withdraw(), isNull);
@@ -201,19 +233,28 @@ void main() {
       vm.dispose();
     });
 
-    test('deadline passed shows a clear message and refreshes the actions', () async {
-      final ApplicationDetailViewModel vm = ApplicationDetailViewModel(repo, applicationId: appId);
+    test('deadline passed shows a clear message and refreshes the actions',
+        () async {
+      final ApplicationDetailViewModel vm =
+          ApplicationDetailViewModel(repo, applicationId: appId);
       await vm.load();
-      api.reply(ApiEndpoints.withdrawApplication(appId),
-          const ServerFailure(message: 'Không thể rút hồ sơ sau khi cơ hội đã hết hạn đăng ký', code: 'DEADLINE_PASSED', statusCode: 409));
+      api.reply(
+          ApiEndpoints.withdrawApplication(appId),
+          const ServerFailure(
+              message: 'Không thể rút hồ sơ sau khi cơ hội đã hết hạn đăng ký',
+              code: 'DEADLINE_PASSED',
+              statusCode: 409));
 
-      expect(await vm.withdraw(), 'Đã hết hạn đăng ký nên không thể rút hồ sơ.');
+      expect(
+          await vm.withdraw(), 'Đã hết hạn đăng ký nên không thể rút hồ sơ.');
       expect(api.callsTo(ApiEndpoints.applicationDetail(appId)), hasLength(2));
       vm.dispose();
     });
   });
 
-  test('apply flow knows it resubmits a withdrawn application as the next revision', () async {
+  test(
+      'apply flow knows it resubmits a withdrawn application as the next revision',
+      () async {
     final ApplyHarness h = ApplyHarness();
     h.api.reply(ApiEndpoints.myApplications, <dynamic>[
       <String, dynamic>{
@@ -249,18 +290,25 @@ void main() {
       tester.view.devicePixelRatio = 2.5;
       addTearDown(tester.view.reset);
       api.reply(ApiEndpoints.applicationDetail(appId), json);
-      final ApplicationDetailViewModel vm = ApplicationDetailViewModel(ApplicationRepository(api), applicationId: appId);
+      final ApplicationDetailViewModel vm = ApplicationDetailViewModel(
+          ApplicationRepository(api),
+          applicationId: appId);
       await tester.pumpWidget(MaterialApp(
-        home: ApplicationDetailView(viewModel: vm, onResubmit: onResubmit, onOpenRevision: onOpenRevision),
+        home: ApplicationDetailView(
+            viewModel: vm,
+            onResubmit: onResubmit,
+            onOpenRevision: onOpenRevision),
       ));
       await tester.pump();
       await tester.pump();
       return vm;
     }
 
-    testWidgets('withdraw asks for confirmation before calling the API', (WidgetTester tester) async {
+    testWidgets('withdraw asks for confirmation before calling the API',
+        (WidgetTester tester) async {
       await pumpDetail(tester, detailJson(canWithdraw: true));
-      api.reply(ApiEndpoints.withdrawApplication(appId), <String, dynamic>{'status': 'WITHDRAWN'});
+      api.reply(ApiEndpoints.withdrawApplication(appId),
+          <String, dynamic>{'status': 'WITHDRAWN'});
 
       await tester.tap(find.byKey(const Key('detail_withdraw')));
       await tester.pumpAndSettle();
@@ -269,11 +317,13 @@ void main() {
 
       await tester.tap(find.byKey(const Key('detail_withdraw_confirm')));
       await tester.pumpAndSettle();
-      expect(api.callsTo(ApiEndpoints.withdrawApplication(appId)), hasLength(1));
+      expect(
+          api.callsTo(ApiEndpoints.withdrawApplication(appId)), hasLength(1));
       expect(find.textContaining('Đã rút hồ sơ'), findsOneWidget);
     });
 
-    testWidgets('resubmit button names the next revision', (WidgetTester tester) async {
+    testWidgets('resubmit button names the next revision',
+        (WidgetTester tester) async {
       ApplicationDetail? resubmitted;
       await pumpDetail(
         tester,
@@ -287,20 +337,26 @@ void main() {
       expect(resubmitted!.summary.opportunityId, oppId);
     });
 
-    testWidgets('a team member sees why there is no action (Q8)', (WidgetTester tester) async {
-      await pumpDetail(tester, detailJson(submissionType: 'TEAM', viewerIsOwner: false));
+    testWidgets('a team member sees why there is no action (Q8)',
+        (WidgetTester tester) async {
+      await pumpDetail(
+          tester, detailJson(submissionType: 'TEAM', viewerIsOwner: false));
 
-      expect(find.text('Chỉ trưởng đội có thể rút hồ sơ của đội.'), findsOneWidget);
+      expect(find.text('Chỉ trưởng đội có thể rút hồ sơ của đội.'),
+          findsOneWidget);
       expect(find.byKey(const Key('detail_withdraw')), findsNothing);
     });
 
-    testWidgets('after the deadline the bar explains it', (WidgetTester tester) async {
-      await pumpDetail(tester, detailJson(deadline: '2020-01-01T00:00:00.000Z'));
+    testWidgets('after the deadline the bar explains it',
+        (WidgetTester tester) async {
+      await pumpDetail(
+          tester, detailJson(deadline: '2020-01-01T00:00:00.000Z'));
 
       expect(find.textContaining('Đã hết hạn đăng ký'), findsOneWidget);
     });
 
-    testWidgets('revisions and timeline entries open the submitted snapshot', (WidgetTester tester) async {
+    testWidgets('revisions and timeline entries open the submitted snapshot',
+        (WidgetTester tester) async {
       final List<int> opened = <int>[];
       await pumpDetail(
         tester,
@@ -308,15 +364,31 @@ void main() {
           revision: 2,
           canWithdraw: true,
           events: <Map<String, dynamic>>[
-            <String, dynamic>{'id': 'e1', 'toStatus': 'SUBMITTED', 'revision': 1, 'reason': 'INITIAL_SUBMISSION',
-              'createdAt': '2026-11-01T02:00:00.000Z'},
-            <String, dynamic>{'id': 'e2', 'toStatus': 'WITHDRAWN', 'revision': 1, 'reason': 'STUDENT_WITHDRAWN',
-              'createdAt': '2026-11-01T05:00:00.000Z'},
-            <String, dynamic>{'id': 'e3', 'toStatus': 'SUBMITTED', 'revision': 2, 'reason': 'STUDENT_RESUBMITTED',
-              'createdAt': '2026-11-02T02:00:00.000Z'},
+            <String, dynamic>{
+              'id': 'e1',
+              'toStatus': 'SUBMITTED',
+              'revision': 1,
+              'reason': 'INITIAL_SUBMISSION',
+              'createdAt': '2026-11-01T02:00:00.000Z'
+            },
+            <String, dynamic>{
+              'id': 'e2',
+              'toStatus': 'WITHDRAWN',
+              'revision': 1,
+              'reason': 'STUDENT_WITHDRAWN',
+              'createdAt': '2026-11-01T05:00:00.000Z'
+            },
+            <String, dynamic>{
+              'id': 'e3',
+              'toStatus': 'SUBMITTED',
+              'revision': 2,
+              'reason': 'STUDENT_RESUBMITTED',
+              'createdAt': '2026-11-02T02:00:00.000Z'
+            },
           ],
         ),
-        onOpenRevision: (ApplicationDetail d, ApplicationRevision r) => opened.add(r.revision),
+        onOpenRevision: (ApplicationDetail d, ApplicationRevision r) =>
+            opened.add(r.revision),
       );
 
       expect(find.text('Bạn đã rút hồ sơ'), findsOneWidget);
@@ -328,16 +400,19 @@ void main() {
   });
 
   group('ApplicationSnapshotView', () {
-    Future<void> pumpSnapshot(WidgetTester tester, ApplicationRevision r) async {
+    Future<void> pumpSnapshot(
+        WidgetTester tester, ApplicationRevision r) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.5;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(MaterialApp(
-        home: ApplicationSnapshotView(opportunityTitle: 'Học bổng VinAI 2026', revision: r),
+        home: ApplicationSnapshotView(
+            opportunityTitle: 'Học bổng VinAI 2026', revision: r),
       ));
     }
 
-    testWidgets('shows the Passport as submitted and its files', (WidgetTester tester) async {
+    testWidgets('shows the Passport as submitted and its files',
+        (WidgetTester tester) async {
       await pumpSnapshot(
         tester,
         ApplicationRevision.fromJson(revisionJson(1, manifest: <dynamic>[
@@ -350,24 +425,36 @@ void main() {
       expect(find.text('Tệp đính kèm (1)'), findsOneWidget);
     });
 
-    testWidgets('explains a snapshot removed by retention', (WidgetTester tester) async {
+    testWidgets('explains a snapshot removed by retention',
+        (WidgetTester tester) async {
       await pumpSnapshot(
         tester,
-        ApplicationRevision.fromJson(revisionJson(1, snapshot: <String, dynamic>{'redacted': true})),
+        ApplicationRevision.fromJson(
+            revisionJson(1, snapshot: <String, dynamic>{'redacted': true})),
       );
 
       expect(find.byKey(const Key('snapshot_redacted')), findsOneWidget);
     });
 
-    testWidgets('a team snapshot expands per member with the leader marked', (WidgetTester tester) async {
+    testWidgets('a team snapshot expands per member with the leader marked',
+        (WidgetTester tester) async {
       await pumpSnapshot(
         tester,
-        ApplicationRevision.fromJson(revisionJson(1, snapshot: <String, dynamic>{
+        ApplicationRevision.fromJson(
+            revisionJson(1, snapshot: <String, dynamic>{
           'leaderId': 'stu_1',
           'rosterVersion': 2,
           'members': <dynamic>[
-            <String, dynamic>{'studentId': 'stu_1', 'profileVersion': 5, 'snapshot': <String, dynamic>{'fullName': 'Trưởng Đội'}},
-            <String, dynamic>{'studentId': 'stu_2', 'profileVersion': 2, 'snapshot': <String, dynamic>{'fullName': 'Thành Viên'}},
+            <String, dynamic>{
+              'studentId': 'stu_1',
+              'profileVersion': 5,
+              'snapshot': <String, dynamic>{'fullName': 'Trưởng Đội'}
+            },
+            <String, dynamic>{
+              'studentId': 'stu_2',
+              'profileVersion': 2,
+              'snapshot': <String, dynamic>{'fullName': 'Thành Viên'}
+            },
           ],
         })),
       );
@@ -380,24 +467,32 @@ void main() {
     });
   });
 
-  testWidgets('login sheet returns the guest choice (AUTH-05)', (WidgetTester tester) async {
+  testWidgets('login sheet returns the guest choice (AUTH-05)',
+      (WidgetTester tester) async {
     final List<LoginChoice?> choices = <LoginChoice?>[];
     await tester.pumpWidget(MaterialApp(
       home: Builder(
         builder: (BuildContext context) => TextButton(
-          onPressed: () async => choices.add(await LoginRequiredSheet.show(context, message: 'Đăng nhập để nộp')),
+          onPressed: () async => choices.add(await LoginRequiredSheet.show(
+              context,
+              message: 'Đăng nhập để nộp')),
           child: const Text('open'),
         ),
       ),
     ));
 
-    for (final String key in <String>['login_required_go', 'login_required_register', 'login_required_later']) {
+    for (final String key in <String>[
+      'login_required_go',
+      'login_required_register',
+      'login_required_later'
+    ]) {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(Key(key)));
       await tester.pumpAndSettle();
     }
 
-    expect(choices, <LoginChoice?>[LoginChoice.login, LoginChoice.register, null]);
+    expect(
+        choices, <LoginChoice?>[LoginChoice.login, LoginChoice.register, null]);
   });
 }

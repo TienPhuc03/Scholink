@@ -15,7 +15,8 @@ class UserModel {
   });
 
   /// FR-AUTH-02: registered but the email OTP has not been confirmed yet.
-  bool get isPendingVerification => status.toUpperCase() == 'PENDING_VERIFICATION';
+  bool get isPendingVerification =>
+      status.toUpperCase() == 'PENDING_VERIFICATION';
 
   bool get isStudent => role.toUpperCase() == 'STUDENT';
   bool get isOrganizer => role.toUpperCase() == 'ORGANIZER';
@@ -81,12 +82,15 @@ class OtpTicket {
     this.devOtpPreview,
   });
 
-  factory OtpTicket.fromJson(Map<String, dynamic> json, {required String fallbackEmail}) {
+  factory OtpTicket.fromJson(Map<String, dynamic> json,
+      {required String fallbackEmail}) {
     final String preview = (json['devOtpPreview'] as String?) ?? '';
     final int expires = (json['expiresInSeconds'] as num?)?.toInt() ?? 0;
     final int cooldown = (json['cooldownSeconds'] as num?)?.toInt() ?? 0;
     return OtpTicket(
-      email: (json['email'] as String?)?.isNotEmpty == true ? json['email'] as String : fallbackEmail,
+      email: (json['email'] as String?)?.isNotEmpty == true
+          ? json['email'] as String
+          : fallbackEmail,
       expiresInSeconds: expires > 0 ? expires : 300,
       cooldownSeconds: cooldown > 0 ? cooldown : 60,
       message: (json['message'] as String?) ?? '',

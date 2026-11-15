@@ -76,12 +76,16 @@ class AuthRepository {
     } on UnauthorizedFailure {
       // A 401 from login means wrong credentials; the client maps every 401 to "session expired".
       return const FailureResult<UserModel, Failure>(
-        ServerFailure(message: 'Email hoặc mật khẩu không đúng.', code: 'UNAUTHENTICATED', statusCode: 401),
+        ServerFailure(
+            message: 'Email hoặc mật khẩu không đúng.',
+            code: 'UNAUTHENTICATED',
+            statusCode: 401),
       );
     } on Failure catch (failure) {
       return FailureResult<UserModel, Failure>(failure);
     } catch (e) {
-      return FailureResult<UserModel, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<UserModel, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -115,7 +119,8 @@ class AuthRepository {
         ApiEndpoints.sendOtp,
         data: <String, dynamic>{'email': trimmed, 'purpose': purpose.apiValue},
       );
-      return OtpTicket.fromJson(_unwrap(response.data) ?? <String, dynamic>{}, fallbackEmail: trimmed);
+      return OtpTicket.fromJson(_unwrap(response.data) ?? <String, dynamic>{},
+          fallbackEmail: trimmed);
     });
   }
 
@@ -145,7 +150,8 @@ class AuthRepository {
         ApiEndpoints.forgotPassword,
         data: <String, dynamic>{'email': trimmed},
       );
-      return OtpTicket.fromJson(_unwrap(response.data) ?? <String, dynamic>{}, fallbackEmail: trimmed);
+      return OtpTicket.fromJson(_unwrap(response.data) ?? <String, dynamic>{},
+          fallbackEmail: trimmed);
     });
   }
 
@@ -191,7 +197,8 @@ class AuthRepository {
   /// F40 / FR-AUTH-08: deletes the account after re-entering the password. The server revokes every
   /// session, so local tokens are cleared on success. [purgeSnapshots] asks to purge submitted
   /// application snapshots instead of keeping them under the retention policy.
-  Future<Result<void, Failure>> deleteAccount({required String currentPassword, bool purgeSnapshots = false}) {
+  Future<Result<void, Failure>> deleteAccount(
+      {required String currentPassword, bool purgeSnapshots = false}) {
     return _run(() async {
       await _apiClient.post<dynamic>(
         ApiEndpoints.deleteAccount,

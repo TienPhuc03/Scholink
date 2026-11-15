@@ -18,7 +18,8 @@ class MyApplicationsViewModel extends BaseViewModel {
 
   Future<void> load() async {
     setLoading();
-    final Result<List<ApplicationSummary>, Failure> r = await _repository.getMyApplications();
+    final Result<List<ApplicationSummary>, Failure> r =
+        await _repository.getMyApplications();
     r.fold<void>(
       onSuccess: (List<ApplicationSummary> list) {
         _items = list;
@@ -53,7 +54,8 @@ class ApplicationDetailViewModel extends BaseViewModel {
 
   Future<void> load() async {
     setLoading();
-    final Result<ApplicationDetail, Failure> r = await _repository.getApplication(applicationId);
+    final Result<ApplicationDetail, Failure> r =
+        await _repository.getApplication(applicationId);
     r.fold<void>(
       onSuccess: (ApplicationDetail d) {
         _detail = d;

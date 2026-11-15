@@ -2,11 +2,13 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Req,
   UseGuards,
   Headers,
+  HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import {
@@ -23,6 +25,12 @@ async function forwardCollab(path: string, options: RequestInit = {}) {
   const url = `${COLLAB_URL()}${path}`;
   const res = await fetch(url, options);
   const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new HttpException(
+      data ?? { error: { code: 'UPSTREAM_ERROR', message: res.statusText } },
+      res.status,
+    );
+  }
   return data;
 }
 
@@ -280,6 +288,22 @@ export class GatewayTeamController {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @Roles('STUDENT', 'ADMIN')
+  @ApiOperation({ summary: 'Giải tán và xóa đội thi (Chỉ Trưởng đội)' })
+  @ApiResponse({ status: 200, description: 'Đã giải tán và xóa đội thi' })
+  async deleteTeam(
+    @Param('id') id: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardCollab(`/api/v1/teams/${id}`, {
+      method: 'DELETE',
+      headers: {
         Authorization: auth,
       },
     });

@@ -21,9 +21,18 @@ export class ChatUseCase {
       rooms.map(async (r) => {
         const lastRead = await this.chatRepo.getReadReceipt(r.id, userId);
         const unreadCount = Math.max(0, r.lastSeq - lastRead);
+        let name = r.props.name;
+        if (!name && r.type === 'TEAM' && r.refId) {
+          const team = await this.teamRepo.findById(r.refId);
+          if (team) {
+            name = team.props.name;
+          }
+        }
         return {
           ...r.props,
           id: r.id,
+          name: name || (r.type === 'TEAM' ? 'Phòng đội thi' : 'Trò chuyện'),
+          title: name || (r.type === 'TEAM' ? 'Phòng đội thi' : 'Trò chuyện'),
           lastReadSeq: lastRead,
           unreadCount,
         };
@@ -58,11 +67,19 @@ export class ChatUseCase {
     // 1. Check user permission (must be active room participant & team member if team room)
     await this.assertMemberPermission(room, senderId);
 
-    // 2. Validate max text length (SRS FR-CHAT-02: max 4,000 characters)
-    if (dto.content && dto.content.length > 4000) {
+    // 2. Validate max text length (4,000 chars for text, 10MB for base64 images)
+    const isImage = dto.content.startsWith('[image]') && dto.content.endsWith('[/image]');
+    if (!isImage && dto.content && dto.content.length > 4000) {
       throw new DomainException(
         ErrorCode.VALIDATION_ERROR,
         'Nội dung tin nhắn không được vượt quá 4.000 ký tự',
+        400,
+      );
+    }
+    if (isImage && dto.content.length > 10 * 1024 * 1024) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Dung lượng hình ảnh vượt quá giới hạn cho phép (tối đa 10MB)',
         400,
       );
     }

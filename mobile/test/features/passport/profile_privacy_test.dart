@@ -14,14 +14,19 @@ import '../auth/auth_test_fakes.dart';
 import 'passport_test.dart' show grpcPassport;
 
 /// FR-PROF-05 on mobile: settings, phone, and views that only show granted fields.
-Map<String, dynamic> ownerPassport({Map<String, String>? privacy, int version = 3}) => <String, dynamic>{
+Map<String, dynamic> ownerPassport(
+        {Map<String, String>? privacy, int version = 3}) =>
+    <String, dynamic>{
       ...grpcPassport(version: version),
       'email': 'a@scholink.edu.vn',
       'phone': '0901234567',
-      'fieldPrivacy': privacy ?? <String, String>{'email': 'PRIVATE', 'phone': 'PRIVATE'},
+      'fieldPrivacy':
+          privacy ?? <String, String>{'email': 'PRIVATE', 'phone': 'PRIVATE'},
     };
 
-Map<String, dynamic> grpcView({required List<String> visible, String audience = 'PUBLIC'}) => <String, dynamic>{
+Map<String, dynamic> grpcView(
+        {required List<String> visible, String audience = 'PUBLIC'}) =>
+    <String, dynamic>{
       'studentId': 'u1',
       'fullName': 'Nguyễn Văn A',
       'avatarAssetId': '',
@@ -34,7 +39,13 @@ Map<String, dynamic> grpcView({required List<String> visible, String audience = 
       'regionCode': '',
       'skills': visible.contains('skills') ? <String>['Dart'] : <String>[],
       'education': visible.contains('education')
-          ? <String, dynamic>{'institution': 'ĐH Bách Khoa', 'major': 'KHMT', 'startYear': 2023, 'gpa': 3.6, 'gpaScale': 4}
+          ? <String, dynamic>{
+              'institution': 'ĐH Bách Khoa',
+              'major': 'KHMT',
+              'startYear': 2023,
+              'gpa': 3.6,
+              'gpaScale': 4
+            }
           : null,
       'certificates': <dynamic>[],
       'achievements': <String>[],
@@ -44,7 +55,9 @@ Map<String, dynamic> grpcView({required List<String> visible, String audience = 
 
 void main() {
   group('models', () {
-    test('missing settings fall back to the server defaults (contact details private)', () {
+    test(
+        'missing settings fall back to the server defaults (contact details private)',
+        () {
       final PassportModel p = PassportModel.fromJson(grpcPassport());
 
       expect(p.visibilityOf('email'), FieldVisibility.private);
@@ -53,19 +66,29 @@ void main() {
       expect(p.visibilityOf('education'), FieldVisibility.teammates);
     });
 
-    test('the draft sends phone with the profile and visibility on its own', () {
-      final PassportDraft d = PassportDraft.fromPassport(PassportModel.fromJson(ownerPassport()))
-        ..phone = ' 0987 654 321 '
-        ..fieldPrivacy['phone'] = FieldVisibility.teammates;
+    test('the draft sends phone with the profile and visibility on its own',
+        () {
+      final PassportDraft d =
+          PassportDraft.fromPassport(PassportModel.fromJson(ownerPassport()))
+            ..phone = ' 0987 654 321 '
+            ..fieldPrivacy['phone'] = FieldVisibility.teammates;
 
       expect(d.toUpdateJson(expectedVersion: 3)['phone'], '0987 654 321');
-      expect(d.toUpdateJson(expectedVersion: 3), isNot(contains('fieldPrivacy')));
-      expect((d.toPrivacyJson()['fieldPrivacy'] as Map<String, String>)['phone'], 'TEAMMATES');
-      expect((d.toPrivacyJson()['fieldPrivacy'] as Map<String, String>)['email'], 'PRIVATE');
+      expect(
+          d.toUpdateJson(expectedVersion: 3), isNot(contains('fieldPrivacy')));
+      expect(
+          (d.toPrivacyJson()['fieldPrivacy'] as Map<String, String>)['phone'],
+          'TEAMMATES');
+      expect(
+          (d.toPrivacyJson()['fieldPrivacy'] as Map<String, String>)['email'],
+          'PRIVATE');
     });
 
-    test('a view keeps only granted fields even when gRPC fills hidden ones with defaults', () {
-      final ProfileView v = ProfileView.fromJson(grpcView(visible: <String>['bio', 'skills']));
+    test(
+        'a view keeps only granted fields even when gRPC fills hidden ones with defaults',
+        () {
+      final ProfileView v =
+          ProfileView.fromJson(grpcView(visible: <String>['bio', 'skills']));
 
       expect(v.bio, 'Yêu AI');
       expect(v.skills, <String>['Dart']);
@@ -84,26 +107,36 @@ void main() {
   });
 
   group('PassportViewModel.save', () {
-    test('saves changed visibility first, then the content with the same version', () async {
+    test(
+        'saves changed visibility first, then the content with the same version',
+        () async {
       final ScriptedApiClient api = ScriptedApiClient()
         ..reply(ApiEndpoints.passport, ownerPassport())
-        ..reply(ApiEndpoints.passportPrivacy, ownerPassport(privacy: <String, String>{'phone': 'TEAMMATES'}));
+        ..reply(ApiEndpoints.passportPrivacy,
+            ownerPassport(privacy: <String, String>{'phone': 'TEAMMATES'}));
       final PassportViewModel vm = PassportViewModel(PassportRepository(api));
       await vm.loadPassport();
 
-      final PassportDraft d = PassportDraft.fromPassport(vm.passport!)..fieldPrivacy['phone'] = FieldVisibility.teammates;
+      final PassportDraft d = PassportDraft.fromPassport(vm.passport!)
+        ..fieldPrivacy['phone'] = FieldVisibility.teammates;
       expect(await vm.save(d), isTrue);
 
-      expect(api.calls.map((RecordedCall c) => '${c.method} ${c.path}').toList(), <String>[
-        'GET ${ApiEndpoints.passport}',
-        'PUT ${ApiEndpoints.passportPrivacy}',
-        'PUT ${ApiEndpoints.passport}',
-      ]);
-      expect((api.callsTo(ApiEndpoints.passport).last.data as Map<String, dynamic>)['expectedVersion'], 3);
+      expect(
+          api.calls.map((RecordedCall c) => '${c.method} ${c.path}').toList(),
+          <String>[
+            'GET ${ApiEndpoints.passport}',
+            'PUT ${ApiEndpoints.passportPrivacy}',
+            'PUT ${ApiEndpoints.passport}',
+          ]);
+      expect(
+          (api.callsTo(ApiEndpoints.passport).last.data
+              as Map<String, dynamic>)['expectedVersion'],
+          3);
     });
 
     test('unchanged visibility does not call the privacy endpoint', () async {
-      final ScriptedApiClient api = ScriptedApiClient()..reply(ApiEndpoints.passport, ownerPassport());
+      final ScriptedApiClient api = ScriptedApiClient()
+        ..reply(ApiEndpoints.passport, ownerPassport());
       final PassportViewModel vm = PassportViewModel(PassportRepository(api));
       await vm.loadPassport();
 
@@ -111,21 +144,29 @@ void main() {
       expect(api.callsTo(ApiEndpoints.passportPrivacy), isEmpty);
     });
 
-    test('a failed visibility save keeps the draft and does not touch the content', () async {
+    test(
+        'a failed visibility save keeps the draft and does not touch the content',
+        () async {
       final ScriptedApiClient api = ScriptedApiClient()
         ..reply(ApiEndpoints.passport, ownerPassport())
-        ..reply(ApiEndpoints.passportPrivacy, const ServerFailure(message: 'Mất kết nối'));
+        ..reply(ApiEndpoints.passportPrivacy,
+            const ServerFailure(message: 'Mất kết nối'));
       final PassportViewModel vm = PassportViewModel(PassportRepository(api));
       await vm.loadPassport();
 
-      final PassportDraft d = PassportDraft.fromPassport(vm.passport!)..fieldPrivacy['email'] = FieldVisibility.public;
+      final PassportDraft d = PassportDraft.fromPassport(vm.passport!)
+        ..fieldPrivacy['email'] = FieldVisibility.public;
       expect(await vm.save(d), isFalse);
       expect(vm.saveError, contains('quyền hiển thị'));
-      expect(api.calls.where((RecordedCall c) => c.method == 'PUT' && c.path == ApiEndpoints.passport), isEmpty);
+      expect(
+          api.calls.where((RecordedCall c) =>
+              c.method == 'PUT' && c.path == ApiEndpoints.passport),
+          isEmpty);
     });
   });
 
-  testWidgets('the edit screen lets the student change who sees a field', (WidgetTester tester) async {
+  testWidgets('the edit screen lets the student change who sees a field',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -138,8 +179,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('passport_phone')), findsOneWidget);
-    final Finder list = find.descendant(of: find.byType(ListView).first, matching: find.byType(Scrollable)).first;
-    await tester.scrollUntilVisible(find.byKey(const Key('privacy_pitchVideo')), 300, scrollable: list);
+    final Finder list = find
+        .descendant(
+            of: find.byType(ListView).first, matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('privacy_pitchVideo')), 300,
+        scrollable: list);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('privacy_email')));
     await tester.pumpAndSettle();
@@ -148,32 +194,46 @@ void main() {
     await tester.tap(find.byKey(const Key('passport_save')));
     await tester.pumpAndSettle();
 
-    final Map<String, dynamic> body = api.callsTo(ApiEndpoints.passportPrivacy).single.data as Map<String, dynamic>;
+    final Map<String, dynamic> body = api
+        .callsTo(ApiEndpoints.passportPrivacy)
+        .single
+        .data as Map<String, dynamic>;
     expect((body['fieldPrivacy'] as Map<String, String>)['email'], 'TEAMMATES');
   });
 
-  testWidgets('a profile view shows granted fields, lists hidden ones and switches audience', (WidgetTester tester) async {
+  testWidgets(
+      'a profile view shows granted fields, lists hidden ones and switches audience',
+      (WidgetTester tester) async {
     final List<ProfileAudience> asked = <ProfileAudience>[];
     final ProfileViewViewModel vm = ProfileViewViewModel(
       (ProfileAudience a) async {
         asked.add(a);
-        return SuccessResult<ProfileView, Failure>(ProfileView.fromJson(grpcView(
-          visible: a == ProfileAudience.public ? <String>['bio', 'skills'] : <String>['bio', 'skills', 'education'],
+        return SuccessResult<ProfileView, Failure>(
+            ProfileView.fromJson(grpcView(
+          visible: a == ProfileAudience.public
+              ? <String>['bio', 'skills']
+              : <String>['bio', 'skills', 'education'],
           audience: a.apiValue,
         )));
       },
-      audiences: const <ProfileAudience>[ProfileAudience.public, ProfileAudience.teammates],
+      audiences: const <ProfileAudience>[
+        ProfileAudience.public,
+        ProfileAudience.teammates
+      ],
     );
-    await tester.pumpWidget(MaterialApp(home: ProfileViewScreen(viewModel: vm, title: 'Hồ sơ')));
+    await tester.pumpWidget(
+        MaterialApp(home: ProfileViewScreen(viewModel: vm, title: 'Hồ sơ')));
     await tester.pumpAndSettle();
 
     expect(find.text('Yêu AI'), findsOneWidget);
     expect(find.textContaining('ĐH Bách Khoa'), findsNothing);
-    expect(find.textContaining('Email'), findsOneWidget, reason: 'listed as hidden');
+    expect(find.textContaining('Email'), findsOneWidget,
+        reason: 'listed as hidden');
 
     await tester.tap(find.text('Đồng đội'));
     await tester.pumpAndSettle();
-    expect(asked, <ProfileAudience>[ProfileAudience.public, ProfileAudience.teammates]);
+    expect(asked,
+        <ProfileAudience>[ProfileAudience.public, ProfileAudience.teammates]);
     expect(find.textContaining('ĐH Bách Khoa'), findsOneWidget);
   });
 }

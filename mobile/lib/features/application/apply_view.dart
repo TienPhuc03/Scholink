@@ -16,7 +16,8 @@ class ApplyView extends StatefulWidget {
   final Future<void> Function() onEditPassport;
 
   /// Opens an application's detail (already applied, or right after a successful submit).
-  final void Function(String applicationId, {required bool justSubmitted}) onOpenApplication;
+  final void Function(String applicationId, {required bool justSubmitted})
+      onOpenApplication;
 
   const ApplyView({
     super.key,
@@ -78,7 +79,10 @@ class _ApplyViewState extends State<ApplyView> {
                 vm.opportunityTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -87,9 +91,11 @@ class _ApplyViewState extends State<ApplyView> {
         body: ListenableBuilder(
           listenable: vm,
           builder: (BuildContext context, Widget? child) {
-            if (vm.isLoading) return const Center(child: CircularProgressIndicator());
+            if (vm.isLoading)
+              return const Center(child: CircularProgressIndicator());
             if (vm.result != null) return _buildSuccess(vm.result!);
-            if (vm.existingApplication != null) return _buildAlreadyApplied(vm.existingApplication!);
+            if (vm.existingApplication != null)
+              return _buildAlreadyApplied(vm.existingApplication!);
             return Column(
               children: <Widget>[
                 _StepHeader(step: vm.step),
@@ -100,7 +106,8 @@ class _ApplyViewState extends State<ApplyView> {
                       if (vm.resubmitRevision != null) ...<Widget>[
                         AuthMessageBanner(
                           key: const Key('apply_resubmit_banner'),
-                          message: 'Bạn đang nộp lại hồ sơ đã rút. Đây sẽ là lần nộp thứ ${vm.resubmitRevision}; '
+                          message:
+                              'Bạn đang nộp lại hồ sơ đã rút. Đây sẽ là lần nộp thứ ${vm.resubmitRevision}; '
                               'các lần nộp trước vẫn được lưu nguyên.',
                           tone: AuthBannerTone.info,
                         ),
@@ -110,7 +117,8 @@ class _ApplyViewState extends State<ApplyView> {
                         AuthMessageBanner(message: vm.terminalError!),
                         const SizedBox(height: 16),
                       ],
-                      if (vm.hasUnconfirmedAttempt && !vm.canRetrySubmit) ...<Widget>[
+                      if (vm.hasUnconfirmedAttempt &&
+                          !vm.canRetrySubmit) ...<Widget>[
                         _buildUnconfirmedBanner(),
                         const SizedBox(height: 16),
                       ],
@@ -134,11 +142,18 @@ class _ApplyViewState extends State<ApplyView> {
   // ---------------- Submitted (Q11, Figma 162:807) ----------------
 
   Widget _buildSuccess(SubmitResult r) {
-    const TextStyle stepTitle =
-        TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary);
-    const TextStyle meta = TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary);
-    final String shortId =
-        r.applicationId.length <= 12 ? r.applicationId : r.applicationId.substring(r.applicationId.length - 8);
+    const TextStyle stepTitle = TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary);
+    const TextStyle meta = TextStyle(
+        fontFamily: 'Be Vietnam Pro',
+        fontSize: 12,
+        color: AppColors.textSecondary);
+    final String shortId = r.applicationId.length <= 12
+        ? r.applicationId
+        : r.applicationId.substring(r.applicationId.length - 8);
     return ListView(
       key: const Key('apply_success'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -153,7 +168,9 @@ class _ApplyViewState extends State<ApplyView> {
                     width: 72,
                     height: 72,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: const Color(0x1A3525CD), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                        color: const Color(0x1A3525CD),
+                        borderRadius: BorderRadius.circular(8)),
                     child: Container(
                       width: 64,
                       height: 64,
@@ -162,17 +179,22 @@ class _ApplyViewState extends State<ApplyView> {
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: cardShadow,
                       ),
-                      child: const Icon(Icons.check_rounded, size: 32, color: AppColors.primary),
+                      child: const Icon(Icons.check_rounded,
+                          size: 32, color: AppColors.primary),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(4)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(4)),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        CircleAvatar(radius: 3, backgroundColor: Color(0xFF005338)),
+                        CircleAvatar(
+                            radius: 3, backgroundColor: Color(0xFF005338)),
                         SizedBox(width: 4),
                         Flexible(
                           child: Text(
@@ -202,7 +224,8 @@ class _ApplyViewState extends State<ApplyView> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text('#$shortId', textAlign: TextAlign.center, style: stepTitle),
+                  Text('#$shortId',
+                      textAlign: TextAlign.center, style: stepTitle),
                 ],
               ),
             ),
@@ -221,8 +244,11 @@ class _ApplyViewState extends State<ApplyView> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(4)),
-                child: const Icon(Icons.emoji_events_outlined, color: AppColors.primary),
+                decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(4)),
+                child: const Icon(Icons.emoji_events_outlined,
+                    color: AppColors.primary),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -258,7 +284,9 @@ class _ApplyViewState extends State<ApplyView> {
         const SizedBox(height: 24),
         SectionCard(
           title: 'Trình tự tiếp theo',
-          trailing: const SmallBadge('3 giai đoạn', color: AppColors.textSecondary, background: AppColors.borderLight),
+          trailing: const SmallBadge('3 giai đoạn',
+              color: AppColors.textSecondary,
+              background: AppColors.borderLight),
           child: Column(
             children: <Widget>[
               const _NextStep(
@@ -270,8 +298,10 @@ class _ApplyViewState extends State<ApplyView> {
               _NextStep(
                 color: AppColors.primary,
                 icon: Icons.sync_rounded,
-                title: Text('Đơn vị tổ chức xét duyệt', style: stepTitle.copyWith(color: AppColors.primary)),
-                trailing: const SmallBadge('Đang xử lý', color: Color(0xFFDC2C4F), background: Color(0x80FFDADB)),
+                title: Text('Đơn vị tổ chức xét duyệt',
+                    style: stepTitle.copyWith(color: AppColors.primary)),
+                trailing: const SmallBadge('Đang xử lý',
+                    color: Color(0xFFDC2C4F), background: Color(0x80FFDADB)),
               ),
               const _NextStep(
                 color: Color(0xFFDAE2FD),
@@ -287,35 +317,51 @@ class _ApplyViewState extends State<ApplyView> {
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: AppColors.cardInfoBackground, borderRadius: BorderRadius.circular(6)),
+          decoration: BoxDecoration(
+              color: AppColors.cardInfoBackground,
+              borderRadius: BorderRadius.circular(6)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Container(
                 width: 32,
                 height: 32,
-                decoration: BoxDecoration(color: const Color(0x1A3525CD), borderRadius: BorderRadius.circular(4)),
-                child: const Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
+                decoration: BoxDecoration(
+                    color: const Color(0x1A3525CD),
+                    borderRadius: BorderRadius.circular(4)),
+                child: const Icon(Icons.lightbulb_outline,
+                    size: 18, color: AppColors.primary),
               ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text.rich(
                   TextSpan(
                     text: 'Gợi ý:',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                     children: <InlineSpan>[
                       TextSpan(
                         text: ' Theo dõi trạng thái trong ',
-                        style: TextStyle(fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textSecondary),
                       ),
-                      TextSpan(text: 'Đơn Ứng Tuyển', style: TextStyle(color: AppColors.primary)),
+                      TextSpan(
+                          text: 'Đơn Ứng Tuyển',
+                          style: TextStyle(color: AppColors.primary)),
                       TextSpan(
                         text: ' ở tab Passport.',
-                        style: TextStyle(fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textSecondary),
                       ),
                     ],
                   ),
-                  style: TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, height: 16 / 12),
+                  style: TextStyle(
+                      fontFamily: 'Be Vietnam Pro',
+                      fontSize: 12,
+                      height: 16 / 12),
                 ),
               ),
             ],
@@ -326,20 +372,24 @@ class _ApplyViewState extends State<ApplyView> {
           key: const Key('apply_success_view'),
           label: 'Xem trạng thái',
           icon: Icons.assignment_turned_in_outlined,
-          onPressed: () => widget.onOpenApplication(r.applicationId, justSubmitted: true),
+          onPressed: () =>
+              widget.onOpenApplication(r.applicationId, justSubmitted: true),
         ),
         const SizedBox(height: 8),
         TextButton.icon(
           key: const Key('apply_success_home'),
-          onPressed: () => Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst),
+          onPressed: () => Navigator.of(context)
+              .popUntil((Route<dynamic> route) => route.isFirst),
           icon: const Icon(Icons.home_outlined, size: 18),
           label: const Text('Về trang chủ'),
           style: TextButton.styleFrom(
             foregroundColor: AppColors.textPrimary,
             backgroundColor: AppColors.primaryLight,
             minimumSize: const Size.fromHeight(48),
-            textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            textStyle: const TextStyle(
+                fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
         ),
       ],
@@ -358,7 +408,10 @@ class _ApplyViewState extends State<ApplyView> {
         const Text(
           'Bạn đã nộp hồ sơ cho cơ hội này',
           textAlign: TextAlign.center,
-          style: TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(
+              fontFamily: 'Be Vietnam Pro',
+              fontSize: 18,
+              fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         Text(
@@ -370,14 +423,16 @@ class _ApplyViewState extends State<ApplyView> {
         Center(child: StatusPill(app.status)),
         if (vm.submitError != null) ...<Widget>[
           const SizedBox(height: 16),
-          AuthMessageBanner(message: vm.submitError!, tone: AuthBannerTone.info),
+          AuthMessageBanner(
+              message: vm.submitError!, tone: AuthBannerTone.info),
         ],
         const SizedBox(height: 24),
         AuthPrimaryButton(
           key: const Key('apply_view_existing'),
           label: 'Xem hồ sơ',
           icon: Icons.visibility_outlined,
-          onPressed: () => widget.onOpenApplication(app.id, justSubmitted: false),
+          onPressed: () =>
+              widget.onOpenApplication(app.id, justSubmitted: false),
         ),
       ],
     );
@@ -415,7 +470,11 @@ class _ApplyViewState extends State<ApplyView> {
   List<Widget> _buildReadiness() {
     final ReadinessResult? r = vm.readiness;
     if (vm.checkingReadiness && r == null) {
-      return const <Widget>[Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))];
+      return const <Widget>[
+        Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator()))
+      ];
     }
     return <Widget>[
       if (vm.readinessError != null) ...<Widget>[
@@ -460,7 +519,8 @@ class _ApplyViewState extends State<ApplyView> {
                   value: r.readinessScore / 100,
                   minHeight: 6,
                   backgroundColor: AppColors.borderLight,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
               ),
               const SizedBox(height: 12),
@@ -475,16 +535,23 @@ class _ApplyViewState extends State<ApplyView> {
               ],
               const SizedBox(height: 12),
               if (r.screening == Screening.ineligible)
-                const AuthMessageBanner(message: 'Hồ sơ chưa đáp ứng điều kiện của cơ hội này nên chưa thể nộp.')
+                const AuthMessageBanner(
+                    message:
+                        'Hồ sơ chưa đáp ứng điều kiện của cơ hội này nên chưa thể nộp.')
               else if (r.missingFields.isNotEmpty)
-                const AuthMessageBanner(message: 'Hãy bổ sung các mục còn thiếu trong Passport rồi kiểm tra lại.')
+                const AuthMessageBanner(
+                    message:
+                        'Hãy bổ sung các mục còn thiếu trong Passport rồi kiểm tra lại.')
               else if (r.screening == Screening.needsReview)
                 const AuthMessageBanner(
-                  message: 'Bạn vẫn có thể nộp. Hồ sơ sẽ được đơn vị tổ chức xem xét thủ công.',
+                  message:
+                      'Bạn vẫn có thể nộp. Hồ sơ sẽ được đơn vị tổ chức xem xét thủ công.',
                   tone: AuthBannerTone.info,
                 )
               else
-                const AuthMessageBanner(message: 'Hồ sơ sẵn sàng để nộp.', tone: AuthBannerTone.success),
+                const AuthMessageBanner(
+                    message: 'Hồ sơ sẵn sàng để nộp.',
+                    tone: AuthBannerTone.success),
             ],
           ),
         ),
@@ -504,7 +571,10 @@ class _ApplyViewState extends State<ApplyView> {
             child: OutlinedButton.icon(
               onPressed: vm.checkingReadiness ? null : vm.checkReadiness,
               icon: vm.checkingReadiness
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Kiểm tra lại'),
               style: _outlined(),
@@ -518,7 +588,9 @@ class _ApplyViewState extends State<ApplyView> {
   // ---------------- Step 2: attachments ----------------
 
   List<Widget> _buildAttachments() {
-    final int active = vm.attachments.where((AttachmentItem a) => a.state != AttachmentState.rejected).length;
+    final int active = vm.attachments
+        .where((AttachmentItem a) => a.state != AttachmentState.rejected)
+        .length;
     return <Widget>[
       SectionCard(
         icon: Icons.attach_file_rounded,
@@ -532,7 +604,8 @@ class _ApplyViewState extends State<ApplyView> {
             ),
             const SizedBox(height: 12),
             for (final AttachmentItem a in vm.attachments) ...<Widget>[
-              _AttachmentRow(item: a, onRemove: () => vm.removeAttachment(a.localId)),
+              _AttachmentRow(
+                  item: a, onRemove: () => vm.removeAttachment(a.localId)),
               const SizedBox(height: 8),
             ],
             if (vm.attachmentError != null) ...<Widget>[
@@ -541,7 +614,8 @@ class _ApplyViewState extends State<ApplyView> {
             ],
             OutlinedButton.icon(
               key: const Key('apply_add_file'),
-              onPressed: active >= AttachmentRules.maxFiles ? null : vm.pickAttachment,
+              onPressed:
+                  active >= AttachmentRules.maxFiles ? null : vm.pickAttachment,
               icon: const Icon(Icons.add_rounded, size: 18),
               label: Text('Thêm tệp ($active/${AttachmentRules.maxFiles})'),
               style: _outlined(),
@@ -606,18 +680,24 @@ class _ApplyViewState extends State<ApplyView> {
         ),
         child: Row(
           children: <Widget>[
-            const Icon(Icons.timer_outlined, size: 18, color: AppColors.primary),
+            const Icon(Icons.timer_outlined,
+                size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                vm.previewExpired ? 'Bản xem trước đã hết hạn' : 'Bản xem trước còn hiệu lực',
+                vm.previewExpired
+                    ? 'Bản xem trước đã hết hạn'
+                    : 'Bản xem trước còn hiệu lực',
                 style: const TextStyle(fontSize: 13),
               ),
             ),
             Text(
               formatCountdown(vm.previewSecondsLeft),
               key: const Key('apply_countdown'),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary),
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary),
             ),
           ],
         ),
@@ -631,7 +711,10 @@ class _ApplyViewState extends State<ApplyView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             PassportSnapshotFields(p.snapshot),
-            if (p.reasons.isNotEmpty) ...<Widget>[const SizedBox(height: 8), ReasonList(p.reasons)],
+            if (p.reasons.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              ReasonList(p.reasons)
+            ],
           ],
         ),
       ),
@@ -640,15 +723,18 @@ class _ApplyViewState extends State<ApplyView> {
         icon: Icons.attach_file_rounded,
         title: 'Tệp đính kèm (${p.attachmentIds.length})',
         child: p.attachmentIds.isEmpty
-            ? const Text('Không có tệp đính kèm.', style: TextStyle(fontSize: 13, color: AppColors.textMuted))
+            ? const Text('Không có tệp đính kèm.',
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: p.attachmentIds.map((String id) {
-                  final AttachmentItem? local =
-                      vm.attachments.where((AttachmentItem a) => a.assetId == id).firstOrNull;
+                  final AttachmentItem? local = vm.attachments
+                      .where((AttachmentItem a) => a.assetId == id)
+                      .firstOrNull;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4),
-                    child: Text('• ${local?.fileName ?? id}', style: const TextStyle(fontSize: 13)),
+                    child: Text('• ${local?.fileName ?? id}',
+                        style: const TextStyle(fontSize: 13)),
                   );
                 }).toList(),
               ),
@@ -658,11 +744,13 @@ class _ApplyViewState extends State<ApplyView> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: EdgeInsets.zero,
-          title: const Text('Chi tiết kỹ thuật', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          title: const Text('Chi tiết kỹ thuật',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
           children: <Widget>[
             _kv('Mã bản xem trước', p.previewId),
             _kv('Mã snapshot', p.snapshotId),
-            _kv('Phiên bản hồ sơ / quy tắc', 'v${p.profileVersion} / v${p.ruleVersion}'),
+            _kv('Phiên bản hồ sơ / quy tắc',
+                'v${p.profileVersion} / v${p.ruleVersion}'),
             _kv('Mã băm nội dung', p.payloadHash),
           ],
         ),
@@ -688,7 +776,9 @@ class _ApplyViewState extends State<ApplyView> {
   }
 
   Widget _buildConsent(ApplicationPreview p) {
-    final String files = p.attachmentIds.isEmpty ? '' : ' và ${p.attachmentIds.length} tệp đính kèm';
+    final String files = p.attachmentIds.isEmpty
+        ? ''
+        : ' và ${p.attachmentIds.length} tệp đính kèm';
     final bool enabled = !vm.needsNewPreview && !vm.submitting;
     return InkWell(
       onTap: enabled ? () => vm.setConsent(!vm.consentAccepted) : null,
@@ -704,7 +794,8 @@ class _ApplyViewState extends State<ApplyView> {
               child: Checkbox(
                 key: const Key('apply_consent'),
                 value: vm.consentAccepted,
-                onChanged: enabled ? (bool? v) => vm.setConsent(v ?? false) : null,
+                onChanged:
+                    enabled ? (bool? v) => vm.setConsent(v ?? false) : null,
                 activeColor: AppColors.primary,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -714,7 +805,8 @@ class _ApplyViewState extends State<ApplyView> {
               child: Text(
                 'Tôi đồng ý chia sẻ bản hồ sơ trên$files cho đơn vị tổ chức để xét tuyển '
                 '"${vm.opportunityTitle}". Bản đã nộp không thay đổi khi tôi cập nhật Passport sau này.',
-                style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.textPrimary),
+                style: const TextStyle(
+                    fontSize: 13, height: 1.4, color: AppColors.textPrimary),
               ),
             ),
           ],
@@ -730,19 +822,26 @@ class _ApplyViewState extends State<ApplyView> {
         ? null
         : OutlinedButton(
             onPressed: vm.submitting ? null : vm.back,
-            style: _outlined().copyWith(minimumSize: const WidgetStatePropertyAll<Size>(Size(0, 48))),
+            style: _outlined().copyWith(
+                minimumSize: const WidgetStatePropertyAll<Size>(Size(0, 48))),
             child: const Text('Quay lại'),
           );
     final Widget primary = switch (vm.step) {
       ApplyStep.readiness => AuthPrimaryButton(
           key: const Key('apply_next_1'),
           label: 'Tiếp tục',
-          icon: vm.readiness?.canProceed == true ? Icons.arrow_forward_rounded : Icons.lock_outline_rounded,
-          onPressed: vm.readiness?.canProceed == true && vm.terminalError == null ? vm.goToAttachments : null,
+          icon: vm.readiness?.canProceed == true
+              ? Icons.arrow_forward_rounded
+              : Icons.lock_outline_rounded,
+          onPressed:
+              vm.readiness?.canProceed == true && vm.terminalError == null
+                  ? vm.goToAttachments
+                  : null,
         ),
       ApplyStep.attachments => AuthPrimaryButton(
           key: const Key('apply_next_2'),
-          label: vm.attachments.isEmpty ? 'Bỏ qua, xem trước' : 'Xem trước hồ sơ',
+          label:
+              vm.attachments.isEmpty ? 'Bỏ qua, xem trước' : 'Xem trước hồ sơ',
           onPressed: vm.isUploading ? null : vm.goToReview,
         ),
       ApplyStep.review => AuthPrimaryButton(
@@ -789,10 +888,15 @@ class _StepHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const List<String> labels = <String>['Kiểm tra', 'Tệp đính kèm', 'Xem trước & nộp'];
+    const List<String> labels = <String>[
+      'Kiểm tra',
+      'Tệp đính kèm',
+      'Xem trước & nộp'
+    ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderLight))),
+      decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.borderLight))),
       // F37 (Q7): each step takes a third of the width and its label wraps, so large
       // system text never pushes the header off screen.
       child: Row(
@@ -811,27 +915,34 @@ class _StepHeader extends StatelessWidget {
           final bool current = idx == step.index;
           return Expanded(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              CircleAvatar(
-                radius: 13,
-                backgroundColor: done || current ? AppColors.primary : AppColors.borderLight,
-                child: done
-                    ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-                    : Text('${idx + 1}',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: current ? Colors.white : AppColors.textSecondary)),
-              ),
-              const SizedBox(height: 4),
-              Text(labels[idx],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: current ? FontWeight.w600 : FontWeight.w400,
-                      color: current ? AppColors.primary : AppColors.textSecondary)),
-            ],
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                CircleAvatar(
+                  radius: 13,
+                  backgroundColor: done || current
+                      ? AppColors.primary
+                      : AppColors.borderLight,
+                  child: done
+                      ? const Icon(Icons.check_rounded,
+                          size: 16, color: Colors.white)
+                      : Text('${idx + 1}',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: current
+                                  ? Colors.white
+                                  : AppColors.textSecondary)),
+                ),
+                const SizedBox(height: 4),
+                Text(labels[idx],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+                        color: current
+                            ? AppColors.primary
+                            : AppColors.textSecondary)),
+              ],
             ),
           );
         }),
@@ -859,30 +970,42 @@ class _AttachmentRow extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined, color: AppColors.primary),
+          Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+              color: AppColors.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(item.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
+                Text(item.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14)),
                 const SizedBox(height: 2),
                 Row(
                   children: <Widget>[
-                    Text(item.sizeLabel, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(item.sizeLabel,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(width: 8),
                     switch (item.state) {
-                      AttachmentState.uploading => const Pill(text: 'Đang tải lên', color: AppColors.primary),
-                      AttachmentState.ready =>
-                        const Pill(text: 'Sẵn sàng', color: AppColors.success, icon: Icons.check_rounded),
-                      AttachmentState.rejected => const Pill(text: 'Bị từ chối', color: AppColors.error),
+                      AttachmentState.uploading => const Pill(
+                          text: 'Đang tải lên', color: AppColors.primary),
+                      AttachmentState.ready => const Pill(
+                          text: 'Sẵn sàng',
+                          color: AppColors.success,
+                          icon: Icons.check_rounded),
+                      AttachmentState.rejected =>
+                        const Pill(text: 'Bị từ chối', color: AppColors.error),
                     },
                   ],
                 ),
                 if (item.error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4, right: 8),
-                    child: Text(item.error!, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                    child: Text(item.error!,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.error)),
                   ),
               ],
             ),
@@ -890,7 +1013,8 @@ class _AttachmentRow extends StatelessWidget {
           IconButton(
             tooltip: 'Xóa tệp',
             onPressed: onRemove,
-            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+            icon: const Icon(Icons.close_rounded,
+                size: 18, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -911,7 +1035,10 @@ class _ChecklistRow extends StatelessWidget {
     final String key = (field ?? '').toLowerCase();
     final (IconData icon, String action) = switch (key) {
       _ when key.contains('cv') => (Icons.description_outlined, 'Tải lên'),
-      _ when key.contains('gpa') || key.contains('education') => (Icons.school_outlined, 'Điền'),
+      _ when key.contains('gpa') || key.contains('education') => (
+          Icons.school_outlined,
+          'Điền'
+        ),
       _ when key.contains('skill') => (Icons.psychology_outlined, 'Chọn'),
       _ => (Icons.badge_outlined, 'Bổ sung'),
     };
@@ -932,14 +1059,20 @@ class _ChecklistRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Icon(done ? Icons.badge_outlined : icon,
-                size: 18, color: done ? const Color(0xFF005338) : AppColors.primary),
+                size: 18,
+                color: done ? const Color(0xFF005338) : AppColors.primary),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              done ? 'Passport đã đủ các mục bắt buộc' : missingFieldLabel(field!),
+              done
+                  ? 'Passport đã đủ các mục bắt buộc'
+                  : missingFieldLabel(field!),
               style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary),
             ),
           ),
           const SizedBox(width: 8),
@@ -954,11 +1087,15 @@ class _ChecklistRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
                 onTap: onFix,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   child: Text(
                     action,
                     style: const TextStyle(
-                        fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
                   ),
                 ),
               ),
@@ -998,10 +1135,13 @@ class _NextStep extends StatelessWidget {
               Container(
                 width: 20,
                 height: 20,
-                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+                decoration: BoxDecoration(
+                    color: color, borderRadius: BorderRadius.circular(4)),
                 child: Icon(icon, size: 12, color: iconColor),
               ),
-              if (!last) Expanded(child: Container(width: 2, color: AppColors.primaryLight)),
+              if (!last)
+                Expanded(
+                    child: Container(width: 2, color: AppColors.primaryLight)),
             ],
           ),
           const SizedBox(width: 8),
@@ -1029,12 +1169,15 @@ class _NextStep extends StatelessWidget {
 class _Confetti extends StatelessWidget {
   const _Confetti();
 
-  static Widget _bit(Color color, double w, double h, double turns, {double radius = 1}) => Transform.rotate(
+  static Widget _bit(Color color, double w, double h, double turns,
+          {double radius = 1}) =>
+      Transform.rotate(
         angle: turns * 6.283185307179586,
         child: Container(
           width: w,
           height: h,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(radius)),
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(radius)),
         ),
       );
 
@@ -1046,11 +1189,28 @@ class _Confetti extends StatelessWidget {
           opacity: 0.4,
           child: Stack(
             children: <Widget>[
-              Positioned(left: 24, top: 8, child: _bit(const Color(0x663525CD), 8, 8, 1 / 30, radius: 2)),
-              Positioned(right: 40, top: 30, child: _bit(const Color(0x66005338), 10, 6, -1 / 8)),
-              Positioned(left: 45, top: 64, child: _bit(const Color(0x66DC2C4F), 6, 12, 1 / 8)),
-              Positioned(left: 110, top: 24, child: _bit(const Color(0x4D3525CD), 6, 6, 0, radius: 3)),
-              Positioned(right: 90, top: 56, child: _bit(const Color(0x4D006E4B), 8, 8, 1 / 30, radius: 2)),
+              Positioned(
+                  left: 24,
+                  top: 8,
+                  child:
+                      _bit(const Color(0x663525CD), 8, 8, 1 / 30, radius: 2)),
+              Positioned(
+                  right: 40,
+                  top: 30,
+                  child: _bit(const Color(0x66005338), 10, 6, -1 / 8)),
+              Positioned(
+                  left: 45,
+                  top: 64,
+                  child: _bit(const Color(0x66DC2C4F), 6, 12, 1 / 8)),
+              Positioned(
+                  left: 110,
+                  top: 24,
+                  child: _bit(const Color(0x4D3525CD), 6, 6, 0, radius: 3)),
+              Positioned(
+                  right: 90,
+                  top: 56,
+                  child:
+                      _bit(const Color(0x4D006E4B), 8, 8, 1 / 30, radius: 2)),
             ],
           ),
         ),

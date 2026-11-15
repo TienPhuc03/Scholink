@@ -19,7 +19,8 @@ enum CalendarSyncStatus {
 const int kQuietStartHour = 22;
 const int kQuietEndHour = 7;
 
-bool isInQuietHours(DateTime t) => t.hour >= kQuietStartHour || t.hour < kQuietEndHour;
+bool isInQuietHours(DateTime t) =>
+    t.hour >= kQuietStartHour || t.hour < kQuietEndHour;
 
 enum ReminderMilestone {
   sevenDays('7d', '7 ngày trước hạn', Duration(days: 7)),
@@ -61,7 +62,8 @@ enum ReminderMilestone {
     final DateTime quietStart = due.hour >= kQuietStartHour
         ? DateTime(due.year, due.month, due.day, kQuietStartHour)
         : DateTime(due.year, due.month, due.day - 1, kQuietStartHour);
-    final DateTime quietEnd = DateTime(quietStart.year, quietStart.month, quietStart.day + 1, kQuietEndHour);
+    final DateTime quietEnd = DateTime(
+        quietStart.year, quietStart.month, quietStart.day + 1, kQuietEndHour);
     if (quietEnd.isBefore(deadline)) return quietEnd;
     final DateTime advanced = quietStart.subtract(const Duration(minutes: 1));
     return advanced.isAfter(current) ? advanced : null;
@@ -109,10 +111,13 @@ class NotificationModel {
     if (url == null) return null;
     final List<String> parts = Uri.tryParse(url)?.pathSegments ?? <String>[];
     final int i = parts.indexOf(segment);
-    return i >= 0 && i + 1 < parts.length && parts[i + 1].isNotEmpty ? parts[i + 1] : null;
+    return i >= 0 && i + 1 < parts.length && parts[i + 1].isNotEmpty
+        ? parts[i + 1]
+        : null;
   }
 
-  bool get hasTarget => targetOpportunityId != null || applicationId != null || teamId != null;
+  bool get hasTarget =>
+      targetOpportunityId != null || applicationId != null || teamId != null;
 
   String get typeDisplay {
     switch (type) {
@@ -163,7 +168,8 @@ class NotificationModel {
   static NotificationType _typeOf(String raw) {
     final String t = raw.toUpperCase();
     // Server: DEADLINE_REMINDER (entity) / REMINDER (older worker); app cache: deadlineReminder.
-    if (t.contains('DEADLINE') || t.contains('REMINDER')) return NotificationType.deadlineReminder;
+    if (t.contains('DEADLINE') || t.contains('REMINDER'))
+      return NotificationType.deadlineReminder;
     if (t.contains('APPLICATION')) return NotificationType.applicationUpdate;
     if (t.contains('TEAM')) return NotificationType.teamInvite;
     if (t.contains('MATCH')) return NotificationType.matchSuggestion;
@@ -171,9 +177,14 @@ class NotificationModel {
   }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
-    final String notiId = (json['notificationId'] ?? json['id'] ?? json['_id'] ?? '').toString();
-    final DateTime createdAt = DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now();
-    final DateTime? readAt = json['readAt'] != null ? DateTime.tryParse(json['readAt'].toString()) : null;
+    final String notiId =
+        (json['notificationId'] ?? json['id'] ?? json['_id'] ?? '').toString();
+    final DateTime createdAt =
+        DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+            DateTime.now();
+    final DateTime? readAt = json['readAt'] != null
+        ? DateTime.tryParse(json['readAt'].toString())
+        : null;
 
     return NotificationModel(
       notificationId: notiId,
@@ -225,13 +236,15 @@ class NotificationPreferences {
   /// The in-app inbox cannot be turned off: reminders and application updates must stay visible.
   bool get inAppEnabled => true;
 
-  factory NotificationPreferences.fromJson(Map<String, dynamic> json) => NotificationPreferences(
+  factory NotificationPreferences.fromJson(Map<String, dynamic> json) =>
+      NotificationPreferences(
         timezone: (json['timezone'] ?? 'Asia/Ho_Chi_Minh').toString(),
         pushEnabled: json['pushEnabled'] != false,
         emailEnabled: json['emailEnabled'] != false,
         quietStart: (json['quietStart'] ?? '22:00').toString(),
         quietEnd: (json['quietEnd'] ?? '07:00').toString(),
-        preferenceVersion: int.tryParse('${json['preferenceVersion'] ?? 1}') ?? 1,
+        preferenceVersion:
+            int.tryParse('${json['preferenceVersion'] ?? 1}') ?? 1,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -243,7 +256,8 @@ class NotificationPreferences {
         'preferenceVersion': preferenceVersion,
       };
 
-  NotificationPreferences copyWith({String? timezone, bool? pushEnabled, bool? emailEnabled}) =>
+  NotificationPreferences copyWith(
+          {String? timezone, bool? pushEnabled, bool? emailEnabled}) =>
       NotificationPreferences(
         timezone: timezone ?? this.timezone,
         pushEnabled: pushEnabled ?? this.pushEnabled,
@@ -321,19 +335,26 @@ class CalendarEventRecord {
     if (s == 'failed') status = CalendarSyncStatus.failed;
     if (s == 'permissionDenied') status = CalendarSyncStatus.permissionDenied;
 
-    List<T> listOf<T>(dynamic raw, T Function(dynamic) f) => raw is List ? raw.map(f).toList() : <T>[];
+    List<T> listOf<T>(dynamic raw, T Function(dynamic) f) =>
+        raw is List ? raw.map(f).toList() : <T>[];
 
     return CalendarEventRecord(
       eventId: (json['eventId'] ?? '').toString(),
       opportunityId: (json['opportunityId'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
-      deadline: DateTime.tryParse(json['deadline']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+      deadline:
+          DateTime.tryParse(json['deadline']?.toString() ?? '')?.toLocal() ??
+              DateTime.now(),
       milestone: (json['milestone'] ?? 'deadline').toString(),
-      milestones: listOf<String>(json['milestones'], (dynamic e) => e.toString()),
-      reminderMinutes: listOf<int>(json['reminderMinutes'], (dynamic e) => int.tryParse('$e') ?? 0),
+      milestones:
+          listOf<String>(json['milestones'], (dynamic e) => e.toString()),
+      reminderMinutes: listOf<int>(
+          json['reminderMinutes'], (dynamic e) => int.tryParse('$e') ?? 0),
       nativeEventId: json['nativeEventId']?.toString(),
       syncStatus: status,
-      syncedAt: DateTime.tryParse(json['syncedAt']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+      syncedAt:
+          DateTime.tryParse(json['syncedAt']?.toString() ?? '')?.toLocal() ??
+              DateTime.now(),
     );
   }
 }

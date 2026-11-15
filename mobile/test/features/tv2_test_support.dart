@@ -38,24 +38,34 @@ class DelayedApiClient implements ApiClient {
   final List<Completer<Object>> pending = <Completer<Object>>[];
 
   @override
-  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters, Options? options}) async {
+  Future<Response<T>> get<T>(String path,
+      {Map<String, dynamic>? queryParameters, Options? options}) async {
     calls.add(RecordedCall('GET', path, null, query: queryParameters));
     final Completer<Object> c = Completer<Object>();
     pending.add(c);
     final Object body = await c.future;
     if (body is Failure) throw body;
-    return Response<T>(requestOptions: RequestOptions(path: path), statusCode: 200, data: body as T);
+    return Response<T>(
+        requestOptions: RequestOptions(path: path),
+        statusCode: 200,
+        data: body as T);
   }
 
   @override
-  Future<Response<T>> post<T>(String path, {dynamic data, Map<String, dynamic>? queryParameters, Options? options}) =>
+  Future<Response<T>> post<T>(String path,
+          {dynamic data,
+          Map<String, dynamic>? queryParameters,
+          Options? options}) =>
       throw UnimplementedError();
 
   @override
-  Future<Response<T>> put<T>(String path, {dynamic data, Options? options}) => throw UnimplementedError();
+  Future<Response<T>> put<T>(String path, {dynamic data, Options? options}) =>
+      throw UnimplementedError();
 
   @override
-  Future<Response<T>> delete<T>(String path, {dynamic data, Options? options}) => throw UnimplementedError();
+  Future<Response<T>> delete<T>(String path,
+          {dynamic data, Options? options}) =>
+      throw UnimplementedError();
 }
 
 /// Device calendar double: records every write, like the Android channel would.
@@ -69,7 +79,8 @@ class FakeDeviceCalendar implements DeviceCalendar, NotificationPermission {
   int _nextId = 100;
 
   /// native id -> event currently on the "device".
-  final Map<String, DeviceCalendarEvent> events = <String, DeviceCalendarEvent>{};
+  final Map<String, DeviceCalendarEvent> events =
+      <String, DeviceCalendarEvent>{};
   final List<String?> upsertExistingIds = <String?>[];
 
   FakeDeviceCalendar({
@@ -90,13 +101,17 @@ class FakeDeviceCalendar implements DeviceCalendar, NotificationPermission {
   }
 
   @override
-  Future<String> upsertEvent(DeviceCalendarEvent event, {String? existingEventId}) async {
+  Future<String> upsertEvent(DeviceCalendarEvent event,
+      {String? existingEventId}) async {
     if (!calendarGranted) {
-      throw const DeviceServiceException(DeviceErrorKind.permissionDenied, 'no permission');
+      throw const DeviceServiceException(
+          DeviceErrorKind.permissionDenied, 'no permission');
     }
     upsertExistingIds.add(existingEventId);
     final String id =
-        existingEventId != null && events.containsKey(existingEventId) ? existingEventId : '${_nextId++}';
+        existingEventId != null && events.containsKey(existingEventId)
+            ? existingEventId
+            : '${_nextId++}';
     events[id] = event;
     return id;
   }
@@ -133,7 +148,8 @@ Map<String, dynamic> oppJson(
       'description': 'Mô tả $id',
       'organizerName': 'Đơn vị $id',
       'applyMode': applyMode,
-      'registerDeadline': DateTime.now().add(deadlineIn).toUtc().toIso8601String(),
+      'registerDeadline':
+          DateTime.now().add(deadlineIn).toUtc().toIso8601String(),
       'timezone': 'Asia/Ho_Chi_Minh',
       'sourceUrl': sourceUrl ?? 'https://example.edu.vn/$id',
       'updatedAt': '2026-11-01T03:00:00.000Z',

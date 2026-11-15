@@ -7,13 +7,16 @@ import 'package:scholink_mobile/core/realtime/mqtt_manager.dart';
 import 'package:scholink_mobile/features/notification/push_listener.dart';
 
 class FakeMqtt implements MqttManager {
-  final StreamController<Map<String, String>> ctrl = StreamController<Map<String, String>>.broadcast();
+  final StreamController<Map<String, String>> ctrl =
+      StreamController<Map<String, String>>.broadcast();
   bool connected = false;
   final List<String> connectedAs = <String>[];
   int disconnects = 0;
 
-  void deliver(String topic, Object payload) =>
-      ctrl.add(<String, String>{'topic': topic, 'payload': payload is String ? payload : jsonEncode(payload)});
+  void deliver(String topic, Object payload) => ctrl.add(<String, String>{
+        'topic': topic,
+        'payload': payload is String ? payload : jsonEncode(payload)
+      });
 
   @override
   Future<bool> connect(String userId) async {
@@ -54,8 +57,17 @@ class RecordingNotifier implements LocalNotifier {
   final List<Map<String, String?>> shown = <Map<String, String?>>[];
 
   @override
-  Future<bool> show({required String id, required String title, required String body, String? refUrl}) async {
-    shown.add(<String, String?>{'id': id, 'title': title, 'body': body, 'refUrl': refUrl});
+  Future<bool> show(
+      {required String id,
+      required String title,
+      required String body,
+      String? refUrl}) async {
+    shown.add(<String, String?>{
+      'id': id,
+      'title': title,
+      'body': body,
+      'refUrl': refUrl
+    });
     return true;
   }
 
@@ -86,7 +98,8 @@ void main() {
 
   Future<void> flush() => Future<void>.delayed(Duration.zero);
 
-  test('a push on my topic becomes a system notification and reloads the inbox', () async {
+  test('a push on my topic becomes a system notification and reloads the inbox',
+      () async {
     await listener.start('u1', onReceived: () => reloads++);
     mqtt.deliver('users/u1/notifications', push('reminder:opp_1:7d:v1'));
     await flush();
@@ -97,17 +110,21 @@ void main() {
     expect(reloads, 1);
   });
 
-  test('QoS 1 redelivery is shown once; other topics and bad payloads are ignored', () async {
+  test(
+      'QoS 1 redelivery is shown once; other topics and bad payloads are ignored',
+      () async {
     await listener.start('u1');
     mqtt.deliver('users/u1/notifications', push('k1'));
     mqtt.deliver('users/u1/notifications', push('k1'));
     mqtt.deliver('users/u2/notifications', push('k2'));
     mqtt.deliver('users/u1/chat', push('k3'));
     mqtt.deliver('users/u1/notifications', '{not json');
-    mqtt.deliver('users/u1/notifications', <String, String>{'notificationKey': 'k4'}); // no title
+    mqtt.deliver('users/u1/notifications',
+        <String, String>{'notificationKey': 'k4'}); // no title
     await flush();
 
-    expect(notifier.shown.map((Map<String, String?> s) => s['id']), <String>['k1']);
+    expect(notifier.shown.map((Map<String, String?> s) => s['id']),
+        <String>['k1']);
   });
 
   test('logout stops showing that account\'s pushes and disconnects', () async {
@@ -121,7 +138,9 @@ void main() {
     expect(listener.isListening, isFalse);
   });
 
-  test('N2: starting again for the same user reconnects a dropped connection, once', () async {
+  test(
+      'N2: starting again for the same user reconnects a dropped connection, once',
+      () async {
     await listener.start('u1');
     mqtt.connected = false; // socket lost while the app was in background
     await listener.start('u1');
@@ -130,7 +149,8 @@ void main() {
     expect(mqtt.connectedAs, <String>['u1', 'u1']);
     mqtt.deliver('users/u1/notifications', push('after-resume'));
     await flush();
-    expect(notifier.shown.single['id'], 'after-resume', reason: 'still one listener, no duplicate');
+    expect(notifier.shown.single['id'], 'after-resume',
+        reason: 'still one listener, no duplicate');
   });
 
   test('switching account reconnects as the new user', () async {
@@ -141,6 +161,7 @@ void main() {
     await flush();
 
     expect(mqtt.connectedAs, <String>['u1', 'u2']);
-    expect(notifier.shown.map((Map<String, String?> s) => s['id']), <String>['new']);
+    expect(notifier.shown.map((Map<String, String?> s) => s['id']),
+        <String>['new']);
   });
 }

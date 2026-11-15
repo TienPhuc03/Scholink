@@ -28,9 +28,12 @@ void main() {
         'items': <dynamic>[oppJson('opp_a', title: 'Học bổng A')],
         'hasMore': false,
       })
-      ..reply(ApiEndpoints.opportunityDetail('opp_a'), oppJson('opp_a', title: 'Học bổng A'))
-      ..reply(ApiEndpoints.passport, <String, dynamic>{'studentId': 'stu_a', 'fullName': 'Sinh viên A'})
-      ..reply(ApiEndpoints.notificationPreferences, <String, dynamic>{'timezone': 'Asia/Ho_Chi_Minh'});
+      ..reply(ApiEndpoints.opportunityDetail('opp_a'),
+          oppJson('opp_a', title: 'Học bổng A'))
+      ..reply(ApiEndpoints.passport,
+          <String, dynamic>{'studentId': 'stu_a', 'fullName': 'Sinh viên A'})
+      ..reply(ApiEndpoints.notificationPreferences,
+          <String, dynamic>{'timezone': 'Asia/Ho_Chi_Minh'});
     storage = InMemorySecureStorage();
     if (signedIn) {
       storage
@@ -58,14 +61,16 @@ void main() {
     // Other tabs (TV3) are not part of these checks; ignore their overflow under the test font.
     final void Function(FlutterErrorDetails)? original = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails d) {
-      if (!d.exceptionAsString().contains('RenderFlex overflowed')) original?.call(d);
+      if (!d.exceptionAsString().contains('RenderFlex overflowed'))
+        original?.call(d);
     };
     addTearDown(() => FlutterError.onError = original);
   }
 
   tearDown(() async => sl.reset());
 
-  testWidgets('guest taps "Lưu", logs in, and the bookmark is saved for them (F10 + F29)',
+  testWidgets(
+      'guest taps "Lưu", logs in, and the bookmark is saved for them (F10 + F29)',
       (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: false);
@@ -73,9 +78,14 @@ void main() {
       ..reply(ApiEndpoints.login, <String, dynamic>{
         'accessToken': 'access_a',
         'refreshToken': 'refresh_a',
-        'user': <String, dynamic>{'id': 'stu_a', 'email': 'sv@uit.edu.vn', 'fullName': 'Sinh viên A'},
+        'user': <String, dynamic>{
+          'id': 'stu_a',
+          'email': 'sv@uit.edu.vn',
+          'fullName': 'Sinh viên A'
+        },
       })
-      ..reply(ApiEndpoints.opportunityBookmark('opp_a'), <String, dynamic>{'bookmarked': true});
+      ..reply(ApiEndpoints.opportunityBookmark('opp_a'),
+          <String, dynamic>{'bookmarked': true});
 
     await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: false));
     await tester.pumpAndSettle();
@@ -85,25 +95,30 @@ void main() {
 
     await tester.tap(find.byTooltip('Lưu Học bổng A opp_a'));
     await tester.pumpAndSettle();
-    expect(api.callsTo(ApiEndpoints.opportunityBookmark('opp_a')), isEmpty, reason: 'guest: no account call');
+    expect(api.callsTo(ApiEndpoints.opportunityBookmark('opp_a')), isEmpty,
+        reason: 'guest: no account call');
     await tester.tap(find.byKey(const Key('login_required_go')));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginView), findsOneWidget);
     await tester.enterText(find.byType(TextField).at(0), 'sv@uit.edu.vn');
     await tester.enterText(find.byType(TextField).at(1), 'Matkhau@123');
-    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+    await tester
+        .ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await tester.pumpAndSettle();
 
-    final List<RecordedCall> saves = api.callsTo(ApiEndpoints.opportunityBookmark('opp_a'));
+    final List<RecordedCall> saves =
+        api.callsTo(ApiEndpoints.opportunityBookmark('opp_a'));
     expect(saves, hasLength(1));
     expect(saves.single.data, <String, dynamic>{'bookmarked': true});
-    expect(await sl<RoomDatabase>().opportunityDao.isBookmarked('opp_a'), isTrue);
+    expect(
+        await sl<RoomDatabase>().opportunityDao.isBookmarked('opp_a'), isTrue);
     expect(find.textContaining('Đã lưu "Học bổng A opp_a"'), findsOneWidget);
   });
 
-  testWidgets('an application update in the inbox opens TV1 application detail', (WidgetTester tester) async {
+  testWidgets('an application update in the inbox opens TV1 application detail',
+      (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: true);
     api
@@ -117,8 +132,10 @@ void main() {
           'createdAt': DateTime.now().toUtc().toIso8601String(),
         },
       ])
-      ..reply(ApiEndpoints.notificationRead('n_app'), <String, dynamic>{'id': 'n_app', 'isRead': true})
-      ..reply(ApiEndpoints.applicationDetail(appId), detailJson(canWithdraw: true));
+      ..reply(ApiEndpoints.notificationRead('n_app'),
+          <String, dynamic>{'id': 'n_app', 'isRead': true})
+      ..reply(
+          ApiEndpoints.applicationDetail(appId), detailJson(canWithdraw: true));
 
     await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: true));
     await tester.pumpAndSettle();
@@ -139,30 +156,41 @@ void main() {
         'createdAt': DateTime.now().toUtc().toIso8601String(),
       };
 
-  testWidgets('N2: after login the inbox and badge load without opening the inbox', (WidgetTester tester) async {
+  testWidgets(
+      'N2: after login the inbox and badge load without opening the inbox',
+      (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: false);
     api
       ..reply(ApiEndpoints.login, <String, dynamic>{
         'accessToken': 'access_a',
         'refreshToken': 'refresh_a',
-        'user': <String, dynamic>{'id': 'stu_a', 'email': 'sv@uit.edu.vn', 'fullName': 'Sinh viên A'},
+        'user': <String, dynamic>{
+          'id': 'stu_a',
+          'email': 'sv@uit.edu.vn',
+          'fullName': 'Sinh viên A'
+        },
       })
-      ..reply(ApiEndpoints.notifications, <dynamic>[unread('n1'), unread('n2')]);
+      ..reply(
+          ApiEndpoints.notifications, <dynamic>[unread('n1'), unread('n2')]);
 
     await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: false));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'sv@uit.edu.vn');
     await tester.enterText(find.byType(TextField).at(1), 'Matkhau@123');
-    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+    await tester
+        .ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await tester.pumpAndSettle();
 
     expect(api.callsTo(ApiEndpoints.notifications), isNotEmpty);
-    expect(find.text('2'), findsOneWidget, reason: 'badge on the Thông báo tab right after login');
+    expect(find.text('2'), findsOneWidget,
+        reason: 'badge on the Thông báo tab right after login');
   });
 
-  testWidgets('N2: coming back to the foreground reloads the inbox and the badge', (WidgetTester tester) async {
+  testWidgets(
+      'N2: coming back to the foreground reloads the inbox and the badge',
+      (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: true);
     api.reply(ApiEndpoints.notifications, <dynamic>[unread('n1')]);
@@ -172,7 +200,8 @@ void main() {
     final int before = api.callsTo(ApiEndpoints.notifications).length;
 
     // A new notification arrives while the app is in the background (no MQTT then).
-    api.reply(ApiEndpoints.notifications, <dynamic>[unread('n1'), unread('n2'), unread('n3')]);
+    api.reply(ApiEndpoints.notifications,
+        <dynamic>[unread('n1'), unread('n2'), unread('n3')]);
     for (final AppLifecycleState s in <AppLifecycleState>[
       AppLifecycleState.inactive,
       AppLifecycleState.hidden,
@@ -189,7 +218,9 @@ void main() {
     expect(find.text('3'), findsOneWidget);
   });
 
-  testWidgets('the Thông báo tab shows the unread count and refreshes when opened again', (WidgetTester tester) async {
+  testWidgets(
+      'the Thông báo tab shows the unread count and refreshes when opened again',
+      (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: true);
     Map<String, dynamic> n(String id) => <String, dynamic>{
@@ -214,7 +245,9 @@ void main() {
     expect(find.byKey(const ValueKey<String>('noti_n3')), findsOneWidget);
   });
 
-  testWidgets('a deadline reminder opens its opportunity; settings open from the inbox', (WidgetTester tester) async {
+  testWidgets(
+      'a deadline reminder opens its opportunity; settings open from the inbox',
+      (WidgetTester tester) async {
     phone(tester);
     await boot(signedIn: true);
     api.reply(ApiEndpoints.notifications, <dynamic>[

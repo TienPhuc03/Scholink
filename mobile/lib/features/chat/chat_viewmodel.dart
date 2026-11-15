@@ -56,7 +56,8 @@ class ChatViewModel extends BaseViewModel {
 
   void _initMqttListeners() {
     // 1. Listen for real-time messages broadcast over MQTT
-    _mqttSubscription = _mqttManager.messageStream.listen((Map<String, String> data) {
+    _mqttSubscription =
+        _mqttManager.messageStream.listen((Map<String, String> data) {
       final String? topic = data['topic'];
       final String? payloadStr = data['payload'];
 
@@ -72,7 +73,8 @@ class ChatViewModel extends BaseViewModel {
       }
     };
 
-    _connectionStatusSub = _mqttManager.connectionStatusStream.listen((bool connected) {
+    _connectionStatusSub =
+        _mqttManager.connectionStatusStream.listen((bool connected) {
       notifyListeners();
     });
   }
@@ -98,7 +100,8 @@ class ChatViewModel extends BaseViewModel {
       }
 
       // Update room preview snippet and unread count in room list
-      final int roomIndex = _rooms.indexWhere((ChatRoomModel r) => r.id == roomId);
+      final int roomIndex =
+          _rooms.indexWhere((ChatRoomModel r) => r.id == roomId);
       if (roomIndex != -1) {
         final ChatRoomModel current = _rooms[roomIndex];
         final String content = (decoded['content'] ?? '') as String;
@@ -120,7 +123,8 @@ class ChatViewModel extends BaseViewModel {
 
   /// Merges a newly received message and eliminates duplicates by (clientMsgId, seq, id).
   void _mergeAndDeduplicateIncoming(ChatMessageModel incoming) {
-    final List<ChatMessageModel> updated = List<ChatMessageModel>.from(_messages);
+    final List<ChatMessageModel> updated =
+        List<ChatMessageModel>.from(_messages);
 
     // 1. Check if matches any existing pending optimistic message by clientMsgId
     if (incoming.clientMsgId != null && incoming.clientMsgId!.isNotEmpty) {
@@ -128,7 +132,8 @@ class ChatViewModel extends BaseViewModel {
         (ChatMessageModel m) => m.clientMsgId == incoming.clientMsgId,
       );
       if (pendingIndex != -1) {
-        updated[pendingIndex] = incoming.copyWith(sendStatus: MessageSendStatus.sent);
+        updated[pendingIndex] =
+            incoming.copyWith(sendStatus: MessageSendStatus.sent);
         _sortAndAssignMessages(updated);
         return;
       }
@@ -136,7 +141,9 @@ class ChatViewModel extends BaseViewModel {
 
     // 2. Check if already exists by id or seq (idempotent delivery)
     final bool alreadyExists = updated.any(
-      (ChatMessageModel m) => (m.id.isNotEmpty && m.id == incoming.id) || (m.seq > 0 && m.seq == incoming.seq),
+      (ChatMessageModel m) =>
+          (m.id.isNotEmpty && m.id == incoming.id) ||
+          (m.seq > 0 && m.seq == incoming.seq),
     );
 
     if (alreadyExists) return;
@@ -158,7 +165,9 @@ class ChatViewModel extends BaseViewModel {
 
     _messages = list;
     if (_messages.isNotEmpty) {
-      final Iterable<int> seqs = _messages.where((ChatMessageModel m) => m.seq > 0).map((ChatMessageModel m) => m.seq);
+      final Iterable<int> seqs = _messages
+          .where((ChatMessageModel m) => m.seq > 0)
+          .map((ChatMessageModel m) => m.seq);
       if (seqs.isNotEmpty) {
         _lastSeq = max(_lastSeq, seqs.reduce(max));
       }
@@ -177,7 +186,8 @@ class ChatViewModel extends BaseViewModel {
     setLoading();
     await initUser();
 
-    final Result<List<ChatRoomModel>, Failure> result = await _repository.getMyRooms();
+    final Result<List<ChatRoomModel>, Failure> result =
+        await _repository.getMyRooms();
 
     result.fold<void>(
       onSuccess: (List<ChatRoomModel> data) {
@@ -253,14 +263,16 @@ class ChatViewModel extends BaseViewModel {
         setSuccess();
       },
       onFailure: (Failure failure) {
-        if (failure.message.contains('403') || failure.message.contains('FORBIDDEN')) {
+        if (failure.message.contains('403') ||
+            failure.message.contains('FORBIDDEN')) {
           _hasPermission = false;
           _isReady = false;
           if (_activeMqttTopic != null) {
             _mqttManager.unsubscribe(_activeMqttTopic!);
             _activeMqttTopic = null;
           }
-          setError('Bạn không có quyền truy cập hoặc đã rời khỏi đội (403 Forbidden).');
+          setError(
+              'Bạn không có quyền truy cập hoặc đã rời khỏi đội (403 Forbidden).');
         } else {
           setError(failure.message);
         }
@@ -272,7 +284,8 @@ class ChatViewModel extends BaseViewModel {
   Future<void> catchUpMissingMessages() async {
     if (_selectedRoom == null || !_hasPermission) return;
 
-    final Result<List<ChatMessageModel>, Failure> result = await _repository.getMessages(
+    final Result<List<ChatMessageModel>, Failure> result =
+        await _repository.getMessages(
       _selectedRoom!.id,
       afterSeq: _lastSeq,
       limit: 100,
@@ -281,10 +294,13 @@ class ChatViewModel extends BaseViewModel {
     result.fold<void>(
       onSuccess: (List<ChatMessageModel> newMsgs) {
         if (newMsgs.isNotEmpty) {
-          final List<ChatMessageModel> merged = List<ChatMessageModel>.from(_messages);
+          final List<ChatMessageModel> merged =
+              List<ChatMessageModel>.from(_messages);
           for (final ChatMessageModel msg in newMsgs) {
             final bool exists = merged.any(
-              (ChatMessageModel m) => (m.id.isNotEmpty && m.id == msg.id) || (m.seq > 0 && m.seq == msg.seq),
+              (ChatMessageModel m) =>
+                  (m.id.isNotEmpty && m.id == msg.id) ||
+                  (m.seq > 0 && m.seq == msg.seq),
             );
             if (!exists) {
               merged.add(msg);
@@ -342,7 +358,8 @@ class ChatViewModel extends BaseViewModel {
   Future<bool> retryMessage(ChatMessageModel failedMsg) async {
     if (_selectedRoom == null || !_hasPermission) return false;
 
-    final int index = _messages.indexWhere((ChatMessageModel m) => m.clientMsgId == failedMsg.clientMsgId);
+    final int index = _messages.indexWhere(
+        (ChatMessageModel m) => m.clientMsgId == failedMsg.clientMsgId);
     if (index != -1) {
       _messages[index] = _messages[index].copyWith(
         sendStatus: MessageSendStatus.pending,
@@ -355,7 +372,8 @@ class ChatViewModel extends BaseViewModel {
   }
 
   Future<bool> _executeSendMessage(ChatMessageModel msg) async {
-    final Result<ChatMessageModel, Failure> result = await _repository.sendMessage(
+    final Result<ChatMessageModel, Failure> result =
+        await _repository.sendMessage(
       roomId: msg.roomId,
       content: msg.content,
       clientMsgId: msg.clientMsgId!,
@@ -378,7 +396,8 @@ class ChatViewModel extends BaseViewModel {
           (ChatMessageModel m) => m.clientMsgId == msg.clientMsgId,
         );
         if (index != -1) {
-          if (failure.message.contains('403') || failure.message.contains('FORBIDDEN')) {
+          if (failure.message.contains('403') ||
+              failure.message.contains('FORBIDDEN')) {
             _hasPermission = false;
             _isReady = false;
             _messages[index] = _messages[index].copyWith(

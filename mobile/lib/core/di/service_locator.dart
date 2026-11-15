@@ -55,7 +55,8 @@ Future<void> setupServiceLocator() async {
     secureStorage: secureStorage,
     localCache: await SharedPreferencesCacheManager.create(),
     sessionEvents: sessionEvents,
-    apiClient: DioApiClient(secureStorage: secureStorage, sessionEvents: sessionEvents),
+    apiClient: DioApiClient(
+        secureStorage: secureStorage, sessionEvents: sessionEvents),
     mqttManager: MqttManagerImpl(),
     attachmentPicker: FileAttachmentPicker(),
   );
@@ -72,7 +73,8 @@ void registerDependencies({
   required AttachmentPicker attachmentPicker,
   // F29: device calendar + Android notification permission (fakes in tests).
   DeviceCalendar deviceCalendar = const MethodChannelDeviceServices(),
-  NotificationPermission notificationPermission = const MethodChannelDeviceServices(),
+  NotificationPermission notificationPermission =
+      const MethodChannelDeviceServices(),
   LocalNotifier localNotifier = const MethodChannelDeviceServices(),
 }) {
   sl.registerSingleton<DeviceCalendar>(deviceCalendar);
@@ -105,7 +107,9 @@ void registerDependencies({
       roomDb: sl<RoomDatabase>(),
       localCache: sl<LocalCacheManager>(),
       // Guests browse without calling account APIs (bookmark sync, external marks).
-      isSignedIn: () async => (await sl<SecureStorageHelper>().getAccessToken())?.isNotEmpty ?? false,
+      isSignedIn: () async =>
+          (await sl<SecureStorageHelper>().getAccessToken())?.isNotEmpty ??
+          false,
     ),
   );
 
@@ -142,7 +146,8 @@ void registerDependencies({
 
   // F37: team submission (APP-05)
   sl.registerLazySingleton<TeamSubmissionRepository>(
-    () => TeamSubmissionRepository(sl<ApiClient>(), sl<ApplicationRepository>()),
+    () =>
+        TeamSubmissionRepository(sl<ApiClient>(), sl<ApplicationRepository>()),
   );
 
   sl.registerLazySingleton<MediaRepository>(
@@ -150,7 +155,8 @@ void registerDependencies({
   );
 
   sl.registerLazySingleton<SubmissionStore>(
-    () => SubmissionStore(sl<LocalCacheManager>(), currentUserId: sl<SecureStorageHelper>().getUserId),
+    () => SubmissionStore(sl<LocalCacheManager>(),
+        currentUserId: sl<SecureStorageHelper>().getUserId),
   );
 
   sl.registerSingleton<AttachmentPicker>(attachmentPicker);
@@ -193,7 +199,8 @@ void registerDependencies({
   );
 
   sl.registerFactory<PassportViewModel>(
-    () => PassportViewModel(sl<PassportRepository>(), media: sl<MediaRepository>()),
+    () => PassportViewModel(sl<PassportRepository>(),
+        media: sl<MediaRepository>()),
   );
 
   sl.registerFactory<NotificationViewModel>(

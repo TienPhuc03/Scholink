@@ -11,11 +11,13 @@ class LoginRequiredSheet extends StatelessWidget {
 
   const LoginRequiredSheet({super.key, required this.message});
 
-  static Future<LoginChoice?> show(BuildContext context, {required String message}) =>
+  static Future<LoginChoice?> show(BuildContext context,
+          {required String message}) =>
       showModalBottomSheet<LoginChoice>(
         context: context,
         backgroundColor: AppColors.background,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
         builder: (BuildContext ctx) => LoginRequiredSheet(message: message),
       );
 
@@ -28,18 +30,23 @@ class LoginRequiredSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Icon(Icons.lock_person_outlined, size: 40, color: AppColors.primary),
+            const Icon(Icons.lock_person_outlined,
+                size: 40, color: AppColors.primary),
             const SizedBox(height: 12),
             const Text(
               'Bạn cần đăng nhập',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 18, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  fontFamily: 'Be Vietnam Pro',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -47,7 +54,8 @@ class LoginRequiredSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(LoginChoice.login),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6)),
               ),
               child: const Text('Đăng nhập'),
             ),
@@ -57,7 +65,8 @@ class LoginRequiredSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(LoginChoice.register),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6)),
               ),
               child: const Text('Tạo tài khoản'),
             ),

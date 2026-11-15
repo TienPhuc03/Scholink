@@ -7,7 +7,8 @@ import '../../core/errors/result.dart';
 import '../auth/widgets/auth_widgets.dart';
 import 'passport_model.dart';
 
-typedef SuggestionLoader = Future<Result<List<ProfileSuggestion>, Failure>> Function(String query);
+typedef SuggestionLoader = Future<Result<List<ProfileSuggestion>, Failure>>
+    Function(String query);
 
 /// Text field with server suggestions under it while the user types (Passport autocomplete).
 /// Typed text is kept as is; picking a suggestion only fills the field faster.
@@ -79,11 +80,14 @@ class _SuggestFieldState extends State<SuggestField> {
 
   Future<void> _fetch(String text) async {
     final int id = ++_request;
-    final Result<List<ProfileSuggestion>, Failure> r = await widget.load(text.trim());
+    final Result<List<ProfileSuggestion>, Failure> r =
+        await widget.load(text.trim());
     if (!mounted || id != _request) return;
     setState(() {
       _loading = false;
-      _error = r.errorOrNull == null ? null : 'Không tải được gợi ý. Bạn vẫn có thể tự nhập.';
+      _error = r.errorOrNull == null
+          ? null
+          : 'Không tải được gợi ý. Bạn vẫn có thể tự nhập.';
       _items = r.dataOrNull ?? const <ProfileSuggestion>[];
       // Nothing to show for an empty field: keep the box closed rather than say "not found".
       if (text.trim().isEmpty && _items.isEmpty) _open = false;
@@ -106,7 +110,8 @@ class _SuggestFieldState extends State<SuggestField> {
       onFocusChange: (bool has) {
         if (!has) {
           _close();
-        } else if (widget.suggestWhenEmpty && widget.controller.text.trim().isEmpty) {
+        } else if (widget.suggestWhenEmpty &&
+            widget.controller.text.trim().isEmpty) {
           _query('');
         }
       },
@@ -134,7 +139,9 @@ class _SuggestFieldState extends State<SuggestField> {
   Widget _box() {
     Widget message(String text) => Padding(
           padding: const EdgeInsets.all(12),
-          child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          child: Text(text,
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
         );
 
     final Widget content;
@@ -143,16 +150,21 @@ class _SuggestFieldState extends State<SuggestField> {
         padding: EdgeInsets.all(12),
         child: Row(
           children: <Widget>[
-            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
             SizedBox(width: 10),
-            Text('Đang tìm gợi ý...', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text('Đang tìm gợi ý...',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
           ],
         ),
       );
     } else if (_error != null) {
       content = message(_error!);
     } else if (_items.isEmpty) {
-      content = message('Không có gợi ý phù hợp. Bạn vẫn có thể giữ nội dung đã nhập.');
+      content = message(
+          'Không có gợi ý phù hợp. Bạn vẫn có thể giữ nội dung đã nhập.');
     } else {
       content = Column(
         mainAxisSize: MainAxisSize.min,
@@ -162,20 +174,26 @@ class _SuggestFieldState extends State<SuggestField> {
               key: Key('suggestion_${s.value}'),
               onTap: () => _pick(s),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Row(
                   children: <Widget>[
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(s.value, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                          Text(s.value,
+                              style: const TextStyle(
+                                  fontSize: 14, color: AppColors.textPrimary)),
                           if (s.detail != null)
-                            Text(s.detail!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                            Text(s.detail!,
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.textMuted)),
                         ],
                       ),
                     ),
-                    const Icon(Icons.north_west_rounded, size: 16, color: AppColors.textMuted),
+                    const Icon(Icons.north_west_rounded,
+                        size: 16, color: AppColors.textMuted),
                   ],
                 ),
               ),
@@ -191,7 +209,10 @@ class _SuggestFieldState extends State<SuggestField> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: AppColors.border),
-        boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))],
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+              color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))
+        ],
       ),
       child: content,
     );

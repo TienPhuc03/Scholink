@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_widgets.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import 'notification_model.dart';
 import 'notification_viewmodel.dart';
@@ -19,11 +20,15 @@ class NotificationInboxView extends StatefulWidget {
   /// Opens the channel & timezone settings (F29).
   final VoidCallback? onOpenSettings;
 
+  /// Navigates to opportunity explorer when inbox is empty (AC-04).
+  final VoidCallback? onExploreOpportunities;
+
   const NotificationInboxView({
     super.key,
     required this.viewModel,
     this.onOpenTarget,
     this.onOpenSettings,
+    this.onExploreOpportunities,
   });
 
   @override
@@ -36,12 +41,14 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _vm.loadNotifications());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _vm.loadNotifications());
   }
 
   void _open(NotificationModel noti) {
     if (!noti.isRead) _vm.markAsRead(noti.notificationId);
-    if (noti.hasTarget && widget.onOpenTarget != null) widget.onOpenTarget!(noti);
+    if (noti.hasTarget && widget.onOpenTarget != null)
+      widget.onOpenTarget!(noti);
   }
 
   @override
@@ -83,7 +90,8 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
             children: <Widget>[
               // Filter Tabs: Tất cả vs Chưa đọc
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 4,
@@ -95,7 +103,9 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
                     ),
                     ChoiceChip(
                       selected: _vm.selectedFilter == 'UNREAD',
-                      label: Text(_vm.unreadCount > 0 ? 'Chưa đọc (${_vm.unreadCount})' : 'Chưa đọc'),
+                      label: Text(_vm.unreadCount > 0
+                          ? 'Chưa đọc (${_vm.unreadCount})'
+                          : 'Chưa đọc'),
                       onSelected: (_) => _vm.setFilter('UNREAD'),
                     ),
                   ],
@@ -107,18 +117,24 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
                   key: const Key('inbox_cache_banner'),
                   width: double.infinity,
                   color: Colors.amber.shade100,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Text(
                     _vm.syncedAtText != null
                         ? 'Đang xem hộp thư lưu trên máy (cập nhật lúc ${_vm.syncedAtText}).'
                         : 'Đang xem hộp thư lưu trên máy.',
-                    style: const TextStyle(fontSize: 12, color: Colors.brown, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.brown,
+                        fontWeight: FontWeight.w500),
                   ),
                 ),
               if (_vm.refreshError != null && _vm.items.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                  child: RefreshErrorBanner(message: _vm.refreshError, onRetry: _vm.loadNotifications),
+                  child: RefreshErrorBanner(
+                      message: _vm.refreshError,
+                      onRetry: _vm.loadNotifications),
                 ),
               if (_vm.pendingReads > 0)
                 const Padding(
@@ -152,9 +168,12 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
             children: <Widget>[
               const Icon(Icons.error_outline, size: 48, color: AppColors.error),
               const SizedBox(height: 12),
-              Text(_vm.errorMessage ?? 'Không thể tải thông báo', textAlign: TextAlign.center),
+              Text(_vm.errorMessage ?? 'Không thể tải thông báo',
+                  textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _vm.loadNotifications, child: const Text('Thử lại')),
+              ElevatedButton(
+                  onPressed: _vm.loadNotifications,
+                  child: const Text('Thử lại')),
             ],
           ),
         ),
@@ -167,23 +186,33 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
         onRefresh: _vm.loadNotifications,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
           children: <Widget>[
-            const SizedBox(height: 40),
-            const Icon(Icons.notifications_off_outlined, size: 54, color: AppColors.textMuted),
-            const SizedBox(height: 12),
-            const Text(
-              'Hộp thư rỗng',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _vm.selectedFilter == 'UNREAD'
+            const SizedBox(height: 32),
+            AppEmptyState(
+              icon: Icons.notifications_none_rounded,
+              title: _vm.selectedFilter == 'UNREAD'
+                  ? 'Không có thông báo chưa đọc'
+                  : 'Hộp thư rỗng',
+              message: _vm.selectedFilter == 'UNREAD'
                   ? 'Bạn đã đọc toàn bộ thông báo!'
-                  : 'Chưa có thông báo. Lưu một cơ hội để nhận nhắc hạn tại đây.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
+                  : 'Chưa có thông báo nào. Cập nhật về cơ hội, đội thi và tin nhắn sẽ xuất hiện tại đây.',
+              action: widget.onExploreOpportunities != null
+                  ? ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 11),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: widget.onExploreOpportunities,
+                      icon: const Icon(Icons.explore_outlined, size: 18),
+                      label: const Text('Khám phá cơ hội',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    )
+                  : null,
             ),
           ],
         ),
@@ -224,14 +253,17 @@ class _NotificationTile extends StatelessWidget {
     final Color color = _getIconColor(notification.type);
     return Semantics(
       button: true,
-      label: '${notification.isRead ? '' : 'Chưa đọc. '}${notification.typeDisplay}. '
+      label:
+          '${notification.isRead ? '' : 'Chưa đọc. '}${notification.typeDisplay}. '
           '${notification.title}. ${notification.body}. ${notification.formattedCreatedAt}',
       excludeSemantics: true,
       onTap: onTap,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          color: notification.isRead ? Colors.transparent : AppColors.primary.withValues(alpha: 0.04),
+          color: notification.isRead
+              ? Colors.transparent
+              : AppColors.primary.withValues(alpha: 0.04),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,8 +271,11 @@ class _NotificationTile extends StatelessWidget {
               // Icon according to type
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(_getIconData(notification.type), size: 20, color: color),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle),
+                child: Icon(_getIconData(notification.type),
+                    size: 20, color: color),
               ),
               const SizedBox(width: 12),
 
@@ -255,19 +290,24 @@ class _NotificationTile extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: <Widget>[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             notification.typeDisplay,
-                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
+                            style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: color),
                           ),
                         ),
                         Text(
                           notification.formattedCreatedAt,
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.textMuted),
                         ),
                       ],
                     ),
@@ -276,21 +316,29 @@ class _NotificationTile extends StatelessWidget {
                       notification.title,
                       style: TextStyle(
                         fontSize: 14.5,
-                        fontWeight: notification.isRead ? FontWeight.w600 : FontWeight.bold,
+                        fontWeight: notification.isRead
+                            ? FontWeight.w600
+                            : FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       notification.body,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.35),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.35),
                     ),
                     if (notification.hasTarget)
                       const Padding(
                         padding: EdgeInsets.only(top: 6),
                         child: Text(
                           'Nhấn để xem chi tiết',
-                          style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600),
                         ),
                       ),
                   ],
@@ -304,7 +352,8 @@ class _NotificationTile extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 8),
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                      color: AppColors.primary, shape: BoxShape.circle),
                 ),
               ],
             ],

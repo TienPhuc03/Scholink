@@ -25,7 +25,8 @@ import 'auth/auth_test_fakes.dart';
 
 class SilentMqtt implements MqttManager {
   // ignore: close_sinks, the fake lives for the whole test run.
-  final StreamController<Map<String, String>> _messages = StreamController<Map<String, String>>.broadcast();
+  final StreamController<Map<String, String>> _messages =
+      StreamController<Map<String, String>>.broadcast();
 
   @override
   Future<bool> connect(String userId) async => false;
@@ -49,7 +50,8 @@ class SilentMqtt implements MqttManager {
 
 class ThrowingPicker implements AttachmentPicker {
   @override
-  Future<PickedAttachment?> pick() async => throw Exception('PERMISSION_DENIED');
+  Future<PickedAttachment?> pick() async =>
+      throw Exception('PERMISSION_DENIED');
 }
 
 void main() {
@@ -61,10 +63,20 @@ void main() {
     setUp(() async {
       await sl.reset();
       api = ScriptedApiClient()
-        ..reply(ApiEndpoints.passport, <String, dynamic>{'studentId': 'stu_a', 'fullName': 'Sinh viên A', 'completionScore': 80})
+        ..reply(ApiEndpoints.passport, <String, dynamic>{
+          'studentId': 'stu_a',
+          'fullName': 'Sinh viên A',
+          'completionScore': 80
+        })
         ..reply(ApiEndpoints.myApplications, <dynamic>[
-          <String, dynamic>{'id': appId, 'opportunityId': oppId, 'opportunityTitle': 'Học bổng A', 'status': 'SUBMITTED',
-            'revision': 1, 'submittedAt': '2026-11-01T02:00:00.000Z'},
+          <String, dynamic>{
+            'id': appId,
+            'opportunityId': oppId,
+            'opportunityTitle': 'Học bổng A',
+            'status': 'SUBMITTED',
+            'revision': 1,
+            'submittedAt': '2026-11-01T02:00:00.000Z'
+          },
         ]);
       storage = InMemorySecureStorage()
         ..accessToken = 'access_a'
@@ -83,18 +95,23 @@ void main() {
 
     tearDown(() async => sl.reset());
 
-    testWidgets('when the session ends no account screen or cached data is left', (WidgetTester tester) async {
+    testWidgets(
+        'when the session ends no account screen or cached data is left',
+        (WidgetTester tester) async {
       // The test font draws every glyph as a full square, so other members' list cards overflow here;
       // layout under large text is covered by the Q7 tests below.
       final void Function(FlutterErrorDetails)? original = FlutterError.onError;
       FlutterError.onError = (FlutterErrorDetails d) {
-        if (!d.exceptionAsString().contains('RenderFlex overflowed')) original?.call(d);
+        if (!d.exceptionAsString().contains('RenderFlex overflowed'))
+          original?.call(d);
       };
       addTearDown(() => FlutterError.onError = original);
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.5;
       addTearDown(tester.view.reset);
-      await sl<RoomDatabase>().opportunityDao.saveBookmark('opp_bookmarked_by_a');
+      await sl<RoomDatabase>()
+          .opportunityDao
+          .saveBookmark('opp_bookmarked_by_a');
 
       await tester.pumpWidget(const ScholinkApp(initialIsAuthenticated: true));
       await tester.pumpAndSettle();
@@ -112,14 +129,16 @@ void main() {
       expect(find.byType(MyApplicationsView), findsNothing);
       expect(find.text('Học bổng A'), findsNothing);
       expect(find.textContaining('Phiên đăng nhập đã hết hạn'), findsOneWidget);
-      expect(await sl<RoomDatabase>().opportunityDao.getAllBookmarkedIds(), isEmpty);
+      expect(await sl<RoomDatabase>().opportunityDao.getAllBookmarkedIds(),
+          isEmpty);
     });
   });
 
   group('Large text and denied permissions (F37, Q7)', () {
     Widget scaled(Widget home, double scale) => MaterialApp(
           builder: (BuildContext context, Widget? child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(scale)),
             child: child!,
           ),
           home: home,
@@ -132,35 +151,47 @@ void main() {
     }
 
     for (final double scale in <double>[1.3, 2.0]) {
-      testWidgets('apply flow keeps its action visible at text scale $scale', (WidgetTester tester) async {
+      testWidgets('apply flow keeps its action visible at text scale $scale',
+          (WidgetTester tester) async {
         phone(tester);
         final ApplyHarness h = ApplyHarness()..now = DateTime.now();
         await tester.pumpWidget(scaled(
-          ApplyView(viewModel: h.build(), onEditPassport: () async {}, onOpenApplication: (String id, {required bool justSubmitted}) {}),
+          ApplyView(
+              viewModel: h.build(),
+              onEditPassport: () async {},
+              onOpenApplication: (String id, {required bool justSubmitted}) {}),
           scale,
         ));
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const Key('apply_next_1')).hitTestable(), findsOneWidget);
+        expect(find.byKey(const Key('apply_next_1')).hitTestable(),
+            findsOneWidget);
       });
 
-      testWidgets('application detail keeps withdraw visible at text scale $scale', (WidgetTester tester) async {
+      testWidgets(
+          'application detail keeps withdraw visible at text scale $scale',
+          (WidgetTester tester) async {
         phone(tester);
         final ScriptedApiClient api = ScriptedApiClient()
-          ..reply(ApiEndpoints.applicationDetail(appId), detailJson(canWithdraw: true));
+          ..reply(ApiEndpoints.applicationDetail(appId),
+              detailJson(canWithdraw: true));
         await tester.pumpWidget(scaled(
-          ApplicationDetailView(viewModel: ApplicationDetailViewModel(ApplicationRepository(api), applicationId: appId)),
+          ApplicationDetailView(
+              viewModel: ApplicationDetailViewModel(ApplicationRepository(api),
+                  applicationId: appId)),
           scale,
         ));
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const Key('detail_withdraw')).hitTestable(), findsOneWidget);
+        expect(find.byKey(const Key('detail_withdraw')).hitTestable(),
+            findsOneWidget);
       });
     }
 
-    testWidgets('a failing file picker explains and keeps the flow usable', (WidgetTester tester) async {
+    testWidgets('a failing file picker explains and keeps the flow usable',
+        (WidgetTester tester) async {
       phone(tester);
       final ApplyHarness h = ApplyHarness()..now = DateTime.now();
       final ApplyViewModel vm = ApplyViewModel(
@@ -173,7 +204,10 @@ void main() {
         clock: () => h.now,
       );
       await tester.pumpWidget(scaled(
-        ApplyView(viewModel: vm, onEditPassport: () async {}, onOpenApplication: (String id, {required bool justSubmitted}) {}),
+        ApplyView(
+            viewModel: vm,
+            onEditPassport: () async {},
+            onOpenApplication: (String id, {required bool justSubmitted}) {}),
         1,
       ));
       await tester.pumpAndSettle();
@@ -182,8 +216,10 @@ void main() {
       await tester.tap(find.byKey(const Key('apply_add_file')));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Không mở được trình chọn tệp'), findsOneWidget);
-      expect(find.byKey(const Key('apply_next_2')).hitTestable(), findsOneWidget);
+      expect(
+          find.textContaining('Không mở được trình chọn tệp'), findsOneWidget);
+      expect(
+          find.byKey(const Key('apply_next_2')).hitTestable(), findsOneWidget);
     });
   });
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TeamUseCase } from '../application/use-cases/team.use-case';
 import {
@@ -206,5 +206,16 @@ export class TeamController {
   @ApiResponse({ status: 200, description: 'Đã hủy phiên nộp và mở khóa đội' })
   async abortSubmission(@Param('reservationId') reservationId: string) {
     return this.teamUseCase.abortSubmission(reservationId);
+  }
+
+  @Delete(':id')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Giải tán và xóa đội thi (Chỉ dành cho Trưởng đội)' })
+  @ApiResponse({ status: 200, description: 'Đã giải tán và xóa đội thi' })
+  async deleteTeam(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') teamId: string,
+  ) {
+    return this.teamUseCase.deleteTeam(teamId, req.user.userId);
   }
 }

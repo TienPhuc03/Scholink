@@ -18,8 +18,12 @@ int? _positiveInt(dynamic v) {
   return (i == null || i <= 0) ? null : i;
 }
 
-List<String> _stringList(dynamic v) =>
-    v is List ? v.map((dynamic e) => e.toString()).where((String s) => s.trim().isNotEmpty).toList() : <String>[];
+List<String> _stringList(dynamic v) => v is List
+    ? v
+        .map((dynamic e) => e.toString())
+        .where((String s) => s.trim().isNotEmpty)
+        .toList()
+    : <String>[];
 
 /// Unified Education Model for MVVM Architecture.
 class EducationModel {
@@ -41,11 +45,13 @@ class EducationModel {
 
   String get gpaDisplay {
     if (gpa == null) return 'Chưa cập nhật GPA';
-    String fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+    String fmt(double v) =>
+        v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
     return '${fmt(gpa!)} / ${fmt(gpaScale)}';
   }
 
-  String get yearsDisplay => endYear != null ? '$startYear – $endYear' : '$startYear – nay';
+  String get yearsDisplay =>
+      endYear != null ? '$startYear – $endYear' : '$startYear – nay';
 
   /// Returns null when the server sent an empty education block.
   static EducationModel? fromJsonOrNull(dynamic json) {
@@ -100,7 +106,8 @@ class CertificateModel {
   static CertificateModel? fromJsonOrNull(dynamic json) {
     if (json is! Map<String, dynamic>) return null;
     final String? name = _nonEmpty(json['name']);
-    final DateTime? issued = DateTime.tryParse(_nonEmpty(json['issuedDate']) ?? '');
+    final DateTime? issued =
+        DateTime.tryParse(_nonEmpty(json['issuedDate']) ?? '');
     if (name == null || issued == null) return null;
     return CertificateModel(
       type: _nonEmpty(json['type']) ?? 'OTHER',
@@ -119,7 +126,8 @@ class CertificateModel {
         'name': name,
         if (score != null) 'score': score,
         'issuedDate': issuedDate.toUtc().toIso8601String(),
-        if (expiryDate != null) 'expiryDate': expiryDate!.toUtc().toIso8601String(),
+        if (expiryDate != null)
+          'expiryDate': expiryDate!.toUtc().toIso8601String(),
         if (assetId != null) 'assetId': assetId,
       };
 }
@@ -143,7 +151,11 @@ enum FieldVisibility {
   }
 }
 
-typedef PrivacyFieldInfo = ({String key, String label, FieldVisibility byDefault});
+typedef PrivacyFieldInfo = ({
+  String key,
+  String label,
+  FieldVisibility byDefault
+});
 
 /// Fields whose visibility the student chooses, with their labels and the server defaults.
 /// Full name and avatar are always visible.
@@ -154,16 +166,30 @@ const List<PrivacyFieldInfo> privacyFields = <PrivacyFieldInfo>[
   (key: 'regionCode', label: 'Khu vực', byDefault: FieldVisibility.public),
   (key: 'skills', label: 'Kỹ năng', byDefault: FieldVisibility.public),
   (key: 'education', label: 'Học vấn', byDefault: FieldVisibility.teammates),
-  (key: 'certificates', label: 'Chứng chỉ', byDefault: FieldVisibility.teammates),
-  (key: 'achievements', label: 'Thành tích', byDefault: FieldVisibility.teammates),
+  (
+    key: 'certificates',
+    label: 'Chứng chỉ',
+    byDefault: FieldVisibility.teammates
+  ),
+  (
+    key: 'achievements',
+    label: 'Thành tích',
+    byDefault: FieldVisibility.teammates
+  ),
   (key: 'cv', label: 'CV', byDefault: FieldVisibility.teammates),
-  (key: 'pitchVideo', label: 'Video giới thiệu', byDefault: FieldVisibility.teammates),
+  (
+    key: 'pitchVideo',
+    label: 'Video giới thiệu',
+    byDefault: FieldVisibility.teammates
+  ),
 ];
 
 /// Server settings over the defaults; unknown keys and values are ignored.
-Map<String, FieldVisibility> resolveFieldPrivacy(dynamic raw) => <String, FieldVisibility>{
+Map<String, FieldVisibility> resolveFieldPrivacy(dynamic raw) =>
+    <String, FieldVisibility>{
       for (final PrivacyFieldInfo f in privacyFields)
-        f.key: (raw is Map ? FieldVisibility.parse(raw[f.key]) : null) ?? f.byDefault,
+        f.key: (raw is Map ? FieldVisibility.parse(raw[f.key]) : null) ??
+            f.byDefault,
     };
 
 /// One autocomplete entry from `GET /profiles/suggestions`: [value] goes into the field.
@@ -174,7 +200,8 @@ class ProfileSuggestion {
   const ProfileSuggestion(this.value, [this.detail]);
 
   factory ProfileSuggestion.fromJson(Map<String, dynamic> json) =>
-      ProfileSuggestion((json['value'] ?? '').toString(), _nonEmpty(json['detail']));
+      ProfileSuggestion(
+          (json['value'] ?? '').toString(), _nonEmpty(json['detail']));
 }
 
 /// A Passport file the caller may open (`cvFile`). The links live 5 minutes and are empty when
@@ -201,7 +228,9 @@ class FileLink {
 
   /// "PDF · 245 KB"
   String get summary {
-    final String type = fileName.contains('.') ? fileName.split('.').last.toUpperCase() : mimeType;
+    final String type = fileName.contains('.')
+        ? fileName.split('.').last.toUpperCase()
+        : mimeType;
     final String size = sizeBytes >= 1024 * 1024
         ? '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB'
         : '${(sizeBytes / 1024).ceil()} KB';
@@ -276,15 +305,22 @@ class PassportModel {
   bool get isHighQualityProfile => completionScore >= 80;
 
   FieldVisibility visibilityOf(String field) =>
-      fieldPrivacy[field] ?? privacyFields.firstWhere((PrivacyFieldInfo f) => f.key == field).byDefault;
+      fieldPrivacy[field] ??
+      privacyFields
+          .firstWhere((PrivacyFieldInfo f) => f.key == field)
+          .byDefault;
 
   factory PassportModel.fromJson(Map<String, dynamic> json) {
     final dynamic payload = json['data'] ?? json;
-    final Map<String, dynamic> map = payload is Map<String, dynamic> ? payload : <String, dynamic>{};
+    final Map<String, dynamic> map =
+        payload is Map<String, dynamic> ? payload : <String, dynamic>{};
 
     final dynamic certRaw = map['certificates'];
     final List<CertificateModel> certificates = certRaw is List
-        ? certRaw.map(CertificateModel.fromJsonOrNull).whereType<CertificateModel>().toList()
+        ? certRaw
+            .map(CertificateModel.fromJsonOrNull)
+            .whereType<CertificateModel>()
+            .toList()
         : <CertificateModel>[];
 
     return PassportModel(
@@ -296,8 +332,11 @@ class PassportModel {
       cvAssetId: _nonEmpty(map['cvAssetId']),
       avatarUrl: _nonEmpty(map['avatarUrl']),
       cvFile: FileLink.fromJsonOrNull(map['cvFile']),
-      completionScore: ((map['completionScore'] as num?)?.toInt() ?? 0).clamp(0, 100),
-      profileVersion: _positiveInt(map['profileVersion']) ?? _positiveInt(map['version']) ?? 1,
+      completionScore:
+          ((map['completionScore'] as num?)?.toInt() ?? 0).clamp(0, 100),
+      profileVersion: _positiveInt(map['profileVersion']) ??
+          _positiveInt(map['version']) ??
+          1,
       education: EducationModel.fromJsonOrNull(map['education']),
       skills: _stringList(map['skills']),
       achievements: _stringList(map['achievements']),
@@ -358,19 +397,25 @@ class PassportDraft {
         isOpenForScholarship: p.isOpenForScholarship,
         isOpenForMentoring: p.isOpenForMentoring,
         phone: p.phone ?? '',
-        fieldPrivacy: <String, FieldVisibility>{...resolveFieldPrivacy(null), ...p.fieldPrivacy},
+        fieldPrivacy: <String, FieldVisibility>{
+          ...resolveFieldPrivacy(null),
+          ...p.fieldPrivacy
+        },
       );
 
   /// Body for `PUT /api/v1/profiles/me/privacy` (does not change the profile version).
   Map<String, dynamic> toPrivacyJson() => <String, dynamic>{
         'fieldPrivacy': <String, String>{
-          for (final MapEntry<String, FieldVisibility> e in fieldPrivacy.entries) e.key: e.value.apiValue,
+          for (final MapEntry<String, FieldVisibility> e
+              in fieldPrivacy.entries)
+            e.key: e.value.apiValue,
         },
       };
 
   /// Body for `PUT /api/v1/profiles/me`. Sends [expectedVersion] for optimistic locking
   /// (409 VERSION_MISMATCH when someone else saved first).
-  Map<String, dynamic> toUpdateJson({required int expectedVersion, Map<String, String>? assets}) {
+  Map<String, dynamic> toUpdateJson(
+      {required int expectedVersion, Map<String, String>? assets}) {
     final String bioTrim = bio.trim();
     final String regionTrim = regionCode.trim();
     return <String, dynamic>{
@@ -381,7 +426,8 @@ class PassportDraft {
       if (education != null) 'education': education!.toJson(),
       'skills': skills,
       'achievements': achievements,
-      'certificates': certificates.map((CertificateModel c) => c.toJson()).toList(),
+      'certificates':
+          certificates.map((CertificateModel c) => c.toJson()).toList(),
       'isLookingForTeammate': isLookingForTeammate,
       'isOpenForScholarship': isOpenForScholarship,
       'isOpenForMentoring': isOpenForMentoring,
@@ -439,7 +485,8 @@ class ProfileView {
 
   factory ProfileView.fromJson(Map<String, dynamic> json) {
     final dynamic payload = json['data'] ?? json;
-    final Map<String, dynamic> map = payload is Map<String, dynamic> ? payload : <String, dynamic>{};
+    final Map<String, dynamic> map =
+        payload is Map<String, dynamic> ? payload : <String, dynamic>{};
     final Set<String> visible = _stringList(map['visibleFields']).toSet();
     final dynamic certRaw = map['certificates'];
     return ProfileView(
@@ -451,17 +498,31 @@ class ProfileView {
       email: visible.contains('email') ? _nonEmpty(map['email']) : null,
       phone: visible.contains('phone') ? _nonEmpty(map['phone']) : null,
       bio: visible.contains('bio') ? _nonEmpty(map['bio']) : null,
-      regionCode: visible.contains('regionCode') ? _nonEmpty(map['regionCode']) : null,
-      skills: visible.contains('skills') ? _stringList(map['skills']) : const <String>[],
-      education: visible.contains('education') ? EducationModel.fromJsonOrNull(map['education']) : null,
+      regionCode:
+          visible.contains('regionCode') ? _nonEmpty(map['regionCode']) : null,
+      skills: visible.contains('skills')
+          ? _stringList(map['skills'])
+          : const <String>[],
+      education: visible.contains('education')
+          ? EducationModel.fromJsonOrNull(map['education'])
+          : null,
       certificates: visible.contains('certificates') && certRaw is List
-          ? certRaw.map(CertificateModel.fromJsonOrNull).whereType<CertificateModel>().toList()
+          ? certRaw
+              .map(CertificateModel.fromJsonOrNull)
+              .whereType<CertificateModel>()
+              .toList()
           : const <CertificateModel>[],
-      achievements: visible.contains('achievements') ? _stringList(map['achievements']) : const <String>[],
+      achievements: visible.contains('achievements')
+          ? _stringList(map['achievements'])
+          : const <String>[],
       cvAssetId: visible.contains('cv') ? _nonEmpty(map['cvAssetId']) : null,
-      pitchVideoAssetId: visible.contains('pitchVideo') ? _nonEmpty(map['pitchVideoAssetId']) : null,
+      pitchVideoAssetId: visible.contains('pitchVideo')
+          ? _nonEmpty(map['pitchVideoAssetId'])
+          : null,
       avatarUrl: _nonEmpty(map['avatarUrl']),
-      cvFile: visible.contains('cv') ? FileLink.fromJsonOrNull(map['cvFile']) : null,
+      cvFile: visible.contains('cv')
+          ? FileLink.fromJsonOrNull(map['cvFile'])
+          : null,
     );
   }
 }

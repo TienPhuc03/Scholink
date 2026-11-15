@@ -11,7 +11,8 @@ import 'attachment_model.dart';
 
 /// Uploads a file to the bucket at a presigned URL. Separate from [ApiClient] on purpose: the
 /// presigned URL carries its own signature and must not get the app's Bearer header.
-typedef PresignedPut = Future<void> Function(String url, List<int> bytes, String mimeType);
+typedef PresignedPut = Future<void> Function(
+    String url, List<int> bytes, String mimeType);
 
 Future<void> _dioPut(String url, List<int> bytes, String mimeType) async {
   await Dio().put<dynamic>(
@@ -35,16 +36,21 @@ class MediaRepository {
 
   MediaRepository(this._api, {PresignedPut? put}) : _put = put ?? _dioPut;
 
-  static bool _isPlaceholder(String url) => url.isEmpty || Uri.tryParse(url)?.host == 'storage.scholink.edu.vn';
+  static bool _isPlaceholder(String url) =>
+      url.isEmpty || Uri.tryParse(url)?.host == 'storage.scholink.edu.vn';
 
   /// Returns the READY asset id. A rejected scan comes back as a ServerFailure
   /// (code MALICIOUS_FILE_DETECTED or a validation error) with the backend's reason.
-  Future<Result<String, Failure>> uploadAttachment(PickedAttachment file) => upload(file, category: 'ATTACHMENT');
+  Future<Result<String, Failure>> uploadAttachment(PickedAttachment file) =>
+      upload(file, category: 'ATTACHMENT');
 
   /// [category] is one of the backend MediaCategory values (ATTACHMENT, CV, AVATAR, ...).
-  Future<Result<String, Failure>> upload(PickedAttachment file, {required String category, String? mimeType}) async {
+  Future<Result<String, Failure>> upload(PickedAttachment file,
+      {required String category, String? mimeType}) async {
     try {
-      final String mime = mimeType ?? AttachmentRules.mimeForExtension(file.name) ?? 'application/octet-stream';
+      final String mime = mimeType ??
+          AttachmentRules.mimeForExtension(file.name) ??
+          'application/octet-stream';
       final Response<dynamic> created = await _api.post<dynamic>(
         ApiEndpoints.mediaUploadUrl,
         data: <String, dynamic>{
@@ -66,7 +72,8 @@ class MediaRepository {
           await _put(uploadUrl, file.bytes, mime);
         } on DioException catch (e) {
           throw ServerFailure(
-            message: 'Không tải được tệp lên kho lưu trữ. Kiểm tra mạng rồi thử lại.',
+            message:
+                'Không tải được tệp lên kho lưu trữ. Kiểm tra mạng rồi thử lại.',
             code: 'UPLOAD_FAILED',
             statusCode: e.response?.statusCode,
           );
@@ -79,22 +86,28 @@ class MediaRepository {
         ApiEndpoints.mediaComplete(assetId),
         data: <String, dynamic>{
           // First 16 bytes as hex: the backend checks magic bytes (PDF/PNG/JPEG/WEBP).
-          'fileHeaderHex':
-              file.bytes.sublist(0, headerLen).map((int b) => b.toRadixString(16).padLeft(2, '0')).join(),
-          'sampleContent': latin1.decode(file.bytes.sublist(0, sampleLen), allowInvalid: true),
+          'fileHeaderHex': file.bytes
+              .sublist(0, headerLen)
+              .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+              .join(),
+          'sampleContent': latin1.decode(file.bytes.sublist(0, sampleLen),
+              allowInvalid: true),
           'actualSizeBytes': file.bytes.length,
         },
       );
       final Map<String, dynamic> done = unwrapData(completed.data);
       final String status = (done['status'] ?? '').toString().toUpperCase();
       if (status.isNotEmpty && status != 'READY') {
-        throw ServerFailure(message: 'Tệp chưa sẵn sàng (trạng thái $status).', code: 'ASSET_NOT_READY');
+        throw ServerFailure(
+            message: 'Tệp chưa sẵn sàng (trạng thái $status).',
+            code: 'ASSET_NOT_READY');
       }
       return SuccessResult<String, Failure>(assetId);
     } on Failure catch (f) {
       return FailureResult<String, Failure>(f);
     } catch (e) {
-      return FailureResult<String, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<String, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 }

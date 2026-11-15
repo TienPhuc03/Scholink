@@ -50,6 +50,7 @@ export class MongooseChatRepository implements IChatRepository {
       id: room.id,
       type: room.type,
       refId: room.refId,
+      name: room.props.name,
       participants: room.participants as any,
       lastSeq: room.lastSeq,
       lastMessageSnippet: room.props.lastMessageSnippet,
@@ -63,6 +64,7 @@ export class MongooseChatRepository implements IChatRepository {
       .updateOne(
         { id: room.id },
         {
+          name: room.props.name,
           participants: room.participants as any,
           lastSeq: room.lastSeq,
           lastMessageSnippet: room.props.lastMessageSnippet,
@@ -123,6 +125,52 @@ export class MongooseChatRepository implements IChatRepository {
     }
 
     try {
+      return await this.saveMessageInternal(
+        session,
+        roomId,
+        senderId,
+        content,
+        clientMsgId,
+        assetId,
+        outboxPayload,
+      );
+    } catch (err: any) {
+      if (
+        session &&
+        (err.message?.includes('Transaction numbers are only allowed') ||
+          err.message?.includes('replica set') ||
+          err.code === 20 ||
+          err.code === 263)
+      ) {
+        this.logger.warn(
+          '[ChatTransactionFallback] Replica set transaction not available, executing message write non-transactionally',
+        );
+        await session.abortTransaction().catch(() => {});
+        await session.endSession().catch(() => {});
+        return await this.saveMessageInternal(
+          null,
+          roomId,
+          senderId,
+          content,
+          clientMsgId,
+          assetId,
+          outboxPayload,
+        );
+      }
+      throw err;
+    }
+  }
+
+  private async saveMessageInternal(
+    session: any,
+    roomId: string,
+    senderId: string,
+    content: string,
+    clientMsgId?: string,
+    assetId?: string,
+    outboxPayload: any = {},
+  ): Promise<{ message: Message; isDuplicate: boolean }> {
+    try {
       const sessionOpt = session ? { session } : {};
 
       // Atomic increment lastSeq on room
@@ -131,7 +179,7 @@ export class MongooseChatRepository implements IChatRepository {
         {
           $inc: { lastSeq: 1, version: 1 },
           $set: {
-            lastMessageSnippet: content.substring(0, 50),
+            lastMessageSnippet: content.startsWith('[image]') ? '[Hình ảnh]' : content.substring(0, 50),
             lastMessageAt: new Date(),
           },
         },
@@ -325,6 +373,7 @@ export class MongooseChatRepository implements IChatRepository {
     return new ChatRoom(doc.id, {
       type: doc.type as any,
       refId: doc.refId,
+      name: doc.name,
       participants: doc.participants,
       lastSeq: doc.lastSeq || 0,
       lastMessageSnippet: doc.lastMessageSnippet,

@@ -26,7 +26,8 @@ class NotificationViewModel extends BaseViewModel {
   int _pendingReads = 0;
   bool _disposed = false;
 
-  final Map<String, CalendarEventRecord> _calendarRecords = <String, CalendarEventRecord>{};
+  final Map<String, CalendarEventRecord> _calendarRecords =
+      <String, CalendarEventRecord>{};
   String? _lastSyncMessage;
   bool _lastSyncIsSuccess = false;
 
@@ -67,7 +68,8 @@ class NotificationViewModel extends BaseViewModel {
     if (!_disposed) notifyListeners();
   }
 
-  void _recount() => _unreadCount = _items.where((NotificationModel n) => !n.isRead).length;
+  void _recount() =>
+      _unreadCount = _items.where((NotificationModel n) => !n.isRead).length;
 
   Future<void> loadNotifications() async {
     final bool keepOnScreen = _items.isNotEmpty;
@@ -78,7 +80,8 @@ class NotificationViewModel extends BaseViewModel {
       setLoading();
     }
 
-    final Result<InboxSnapshot, Failure> result = await _repository.getNotifications();
+    final Result<InboxSnapshot, Failure> result =
+        await _repository.getNotifications();
     if (_disposed) return;
     _isRefreshing = false;
 
@@ -88,7 +91,9 @@ class NotificationViewModel extends BaseViewModel {
         _recount();
         _showingCache = snap.fromCache;
         _refreshError = snap.refreshFailure?.message;
-        _syncedAtText = snap.syncedAt != null ? DateFormat('dd/MM/yyyy HH:mm').format(snap.syncedAt!.toLocal()) : null;
+        _syncedAtText = snap.syncedAt != null
+            ? DateFormat('dd/MM/yyyy HH:mm').format(snap.syncedAt!.toLocal())
+            : null;
         if (!snap.fromCache) _pendingReads = 0;
         setSuccess();
       },
@@ -120,9 +125,11 @@ class NotificationViewModel extends BaseViewModel {
   }
 
   Future<void> markAsRead(String notificationId) async {
-    final int index = _items.indexWhere((NotificationModel n) => n.notificationId == notificationId);
+    final int index = _items.indexWhere(
+        (NotificationModel n) => n.notificationId == notificationId);
     if (index != -1) {
-      _items[index] = _items[index].copyWith(isRead: true, readAt: DateTime.now());
+      _items[index] =
+          _items[index].copyWith(isRead: true, readAt: DateTime.now());
       _recount();
       _notify();
     }
@@ -134,7 +141,10 @@ class NotificationViewModel extends BaseViewModel {
   }
 
   Future<void> markAllAsRead() async {
-    _items = _items.map((NotificationModel n) => n.isRead ? n : n.copyWith(isRead: true, readAt: DateTime.now())).toList();
+    _items = _items
+        .map((NotificationModel n) =>
+            n.isRead ? n : n.copyWith(isRead: true, readAt: DateTime.now()))
+        .toList();
     _unreadCount = 0;
     _notify();
     final bool delivered = await _repository.markAllAsRead();
@@ -150,7 +160,8 @@ class NotificationViewModel extends BaseViewModel {
     _preferencesLoading = true;
     _preferencesError = null;
     _notify();
-    final Result<({NotificationPreferences prefs, bool fromCache}), Failure> res = await _repository.getPreferences();
+    final Result<({NotificationPreferences prefs, bool fromCache}), Failure>
+        res = await _repository.getPreferences();
     if (_disposed) return;
     _preferencesLoading = false;
     res.fold(
@@ -165,9 +176,11 @@ class NotificationViewModel extends BaseViewModel {
 
   /// Saves the channels / timezone. Turning push on asks for the OS permission first; a refusal
   /// keeps push off and is returned as the failure (never shown as saved).
-  Future<Failure?> savePreferences({String? timezone, bool? pushEnabled, bool? emailEnabled}) async {
+  Future<Failure?> savePreferences(
+      {String? timezone, bool? pushEnabled, bool? emailEnabled}) async {
     if (pushEnabled == true && !(_preferences?.pushEnabled ?? false)) {
-      final Failure? denied = (await _repository.requestNotificationPermission()).errorOrNull;
+      final Failure? denied =
+          (await _repository.requestNotificationPermission()).errorOrNull;
       if (denied != null) {
         _preferencesError = denied.message;
         _notify();
@@ -177,7 +190,8 @@ class NotificationViewModel extends BaseViewModel {
     _preferencesSaving = true;
     _preferencesError = null;
     _notify();
-    final Result<NotificationPreferences, Failure> res = await _repository.updatePreferences(
+    final Result<NotificationPreferences, Failure> res =
+        await _repository.updatePreferences(
       timezone: timezone,
       pushEnabled: pushEnabled,
       emailEnabled: emailEnabled,
@@ -195,18 +209,22 @@ class NotificationViewModel extends BaseViewModel {
     return failure;
   }
 
-  Future<bool> hasNotificationPermission() => _repository.hasNotificationPermission();
+  Future<bool> hasNotificationPermission() =>
+      _repository.hasNotificationPermission();
 
   // ------------------------------------------------------------------ device calendar (NOTI-04)
 
   CalendarSyncStatus getCalendarSyncStatus(String opportunityId) {
-    return _calendarRecords[opportunityId]?.syncStatus ?? CalendarSyncStatus.notSynced;
+    return _calendarRecords[opportunityId]?.syncStatus ??
+        CalendarSyncStatus.notSynced;
   }
 
-  CalendarEventRecord? calendarRecordFor(String opportunityId) => _calendarRecords[opportunityId];
+  CalendarEventRecord? calendarRecordFor(String opportunityId) =>
+      _calendarRecords[opportunityId];
 
   Future<void> loadCalendarRecord(String opportunityId) async {
-    final CalendarEventRecord? record = await _repository.getCalendarRecord(opportunityId);
+    final CalendarEventRecord? record =
+        await _repository.getCalendarRecord(opportunityId);
     if (record != null) {
       _calendarRecords[opportunityId] = record;
     } else {
@@ -222,7 +240,8 @@ class NotificationViewModel extends BaseViewModel {
     OpportunityModel opportunity,
     List<ReminderMilestone> milestones,
   ) async {
-    final Result<CalendarEventRecord, Failure> result = await _repository.syncOpportunityToCalendar(
+    final Result<CalendarEventRecord, Failure> result =
+        await _repository.syncOpportunityToCalendar(
       opportunity: opportunity,
       milestones: milestones,
     );
@@ -247,7 +266,9 @@ class NotificationViewModel extends BaseViewModel {
           title: opportunity.title,
           deadline: opportunity.registerDeadlineAt ?? DateTime.now(),
           milestone: 'failed',
-          syncStatus: failure is PermissionDeniedFailure ? CalendarSyncStatus.permissionDenied : CalendarSyncStatus.failed,
+          syncStatus: failure is PermissionDeniedFailure
+              ? CalendarSyncStatus.permissionDenied
+              : CalendarSyncStatus.failed,
           syncedAt: DateTime.now(),
           nativeEventId: _calendarRecords[opportunity.id]?.nativeEventId,
         );
@@ -260,7 +281,8 @@ class NotificationViewModel extends BaseViewModel {
   }
 
   Future<bool> removeFromCalendar(String opportunityId) async {
-    final Failure? f = (await _repository.removeFromCalendar(opportunityId)).errorOrNull;
+    final Failure? f =
+        (await _repository.removeFromCalendar(opportunityId)).errorOrNull;
     if (_disposed) return f == null;
     if (f == null) {
       _calendarRecords.remove(opportunityId);

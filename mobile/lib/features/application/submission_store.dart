@@ -29,7 +29,9 @@ class PendingSubmission {
 
   bool get hasSentRequest => idempotencyKey != null && body != null;
 
-  PendingSubmission withRequest({required String idempotencyKey, required Map<String, dynamic> body}) =>
+  PendingSubmission withRequest(
+          {required String idempotencyKey,
+          required Map<String, dynamic> body}) =>
       PendingSubmission(
         opportunityId: opportunityId,
         submissionId: submissionId,
@@ -50,7 +52,8 @@ class PendingSubmission {
     if (json is! Map<String, dynamic>) return null;
     final String? opp = json['opportunityId'] as String?;
     final String? sub = json['submissionId'] as String?;
-    final DateTime? created = DateTime.tryParse((json['createdAt'] as String?) ?? '');
+    final DateTime? created =
+        DateTime.tryParse((json['createdAt'] as String?) ?? '');
     if (opp == null || sub == null || created == null) return null;
     final dynamic body = json['body'];
     return PendingSubmission(
@@ -73,13 +76,15 @@ class SubmissionStore {
   final DateTime Function() _clock;
   final Future<String?> Function() _currentUserId;
 
-  SubmissionStore(this._cache, {DateTime Function()? clock, Future<String?> Function()? currentUserId})
+  SubmissionStore(this._cache,
+      {DateTime Function()? clock, Future<String?> Function()? currentUserId})
       : _clock = clock ?? DateTime.now,
         _currentUserId = currentUserId ?? _noUser;
 
   static Future<String?> _noUser() async => null;
 
-  static String _legacyKey(String opportunityId) => 'apply.pending.$opportunityId';
+  static String _legacyKey(String opportunityId) =>
+      'apply.pending.$opportunityId';
 
   Future<String> _key(String opportunityId) async {
     final String? uid = await _currentUserId();
@@ -91,7 +96,8 @@ class SubmissionStore {
     try {
       // Entries written before F37 have no owner: drop them instead of guessing.
       await _cache.remove(_legacyKey(opportunityId));
-      final PendingSubmission? p = PendingSubmission.fromJson(await _cache.getJson(await _key(opportunityId)));
+      final PendingSubmission? p = PendingSubmission.fromJson(
+          await _cache.getJson(await _key(opportunityId)));
       if (p == null) return null;
       if (p.isExpired(_clock())) {
         await clear(opportunityId);
@@ -103,7 +109,9 @@ class SubmissionStore {
     }
   }
 
-  Future<void> save(PendingSubmission p) async => _cache.saveJson(await _key(p.opportunityId), p.toJson());
+  Future<void> save(PendingSubmission p) async =>
+      _cache.saveJson(await _key(p.opportunityId), p.toJson());
 
-  Future<void> clear(String opportunityId) async => _cache.remove(await _key(opportunityId));
+  Future<void> clear(String opportunityId) async =>
+      _cache.remove(await _key(opportunityId));
 }

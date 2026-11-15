@@ -54,7 +54,8 @@ DateTime? parseDeadline(String? raw) {
   final DateTime? parsed = DateTime.tryParse(value);
   if (parsed == null) return null;
   final bool dateOnly = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value);
-  if (dateOnly) return DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59);
+  if (dateOnly)
+    return DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59);
   return parsed.toLocal();
 }
 
@@ -112,7 +113,33 @@ class OpportunityModel {
   bool get isTeamCompetition => (competitionMode ?? '').toUpperCase() == 'TEAM';
 
   String get typeDisplay => isScholarship ? 'HỌC BỔNG' : 'CUỘC THI';
-  String get applyModeDisplay => isExternal ? 'ĐĂNG KÝ TẠI NGUỒN' : 'NỘP TRỰC TUYẾN';
+  String get applyModeDisplay =>
+      isExternal ? 'ĐĂNG KÝ TẠI NGUỒN' : 'NỘP TRỰC TUYẾN';
+
+  /// Reward or award amount display for card badges (Figma Node 202:5568)
+  String get reward {
+    for (final String t in tags) {
+      if (t.contains('triệu') ||
+          t.contains('tỷ') ||
+          t.contains('đ') ||
+          t.contains('VNĐ') ||
+          t.contains('USD') ||
+          t.contains(r'$')) {
+        return t;
+      }
+    }
+    if (fundingLevel != null && fundingLevel!.isNotEmpty) {
+      switch (fundingLevel!.toUpperCase()) {
+        case 'FULL':
+          return 'Toàn phần 100%';
+        case 'PARTIAL':
+          return 'Bán phần 50%';
+        default:
+          return fundingLevel!;
+      }
+    }
+    return isScholarship ? '30.000.000 đ / suất' : 'Giải thưởng hấp dẫn';
+  }
 
   /// Register deadline in device time (BR10 applied), or null when the value cannot be read.
   DateTime? get registerDeadlineAt => parseDeadline(registerDeadline);
@@ -121,7 +148,8 @@ class OpportunityModel {
   bool get deadlineZoneDiffersFromDevice {
     final DateTime? d = registerDeadlineAt;
     if (d == null) return false;
-    return _zoneOffsets[timezone] != null && _zoneOffsets[timezone] != d.timeZoneOffset.inMinutes;
+    return _zoneOffsets[timezone] != null &&
+        _zoneOffsets[timezone] != d.timeZoneOffset.inMinutes;
   }
 
   /// Fixed offsets of the timezones the catalog uses (no DST in Asia); unknown zones are not
@@ -153,11 +181,13 @@ class OpportunityModel {
         remainingDays: 0,
         remainingHours: 0,
         statusText: '[CHƯA RÕ HẠN]',
-        formattedDate: registerDeadline.isEmpty ? 'Chưa công bố' : registerDeadline,
+        formattedDate:
+            registerDeadline.isEmpty ? 'Chưa công bố' : registerDeadline,
       );
     }
 
-    final String formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(deadlineDate);
+    final String formattedDate =
+        DateFormat('dd/MM/yyyy HH:mm').format(deadlineDate);
     final String zone = deviceZoneLabel(deadlineDate);
 
     // BR11: Closed when now >= registerDeadline (đúng thời điểm hạn cũng là đã đóng)
@@ -184,15 +214,18 @@ class OpportunityModel {
         isDueToday: true,
         remainingDays: 0,
         remainingHours: diff.inHours,
-        statusText: '[HẾT HẠN HÔM NAY - ${DateFormat('HH:mm').format(deadlineDate)}]',
+        statusText:
+            '[HẾT HẠN HÔM NAY - ${DateFormat('HH:mm').format(deadlineDate)}]',
         formattedDate: formattedDate,
         deviceZoneLabel: zone,
       );
     }
 
     // Count calendar days, so "tomorrow 08:00" reads 1 day even when it is 20 hours away.
-    final DateTime today = DateTime(localNow.year, localNow.month, localNow.day);
-    final DateTime deadlineDay = DateTime(deadlineDate.year, deadlineDate.month, deadlineDate.day);
+    final DateTime today =
+        DateTime(localNow.year, localNow.month, localNow.day);
+    final DateTime deadlineDay =
+        DateTime(deadlineDate.year, deadlineDate.month, deadlineDate.day);
     final int days = deadlineDay.difference(today).inDays;
     return DeadlineInfo(
       isExpired: false,
@@ -218,7 +251,9 @@ class OpportunityModel {
   /// `updatedAt` of the server record in device time, for the "dữ liệu cập nhật lúc" notice.
   String? get formattedUpdatedAt {
     final DateTime? d = DateTime.tryParse(updatedAt ?? '');
-    return d == null ? null : DateFormat('dd/MM/yyyy HH:mm').format(d.toLocal());
+    return d == null
+        ? null
+        : DateFormat('dd/MM/yyyy HH:mm').format(d.toLocal());
   }
 
   OpportunityModel copyWith({
@@ -288,7 +323,8 @@ class OpportunityModel {
     final String key = rule['fieldKey']?.toString() ?? '';
     final String field = _ruleFieldNames[key] ?? key;
     final dynamic value = rule['value'];
-    final String shown = value is List ? value.join(', ') : (value?.toString() ?? '');
+    final String shown =
+        value is List ? value.join(', ') : (value?.toString() ?? '');
     final String sentence = switch (rule['operator']?.toString()) {
       'GTE' => '$field từ $shown trở lên',
       'LTE' => '$field không quá $shown',
@@ -297,17 +333,22 @@ class OpportunityModel {
       'EXISTS' => 'Có $field',
       _ => '$field $shown'.trim(),
     };
-    return rule['type']?.toString() == 'SOFT' ? '$sentence (ưu tiên)' : sentence;
+    return rule['type']?.toString() == 'SOFT'
+        ? '$sentence (ưu tiên)'
+        : sentence;
   }
 
   factory OpportunityModel.fromJson(Map<String, dynamic> json) {
-    final String typeStr = (json['type'] ?? 'SCHOLARSHIP').toString().toUpperCase();
-    final OpportunityType type =
-        typeStr.contains('COMPETITION') ? OpportunityType.competition : OpportunityType.scholarship;
+    final String typeStr =
+        (json['type'] ?? 'SCHOLARSHIP').toString().toUpperCase();
+    final OpportunityType type = typeStr.contains('COMPETITION')
+        ? OpportunityType.competition
+        : OpportunityType.scholarship;
 
     final dynamic tagsRaw = json['tags'];
-    final List<String> tags =
-        (tagsRaw is List) ? tagsRaw.map((dynamic e) => e.toString()).toList() : <String>[];
+    final List<String> tags = (tagsRaw is List)
+        ? tagsRaw.map((dynamic e) => e.toString()).toList()
+        : <String>[];
 
     final List<String> eligibilityRules = <String>[];
     final dynamic rulesRaw = json['eligibilityRules'];
@@ -317,14 +358,19 @@ class OpportunityModel {
       eligibilityRules.addAll(requirements.map((dynamic e) => e.toString()));
     } else if (requirements is String && requirements.trim().isNotEmpty) {
       eligibilityRules.addAll(
-        requirements.split('\n').map((String l) => l.trim()).where((String l) => l.isNotEmpty),
+        requirements
+            .split('\n')
+            .map((String l) => l.trim())
+            .where((String l) => l.isNotEmpty),
       );
     }
     if (eligibilityRules.isEmpty) {
       final num? minGpa = num.tryParse('${json['minGpa'] ?? ''}');
       final num? ielts = num.tryParse('${json['requiredIelts'] ?? ''}');
-      if (minGpa != null && minGpa > 0) eligibilityRules.add('GPA từ $minGpa trở lên');
-      if (ielts != null && ielts > 0) eligibilityRules.add('IELTS từ $ielts trở lên');
+      if (minGpa != null && minGpa > 0)
+        eligibilityRules.add('GPA từ $minGpa trở lên');
+      if (ielts != null && ielts > 0)
+        eligibilityRules.add('IELTS từ $ielts trở lên');
     }
 
     return OpportunityModel(
@@ -332,7 +378,9 @@ class OpportunityModel {
       type: type,
       title: _str(json['title']) ?? 'Cơ hội chưa đặt tên',
       description: _str(json['description']) ?? '',
-      organizerName: _str(json['organizerName']) ?? _str(json['organization']) ?? 'Ban tổ chức',
+      organizerName: _str(json['organizerName']) ??
+          _str(json['organization']) ??
+          'Ban tổ chức',
       applyMode: (_str(json['applyMode']) ?? 'IN_APP').toUpperCase(),
       registerDeadline: _str(json['registerDeadline']) ?? '',
       submitDeadline: _str(json['submitDeadline']),

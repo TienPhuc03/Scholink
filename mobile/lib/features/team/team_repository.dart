@@ -11,7 +11,8 @@ class TeamRepository {
 
   TeamRepository(this._apiClient);
 
-  Future<Result<List<TeamModel>, Failure>> getTeamsByCompetition(String competitionId) async {
+  Future<Result<List<TeamModel>, Failure>> getTeamsByCompetition(
+      String competitionId) async {
     try {
       final Response<dynamic> response = await _apiClient.get<dynamic>(
         ApiEndpoints.competitionTeams(competitionId),
@@ -36,7 +37,8 @@ class TeamRepository {
     } on Failure catch (failure) {
       return FailureResult<List<TeamModel>, Failure>(failure);
     } catch (e) {
-      return FailureResult<List<TeamModel>, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<List<TeamModel>, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -56,12 +58,14 @@ class TeamRepository {
       }
 
       return const FailureResult<TeamModel, Failure>(
-        ServerFailure(message: 'Phản hồi chi tiết đội từ máy chủ không hợp lệ.'),
+        ServerFailure(
+            message: 'Phản hồi chi tiết đội từ máy chủ không hợp lệ.'),
       );
     } on Failure catch (failure) {
       return FailureResult<TeamModel, Failure>(failure);
     } catch (e) {
-      return FailureResult<TeamModel, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<TeamModel, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -106,7 +110,8 @@ class TeamRepository {
     } on Failure catch (failure) {
       return FailureResult<TeamModel, Failure>(failure);
     } catch (e) {
-      return FailureResult<TeamModel, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<TeamModel, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -119,7 +124,8 @@ class TeamRepository {
       final Response<dynamic> response = await _apiClient.post<dynamic>(
         ApiEndpoints.joinTeam(teamId),
         data: <String, dynamic>{
-          if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+          if (message != null && message.trim().isNotEmpty)
+            'message': message.trim(),
         },
       );
 
@@ -129,7 +135,8 @@ class TeamRepository {
           : resData;
 
       if (payload is Map<String, dynamic>) {
-        return SuccessResult<JoinRequestModel, Failure>(JoinRequestModel.fromJson(payload));
+        return SuccessResult<JoinRequestModel, Failure>(
+            JoinRequestModel.fromJson(payload));
       }
 
       return const FailureResult<JoinRequestModel, Failure>(
@@ -138,12 +145,14 @@ class TeamRepository {
     } on Failure catch (failure) {
       return FailureResult<JoinRequestModel, Failure>(failure);
     } catch (e) {
-      return FailureResult<JoinRequestModel, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<JoinRequestModel, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
   /// Fetches pending JoinRequests for a team (Leader only).
-  Future<Result<List<JoinRequestModel>, Failure>> getJoinRequests(String teamId) async {
+  Future<Result<List<JoinRequestModel>, Failure>> getJoinRequests(
+      String teamId) async {
     try {
       final Response<dynamic> response = await _apiClient.get<dynamic>(
         ApiEndpoints.teamJoinRequests(teamId),
@@ -168,7 +177,8 @@ class TeamRepository {
     } on Failure catch (failure) {
       return FailureResult<List<JoinRequestModel>, Failure>(failure);
     } catch (e) {
-      return FailureResult<List<JoinRequestModel>, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<List<JoinRequestModel>, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -208,6 +218,18 @@ class TeamRepository {
   Future<Result<void, Failure>> leaveTeam(String teamId) async {
     try {
       await _apiClient.post<dynamic>(ApiEndpoints.leaveTeam(teamId));
+      return const SuccessResult<void, Failure>(null);
+    } on Failure catch (failure) {
+      return FailureResult<void, Failure>(failure);
+    } catch (e) {
+      return FailureResult<void, Failure>(ServerFailure(message: e.toString()));
+    }
+  }
+
+  /// Leader dissolves/deletes the team.
+  Future<Result<void, Failure>> deleteTeam(String teamId) async {
+    try {
+      await _apiClient.delete<dynamic>(ApiEndpoints.teamDetail(teamId));
       return const SuccessResult<void, Failure>(null);
     } on Failure catch (failure) {
       return FailureResult<void, Failure>(failure);

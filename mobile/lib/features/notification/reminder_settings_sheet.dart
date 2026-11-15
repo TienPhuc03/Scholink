@@ -96,10 +96,13 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
     final bool expired = deadline == null || !DateTime.now().isBefore(deadline);
     final CalendarEventRecord? record = _vm.calendarRecordFor(_opp.id);
     final bool synced = record?.syncStatus == CalendarSyncStatus.synced;
-    final bool deadlineChanged = synced && deadline != null && !record!.deadline.isAtSameMomentAs(deadline);
+    final bool deadlineChanged = synced &&
+        deadline != null &&
+        !record!.deadline.isAtSameMomentAs(deadline);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: Column(
@@ -109,14 +112,16 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Icon(Icons.alarm_add_rounded, color: AppColors.primary, size: 26),
+                const Icon(Icons.alarm_add_rounded,
+                    color: AppColors.primary, size: 26),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Semantics(
                     header: true,
                     child: const Text(
                       'Nhắc hạn & Lịch thiết bị',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -131,7 +136,8 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
               _opp.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
 
@@ -146,7 +152,9 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Icon(
-                    _opp.isBookmarked ? Icons.mark_email_unread_outlined : Icons.bookmark_add_outlined,
+                    _opp.isBookmarked
+                        ? Icons.mark_email_unread_outlined
+                        : Icons.bookmark_add_outlined,
                     size: 20,
                     color: AppColors.primary,
                   ),
@@ -156,7 +164,8 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                       _opp.isBookmarked
                           ? 'Bạn đã lưu cơ hội này: Hộp thư sẽ nhắc trước hạn 7 ngày, 3 ngày và 1 ngày (không gửi trong 22:00–07:00).'
                           : 'Lưu cơ hội (biểu tượng bookmark) để nhận nhắc trong Hộp thư trước hạn 7 ngày, 3 ngày và 1 ngày.',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                      style: const TextStyle(
+                          fontSize: 13, color: AppColors.textPrimary),
                     ),
                   ),
                 ],
@@ -175,12 +184,14 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'Cơ hội đã đóng đăng ký, không thể lập nhắc.',
-                  style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: AppColors.error, fontWeight: FontWeight.w600),
                 ),
               )
             else
               ...ReminderMilestone.values.map((ReminderMilestone milestone) {
-                final DateTime due = deadline; // promoted: `expired` is false only when it is known
+                final DateTime due =
+                    deadline; // promoted: `expired` is false only when it is known
                 final DateTime? alarm = milestone.plannedAlarm(due);
                 final bool available = alarm != null;
                 return CheckboxListTile(
@@ -193,7 +204,9 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                     milestone.label,
                     style: TextStyle(
                       fontSize: 14,
-                      color: available ? AppColors.textPrimary : AppColors.textMuted,
+                      color: available
+                          ? AppColors.textPrimary
+                          : AppColors.textMuted,
                       decoration: available ? null : TextDecoration.lineThrough,
                     ),
                   ),
@@ -204,7 +217,9 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                         : 'Mốc này đã qua, hệ thống tự bỏ qua (FR-NOTI-02)',
                     style: TextStyle(
                       fontSize: 12,
-                      color: available ? AppColors.textSecondary : AppColors.textMuted,
+                      color: available
+                          ? AppColors.textSecondary
+                          : AppColors.textMuted,
                     ),
                   ),
                   onChanged: available
@@ -223,14 +238,16 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
               _StatusLine(
                 icon: Icons.event_available_rounded,
                 color: AppColors.success,
-                text: 'Đã có trong lịch thiết bị (lưu lúc ${DateFormat('HH:mm dd/MM/yyyy').format(record!.syncedAt)}).',
+                text:
+                    'Đã có trong lịch thiết bị (lưu lúc ${DateFormat('HH:mm dd/MM/yyyy').format(record!.syncedAt)}).',
               ),
             if (deadlineChanged)
               const _StatusLine(
                 key: Key('calendar_deadline_changed'),
                 icon: Icons.update_rounded,
                 color: AppColors.warning,
-                text: 'Hạn chót đã thay đổi so với lần lưu trước. Nhấn "Cập nhật lịch" để sửa đúng sự kiện cũ.',
+                text:
+                    'Hạn chót đã thay đổi so với lần lưu trước. Nhấn "Cập nhật lịch" để sửa đúng sự kiện cũ.',
               ),
 
             const SizedBox(height: 12),
@@ -242,16 +259,26 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                 margin: const EdgeInsets.only(bottom: 14),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (_vm.lastSyncIsSuccess ? AppColors.success : AppColors.error).withValues(alpha: 0.12),
+                  color: (_vm.lastSyncIsSuccess
+                          ? AppColors.success
+                          : AppColors.error)
+                      .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _vm.lastSyncIsSuccess ? AppColors.success : AppColors.error),
+                  border: Border.all(
+                      color: _vm.lastSyncIsSuccess
+                          ? AppColors.success
+                          : AppColors.error),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Icon(
-                      _vm.lastSyncIsSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
-                      color: _vm.lastSyncIsSuccess ? AppColors.success : AppColors.error,
+                      _vm.lastSyncIsSuccess
+                          ? Icons.check_circle_rounded
+                          : Icons.error_rounded,
+                      color: _vm.lastSyncIsSuccess
+                          ? AppColors.success
+                          : AppColors.error,
                       size: 22,
                     ),
                     const SizedBox(width: 10),
@@ -260,7 +287,10 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                         liveRegion: true,
                         child: Text(
                           _vm.lastSyncMessage!,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary),
                         ),
                       ),
                     ),
@@ -289,18 +319,22 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
                   ),
                   icon: _isSyncing
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
                         )
                       : const Icon(Icons.event_rounded),
                   label: Text(_isSyncing
                       ? 'Đang lưu lịch...'
-                      : (synced || deadlineChanged ? 'Cập nhật lịch' : 'Lưu vào Lịch thiết bị')),
+                      : (synced || deadlineChanged
+                          ? 'Cập nhật lịch'
+                          : 'Lưu vào Lịch thiết bị')),
                   onPressed: _isSyncing || expired ? null : _save,
                 ),
               ],
@@ -317,7 +351,8 @@ class _StatusLine extends StatelessWidget {
   final Color color;
   final String text;
 
-  const _StatusLine({super.key, required this.icon, required this.color, required this.text});
+  const _StatusLine(
+      {super.key, required this.icon, required this.color, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +363,10 @@ class _StatusLine extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary))),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 12.5, color: AppColors.textPrimary))),
         ],
       ),
     );

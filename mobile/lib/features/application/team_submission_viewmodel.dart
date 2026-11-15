@@ -82,7 +82,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
   PendingSubmission? _pending;
 
   /// A commit from an earlier session (app killed, offline) whose answer never arrived.
-  bool get hasUnconfirmedAttempt => _pending?.hasSentRequest == true && !(_status?.isSubmitted ?? false);
+  bool get hasUnconfirmedAttempt =>
+      _pending?.hasSentRequest == true && !(_status?.isSubmitted ?? false);
 
   String? _applicationId;
 
@@ -100,9 +101,13 @@ class TeamSubmissionViewModel extends BaseViewModel {
 
   DateTime get now => _clock();
 
-  bool get isLeader => _status?.isLeader(_userId) ?? (_team != null && _team!.leaderId == _userId);
-  bool get isSessionOpen => _status?.active == true && !(_status?.isLeaseOver(now) ?? true);
-  bool get isLeaseOver => _status?.active == true && (_status?.isLeaseOver(now) ?? false);
+  bool get isLeader =>
+      _status?.isLeader(_userId) ??
+      (_team != null && _team!.leaderId == _userId);
+  bool get isSessionOpen =>
+      _status?.active == true && !(_status?.isLeaseOver(now) ?? true);
+  bool get isLeaseOver =>
+      _status?.active == true && (_status?.isLeaseOver(now) ?? false);
   bool get isSubmitted => _status?.isSubmitted ?? false;
 
   int get leaseSecondsLeft {
@@ -112,8 +117,9 @@ class TeamSubmissionViewModel extends BaseViewModel {
     return s < 0 ? 0 : s;
   }
 
-  MemberConsentState get myConsentState =>
-      (_status != null && _userId != null) ? _status!.stateOf(_userId!, now) : MemberConsentState.missing;
+  MemberConsentState get myConsentState => (_status != null && _userId != null)
+      ? _status!.stateOf(_userId!, now)
+      : MemberConsentState.missing;
 
   bool get isTeamSizeValid {
     final int count = _status?.members.isNotEmpty == true
@@ -124,9 +130,16 @@ class TeamSubmissionViewModel extends BaseViewModel {
     return count >= min && count <= max;
   }
 
-  bool get canSubmit => isLeader && isSessionOpen && isTeamSizeValid && (_status?.allReady(now) ?? false) && !_busy;
+  bool get canSubmit =>
+      isLeader &&
+      isSessionOpen &&
+      isTeamSizeValid &&
+      (_status?.allReady(now) ?? false) &&
+      !_busy;
 
-  String get opportunityId => _status?.competitionId.isNotEmpty == true ? _status!.competitionId : (_team?.competitionId ?? '');
+  String get opportunityId => _status?.competitionId.isNotEmpty == true
+      ? _status!.competitionId
+      : (_team?.competitionId ?? '');
 
   Timer? _timer;
   int _ticks = 0;
@@ -159,7 +172,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
 
   /// Returns false when the status could not be loaded.
   Future<bool> _refreshStatus() async {
-    final Result<TeamSubmissionStatus, Failure> r = await _repo.getStatus(teamId);
+    final Result<TeamSubmissionStatus, Failure> r =
+        await _repo.getStatus(teamId);
     final Failure? f = r.errorOrNull;
     if (f != null) {
       if (_status == null) setError(f.message);
@@ -176,13 +190,16 @@ class TeamSubmissionViewModel extends BaseViewModel {
   }
 
   Future<void> _checkReadiness() async {
-    final Result<ReadinessResult, Failure> r = await _applications.checkReadiness(opportunityId);
+    final Result<ReadinessResult, Failure> r =
+        await _applications.checkReadiness(opportunityId);
     _readiness = r.dataOrNull ?? _readiness;
   }
 
   Future<void> _findApplication() async {
-    final Result<List<ApplicationSummary>, Failure> mine = await _applications.getMyApplications();
-    for (final ApplicationSummary a in mine.dataOrNull ?? <ApplicationSummary>[]) {
+    final Result<List<ApplicationSummary>, Failure> mine =
+        await _applications.getMyApplications();
+    for (final ApplicationSummary a
+        in mine.dataOrNull ?? <ApplicationSummary>[]) {
       if (a.opportunityId == opportunityId && a.isTeam) {
         _applicationId = a.id;
         return;
@@ -202,7 +219,10 @@ class TeamSubmissionViewModel extends BaseViewModel {
     if (tick == null || _timer != null) return;
     _timer = Timer.periodic(tick, (_) {
       _ticks++;
-      if (_status?.active == true && !isSubmitted && !_busy && _ticks % 5 == 0) {
+      if (_status?.active == true &&
+          !isSubmitted &&
+          !_busy &&
+          _ticks % 5 == 0) {
         unawaited(refresh());
       } else {
         notifyListeners(); // countdown
@@ -217,7 +237,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
     await _run(() async {
       final TeamSubmissionStatus? s = _status;
       if (s != null && s.active && s.reservationId.isNotEmpty) {
-        final Failure? abortError = (await _repo.abort(s.reservationId)).errorOrNull;
+        final Failure? abortError =
+            (await _repo.abort(s.reservationId)).errorOrNull;
         if (abortError != null) return abortError.message;
       }
       final Failure? f = (await _repo.prepare(teamId)).errorOrNull;
@@ -244,9 +265,12 @@ class TeamSubmissionViewModel extends BaseViewModel {
     await _run(() async {
       await _checkReadiness();
       final ReadinessResult? r = _readiness;
-      if (r == null) return 'Không kiểm tra được Passport của bạn. Vui lòng thử lại.';
-      if (!r.canProceed) return 'Passport của bạn chưa đáp ứng điều kiện của cuộc thi.';
-      final Result<ApplicationPreview, Failure> p = await _applications.createPreview(
+      if (r == null)
+        return 'Không kiểm tra được Passport của bạn. Vui lòng thử lại.';
+      if (!r.canProceed)
+        return 'Passport của bạn chưa đáp ứng điều kiện của cuộc thi.';
+      final Result<ApplicationPreview, Failure> p =
+          await _applications.createPreview(
         opportunityId: opportunityId,
         submissionId: s.reservationId,
         expectedRuleVersion: r.ruleVersion,
@@ -272,7 +296,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
         _myPreview = null;
         return 'Bản xem trước đã hết hạn. Hãy tạo lại bản xem trước.';
       }
-      final Result<ConsentReceipt, Failure> c = await _applications.createConsent(preview);
+      final Result<ConsentReceipt, Failure> c =
+          await _applications.createConsent(preview);
       final ConsentReceipt? receipt = c.dataOrNull;
       if (receipt == null) return c.errorOrNull!.message;
       final Failure? f = (await _repo.giveConsent(
@@ -298,7 +323,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
     await _run(() async {
       await _checkReadiness();
       final int ruleVersion = _readiness?.ruleVersion ?? 1;
-      final Map<String, dynamic> body = s.buildSubmitBody(expectedRuleVersion: ruleVersion);
+      final Map<String, dynamic> body =
+          s.buildSubmitBody(expectedRuleVersion: ruleVersion);
       final PendingSubmission? previous = _pending;
       final bool sameRequest = previous != null &&
           previous.hasSentRequest &&
@@ -324,8 +350,8 @@ class TeamSubmissionViewModel extends BaseViewModel {
 
   Future<String?> _send() async {
     final PendingSubmission p = _pending!;
-    final Result<SubmitResult, Failure> r =
-        await _applications.submit(body: p.body!, idempotencyKey: p.idempotencyKey!);
+    final Result<SubmitResult, Failure> r = await _applications.submit(
+        body: p.body!, idempotencyKey: p.idempotencyKey!);
     final SubmitResult? ok = r.dataOrNull;
     if (ok != null) {
       _canRetrySubmit = false;
@@ -338,7 +364,9 @@ class TeamSubmissionViewModel extends BaseViewModel {
     }
     final Failure f = r.errorOrNull!;
     final int? code = f is ServerFailure ? f.statusCode : null;
-    if (f is NetworkFailure || f.code == 'REQUEST_IN_PROGRESS' || (code != null && code >= 500)) {
+    if (f is NetworkFailure ||
+        f.code == 'REQUEST_IN_PROGRESS' ||
+        (code != null && code >= 500)) {
       _canRetrySubmit = true;
       return 'Chưa nhận được xác nhận từ máy chủ. Bấm "Thử lại" để gửi lại đúng yêu cầu này, '
           'Scholink sẽ không tạo hồ sơ đội trùng.';
@@ -367,17 +395,24 @@ class TeamSubmissionViewModel extends BaseViewModel {
   }
 
   String _messageFor(Failure f) => switch (f.code) {
-        'HOLD_EXPIRED' => 'Phiên nộp đã hết hạn trên máy chủ. Trưởng đội cần bắt đầu lại và mọi người đồng ý lại.',
-        'PREVIEW_EXPIRED' || 'CONSENT_MISMATCH' || 'SNAPSHOT_STALE' =>
+        'HOLD_EXPIRED' =>
+          'Phiên nộp đã hết hạn trên máy chủ. Trưởng đội cần bắt đầu lại và mọi người đồng ý lại.',
+        'PREVIEW_EXPIRED' ||
+        'CONSENT_MISMATCH' ||
+        'SNAPSHOT_STALE' =>
           'Đồng ý hoặc bản xem trước của một thành viên không còn hiệu lực do đổi hồ sơ hoặc hết hạn. Thành viên đó cần đồng ý lại.',
-        'VERSION_MISMATCH' => 'Đội hình hoặc điều kiện cuộc thi đã thay đổi phiên bản. Hãy bắt đầu lại phiên nộp.',
-        'PROFILE_INCOMPLETE' => 'Passport của một thành viên còn thiếu trường bắt buộc: ${f.message}',
-        'TEAM_LOCKED' => 'Đội đang trong phiên nộp hoặc bị khóa, không thể chỉnh sửa đội hình.',
+        'VERSION_MISMATCH' =>
+          'Đội hình hoặc điều kiện cuộc thi đã thay đổi phiên bản. Hãy bắt đầu lại phiên nộp.',
+        'PROFILE_INCOMPLETE' =>
+          'Passport của một thành viên còn thiếu trường bắt buộc: ${f.message}',
+        'TEAM_LOCKED' =>
+          'Đội đang trong phiên nộp hoặc bị khóa, không thể chỉnh sửa đội hình.',
         'SLOT_FULL' => 'Đội đã đầy hoặc cuộc thi đã hết chỉ tiêu nhận hồ sơ.',
         _ => f.message,
       };
 
-  static bool _sameJson(Map<String, dynamic> a, Map<String, dynamic> b) => jsonEncode(a) == jsonEncode(b);
+  static bool _sameJson(Map<String, dynamic> a, Map<String, dynamic> b) =>
+      jsonEncode(a) == jsonEncode(b);
 
   @override
   void dispose() {

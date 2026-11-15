@@ -18,21 +18,32 @@ class TeamSubmissionRepository {
   TeamSubmissionRepository(this._api, this.applications);
 
   Future<Result<TeamModel, Failure>> getTeam(String teamId) => _guard(() async {
-        final Response<dynamic> r = await _api.get<dynamic>(ApiEndpoints.teamDetail(teamId));
+        final Response<dynamic> r =
+            await _api.get<dynamic>(ApiEndpoints.teamDetail(teamId));
         return TeamModel.fromJson(unwrapData(r.data));
       });
 
   /// Teams of a competition; used to find the signed-in student's own team.
-  Future<Result<List<TeamModel>, Failure>> getCompetitionTeams(String competitionId) => _guard(() async {
-        final Response<dynamic> r = await _api.get<dynamic>(ApiEndpoints.competitionTeams(competitionId));
-        final dynamic data = r.data is Map<String, dynamic> ? (r.data as Map<String, dynamic>)['data'] : r.data;
+  Future<Result<List<TeamModel>, Failure>> getCompetitionTeams(
+          String competitionId) =>
+      _guard(() async {
+        final Response<dynamic> r = await _api
+            .get<dynamic>(ApiEndpoints.competitionTeams(competitionId));
+        final dynamic data = r.data is Map<String, dynamic>
+            ? (r.data as Map<String, dynamic>)['data']
+            : r.data;
         return data is List
-            ? data.whereType<Map<String, dynamic>>().map(TeamModel.fromJson).toList()
+            ? data
+                .whereType<Map<String, dynamic>>()
+                .map(TeamModel.fromJson)
+                .toList()
             : <TeamModel>[];
       });
 
-  Future<Result<TeamSubmissionStatus, Failure>> getStatus(String teamId) => _guard(() async {
-        final Response<dynamic> r = await _api.get<dynamic>(ApiEndpoints.teamSubmission(teamId));
+  Future<Result<TeamSubmissionStatus, Failure>> getStatus(String teamId) =>
+      _guard(() async {
+        final Response<dynamic> r =
+            await _api.get<dynamic>(ApiEndpoints.teamSubmission(teamId));
         return TeamSubmissionStatus.fromJson(unwrapData(r.data));
       });
 
@@ -43,7 +54,8 @@ class TeamSubmissionRepository {
 
   /// Leader only: releases the roster freeze. Aborting an already aborted session is a no-op.
   Future<Result<void, Failure>> abort(String reservationId) => _guard(() async {
-        await _api.post<dynamic>(ApiEndpoints.abortTeamSubmission(reservationId));
+        await _api
+            .post<dynamic>(ApiEndpoints.abortTeamSubmission(reservationId));
       });
 
   /// Leader only: lets a withdrawn team prepare a new submission (resubmit, Q18).

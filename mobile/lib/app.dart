@@ -76,7 +76,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// This State sits above MaterialApp, so its own context has no Navigator/ScaffoldMessenger.
   /// All app-level navigation and snackbars go through these keys.
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   late bool _isAuthenticated;
   bool _isGuest = false;
@@ -112,7 +113,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _resetTabViewModels();
     // F29: the next account on this device must not receive this account's pushes.
     if (sl.isRegistered<PushListener>()) unawaited(sl<PushListener>().stop());
-    if (sl.isRegistered<RoomDatabase>()) unawaited(sl<RoomDatabase>().clearUserData());
+    if (sl.isRegistered<RoomDatabase>())
+      unawaited(sl<RoomDatabase>().clearUserData());
   }
 
   @override
@@ -120,7 +122,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
     super.initState();
     _isAuthenticated = widget.initialIsAuthenticated;
     if (sl.isRegistered<SessionEvents>()) {
-      _sessionExpiry = sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
+      _sessionExpiry =
+          sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
     }
     _lifecycle = AppLifecycleListener(onResume: _onAppResumed);
     if (_isAuthenticated) {
@@ -138,7 +141,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _onAppResumed() {
     if (_isAuthenticated && !_isGuest) {
       unawaited(_tabs.notification.loadNotifications());
-      unawaited(_startPush()); // N2: reconnect realtime if the connection was lost in background
+      unawaited(
+          _startPush()); // N2: reconnect realtime if the connection was lost in background
       unawaited(_openLaunchTarget());
     }
   }
@@ -147,11 +151,13 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _startPush() async {
     if (!sl.isRegistered<PushListener>()) return;
     final String? userId = await sl<SecureStorageHelper>().getUserId();
-    if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated) return;
+    if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated)
+      return;
     await sl<PushListener>().start(
       userId,
       onReceived: () {
-        if (mounted && _isAuthenticated && !_isGuest) unawaited(_tabs.notification.loadNotifications());
+        if (mounted && _isAuthenticated && !_isGuest)
+          unawaited(_tabs.notification.loadNotifications());
       },
     );
   }
@@ -160,7 +166,11 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _openLaunchTarget() async {
     if (!sl.isRegistered<LocalNotifier>()) return;
     final String? refUrl = await sl<LocalNotifier>().takeLaunchRefUrl();
-    if (refUrl == null || refUrl.isEmpty || !mounted || !_isAuthenticated || _isGuest) return;
+    if (refUrl == null ||
+        refUrl.isEmpty ||
+        !mounted ||
+        !_isAuthenticated ||
+        _isGuest) return;
     if (refUrl == '/notifications') {
       // The user tapped a stack of notifications: show the inbox.
       _nav.popUntil((Route<dynamic> r) => r.isFirst);
@@ -209,7 +219,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _pendingBookmark = null;
     });
     unawaited(_startPush());
-    if (resumeBookmark != null) unawaited(_completePendingBookmark(resumeBookmark));
+    if (resumeBookmark != null)
+      unawaited(_completePendingBookmark(resumeBookmark));
     if (resumeApply != null) {
       // Wait for the main shell to replace the login screen before pushing on top of it.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -242,17 +253,20 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _pendingApply = null;
       _pendingBookmark = null;
     });
-    _showMessage('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', color: AppColors.error);
+    _showMessage('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.',
+        color: AppColors.error);
   }
 
   /// F40: on success the server already revoked every session; leave the app like a logout.
-  Future<String?> _handleDeleteAccount(String currentPassword, {required bool purgeSnapshots}) async {
-    final Failure? failure = (await sl<AuthRepository>()
-            .deleteAccount(currentPassword: currentPassword, purgeSnapshots: purgeSnapshots))
+  Future<String?> _handleDeleteAccount(String currentPassword,
+      {required bool purgeSnapshots}) async {
+    final Failure? failure = (await sl<AuthRepository>().deleteAccount(
+            currentPassword: currentPassword, purgeSnapshots: purgeSnapshots))
         .errorOrNull;
     if (failure != null) return failure.message;
     if (!mounted) return null;
-    _signOutLocally('Tài khoản đã được xoá. Dữ liệu cá nhân sẽ được xoá theo chính sách lưu trữ.');
+    _signOutLocally(
+        'Tài khoản đã được xoá. Dữ liệu cá nhân sẽ được xoá theo chính sách lưu trữ.');
     return null;
   }
 
@@ -279,7 +293,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _selectTab(int index) async {
     if (!_isGuest || !AppTabs.requiresAccount(index)) {
       // The inbox tab is built once per session; refresh it each time it is opened again.
-      if (!_isGuest && index == AppTabs.notifications && _currentTabIndex != index) {
+      if (!_isGuest &&
+          index == AppTabs.notifications &&
+          _currentTabIndex != index) {
         unawaited(_tabs.notification.loadNotifications());
       }
       setState(() => _currentTabIndex = index);
@@ -322,7 +338,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _askLoginToBookmark(OpportunityModel opp) async {
     final LoginChoice? choice = await LoginRequiredSheet.show(
       _navigatorKey.currentContext!,
-      message: 'Đăng nhập để lưu "${opp.title}" và nhận nhắc hạn 7, 3, 1 ngày trước khi đóng đăng ký. '
+      message:
+          'Đăng nhập để lưu "${opp.title}" và nhận nhắc hạn 7, 3, 1 ngày trước khi đóng đăng ký. '
           'Sau khi đăng nhập, Scholink sẽ lưu cơ hội này giúp bạn.',
     );
     if (choice == null || !mounted) return;
@@ -340,9 +357,11 @@ class _ScholinkAppState extends State<ScholinkApp> {
     final Failure? failure = await _tabs.opportunity.setBookmark(opp, true);
     if (!mounted) return;
     if (failure == null) {
-      _showMessage('Đã lưu "${opp.title}". Bạn sẽ nhận nhắc hạn trong Hộp thư.', color: AppColors.success);
+      _showMessage('Đã lưu "${opp.title}". Bạn sẽ nhận nhắc hạn trong Hộp thư.',
+          color: AppColors.success);
     } else {
-      _showMessage('Chưa lưu được "${opp.title}": ${failure.message}', color: AppColors.error);
+      _showMessage('Chưa lưu được "${opp.title}": ${failure.message}',
+          color: AppColors.error);
     }
   }
 
@@ -372,11 +391,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
         _openOpportunityDetail(known);
         return;
       }
-      final Result<OpportunityDetail, Failure> res = await _tabs.opportunity.refreshDetail(opportunityId);
+      final Result<OpportunityDetail, Failure> res =
+          await _tabs.opportunity.refreshDetail(opportunityId);
       if (!mounted) return;
       res.fold(
         onSuccess: (OpportunityDetail d) => _openOpportunityDetail(d.item),
-        onFailure: (Failure f) => _showMessage('Không mở được cơ hội: ${f.message}', color: AppColors.error),
+        onFailure: (Failure f) => _showMessage(
+            'Không mở được cơ hội: ${f.message}',
+            color: AppColors.error),
       );
       return;
     }
@@ -418,7 +440,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
           onBack: () => Navigator.of(ctx).pop(),
           onVerified: () {
             _onLoginSuccess();
-            _showMessage('Chào mừng bạn đến với Scholink!', color: AppColors.success);
+            _showMessage('Chào mừng bạn đến với Scholink!',
+                color: AppColors.success);
           },
           onGoToLogin: () => _nav.popUntil((Route<dynamic> r) => r.isFirst),
         ),
@@ -428,7 +451,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
 
   /// FR-AUTH-02: a student who left the OTP screen earlier verifies now, before getting a session.
   Future<void> _verifyEmailAfterLogin(String email, String password) async {
-    final Result<OtpTicket, Failure> otp = await sl<AuthRepository>().sendOtp(email: email);
+    final Result<OtpTicket, Failure> otp =
+        await sl<AuthRepository>().sendOtp(email: email);
     if (!mounted) return;
     _openEmailVerification(RegisterOutcome(
       email: email,
@@ -484,7 +508,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: _tabs.notification,
             );
           },
-          onApplyInApp: () => _isGuest ? _askLoginToApply(opp) : _startApply(opp),
+          onApplyInApp: () =>
+              _isGuest ? _askLoginToApply(opp) : _startApply(opp),
           onBookmarkNeedsLogin: _askLoginToBookmark,
         ),
       ),
@@ -495,7 +520,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
 
   /// [fromDetail]: resubmitting from an application detail (F28, Q4). The detail is already
   /// below this screen and reloads itself, so the apply flow just closes when it is done.
-  void _openApply({required String opportunityId, required String title, bool fromDetail = false}) {
+  void _openApply(
+      {required String opportunityId,
+      required String title,
+      bool fromDetail = false}) {
     final ApplyViewModel vm = ApplyViewModel(
       applications: sl<ApplicationRepository>(),
       media: sl<MediaRepository>(),
@@ -512,11 +540,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
           onEditPassport: _editPassportFromApply,
           onOpenApplication: (String id, {required bool justSubmitted}) {
             if (!fromDetail) {
-              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: justSubmitted);
+              _openApplicationDetail(id,
+                  justSubmitted: justSubmitted, replace: justSubmitted);
               return;
             }
             _nav.pop();
-            if (justSubmitted) _showMessage('Đã nộp lại hồ sơ thành công.', color: AppColors.success);
+            if (justSubmitted)
+              _showMessage('Đã nộp lại hồ sơ thành công.',
+                  color: AppColors.success);
           },
         ),
       ),
@@ -529,7 +560,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
     final PassportViewModel passportVm = _tabs.passport;
     if (passportVm.passport == null) await passportVm.loadPassport();
     if (passportVm.passport == null) {
-      _showMessage(passportVm.errorMessage ?? 'Không tải được Passport.', color: AppColors.error);
+      _showMessage(passportVm.errorMessage ?? 'Không tải được Passport.',
+          color: AppColors.error);
       return;
     }
     await _nav.push<bool>(
@@ -554,14 +586,18 @@ class _ScholinkAppState extends State<ScholinkApp> {
 
   /// Q11: after a successful submit the apply flow is replaced by the detail,
   /// so "back" returns to the opportunity.
-  void _openApplicationDetail(String id, {bool justSubmitted = false, bool replace = false}) {
+  void _openApplicationDetail(String id,
+      {bool justSubmitted = false, bool replace = false}) {
     final MaterialPageRoute<void> route = MaterialPageRoute<void>(
       settings: const RouteSettings(name: AppRoutes.applicationDetail),
       builder: (_) => ApplicationDetailView(
-        viewModel: ApplicationDetailViewModel(sl<ApplicationRepository>(), applicationId: id),
+        viewModel: ApplicationDetailViewModel(sl<ApplicationRepository>(),
+            applicationId: id),
         justSubmitted: justSubmitted,
-        onResubmit: (ApplicationDetail d) =>
-            _openApply(opportunityId: d.summary.opportunityId, title: d.summary.displayTitle, fromDetail: true),
+        onResubmit: (ApplicationDetail d) => _openApply(
+            opportunityId: d.summary.opportunityId,
+            title: d.summary.displayTitle,
+            fromDetail: true),
         onOpenRevision: _openRevisionSnapshot,
         onResubmitTeam: _resubmitTeam,
       ),
@@ -584,7 +620,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   }
 
   Future<void> _openTeamSubmissionForCompetition(OpportunityModel opp) async {
-    final Result<List<TeamModel>, Failure> teams = await sl<TeamSubmissionRepository>().getCompetitionTeams(opp.id);
+    final Result<List<TeamModel>, Failure> teams =
+        await sl<TeamSubmissionRepository>().getCompetitionTeams(opp.id);
     final String? me = await sl<SecureStorageHelper>().getUserId();
     if (!mounted) return;
     TeamModel? mine;
@@ -601,7 +638,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _openTeamSubmission(teamId: mine.id, competitionTitle: opp.title);
   }
 
-  void _openTeamSubmission({required String teamId, required String competitionTitle}) {
+  void _openTeamSubmission(
+      {required String teamId, required String competitionTitle}) {
     final TeamSubmissionViewModel vm = TeamSubmissionViewModel(
       repository: sl<TeamSubmissionRepository>(),
       store: sl<SubmissionStore>(),
@@ -615,8 +653,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
         builder: (_) => TeamSubmissionView(
           viewModel: vm,
           onOpenApplication: (String id, {required bool justSubmitted}) =>
-              _openApplicationDetail(id, justSubmitted: justSubmitted, replace: true),
-          onOpenMemberProfile: (String studentId) => _openTeammateProfile(teamId: teamId, studentId: studentId),
+              _openApplicationDetail(id,
+                  justSubmitted: justSubmitted, replace: true),
+          onOpenMemberProfile: (String studentId) =>
+              _openTeammateProfile(teamId: teamId, studentId: studentId),
         ),
       ),
     );
@@ -631,17 +671,22 @@ class _ScholinkAppState extends State<ScholinkApp> {
         settings: const RouteSettings(name: AppRoutes.profilePreview),
         builder: (_) => ProfileViewScreen(
           title: 'Hồ sơ như người khác thấy',
-          note: 'Chọn đối tượng để xem các trường họ thấy. Đổi quyền hiển thị trong "Chỉnh sửa Passport".',
+          note:
+              'Chọn đối tượng để xem các trường họ thấy. Đổi quyền hiển thị trong "Chỉnh sửa Passport".',
           viewModel: ProfileViewViewModel(
             repo.previewMyProfile,
-            audiences: const <ProfileAudience>[ProfileAudience.public, ProfileAudience.teammates],
+            audiences: const <ProfileAudience>[
+              ProfileAudience.public,
+              ProfileAudience.teammates
+            ],
           ),
         ),
       ),
     );
   }
 
-  void _openTeammateProfile({required String teamId, required String studentId}) {
+  void _openTeammateProfile(
+      {required String teamId, required String studentId}) {
     final PassportRepository repo = sl<PassportRepository>();
     _nav.push<void>(
       MaterialPageRoute<void>(
@@ -649,7 +694,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
         builder: (_) => ProfileViewScreen(
           title: 'Hồ sơ đồng đội',
           viewModel: ProfileViewViewModel(
-            (_) => repo.getTeammateProfile(teamId: teamId, studentId: studentId),
+            (_) =>
+                repo.getTeammateProfile(teamId: teamId, studentId: studentId),
             audiences: const <ProfileAudience>[ProfileAudience.teammates],
           ),
         ),
@@ -661,24 +707,28 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _resubmitTeam(ApplicationDetail d) async {
     final String? teamId = d.summary.teamId;
     if (teamId == null) return;
-    final Failure? f = (await sl<TeamSubmissionRepository>().reopen(teamId)).errorOrNull;
+    final Failure? f =
+        (await sl<TeamSubmissionRepository>().reopen(teamId)).errorOrNull;
     if (!mounted) return;
     // A team that is already open again answers with a state conflict: the flow still applies.
     if (f != null && f.code != 'STATE_CONFLICT') {
       _showMessage(f.message, color: AppColors.error);
       return;
     }
-    _openTeamSubmission(teamId: teamId, competitionTitle: d.summary.displayTitle);
+    _openTeamSubmission(
+        teamId: teamId, competitionTitle: d.summary.displayTitle);
   }
 
-  void _openRevisionSnapshot(ApplicationDetail d, ApplicationRevision revision) {
+  void _openRevisionSnapshot(
+      ApplicationDetail d, ApplicationRevision revision) {
     _nav.push<void>(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: AppRoutes.applicationSnapshot),
         builder: (_) => ApplicationSnapshotView(
           opportunityTitle: d.summary.displayTitle,
           revision: revision,
-          isCurrent: d.revisions.isNotEmpty && identical(d.revisions.first, revision),
+          isCurrent:
+              d.revisions.isNotEmpty && identical(d.revisions.first, revision),
         ),
       ),
     );
@@ -719,6 +769,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
             isGuest: _isGuest,
             onOpportunityTap: _openOpportunityDetail,
             onOpenNotificationInbox: () => _selectTab(AppTabs.notifications),
+            onOpenAiChat: () => _selectTab(AppTabs.chat),
             onBookmarkNeedsLogin: _askLoginToBookmark,
           ),
           // Account-only tabs are not built for guests, so they never fire authenticated calls.
@@ -728,9 +779,13 @@ class _ScholinkAppState extends State<ScholinkApp> {
             TeamListView(
               viewModel: _tabs.team,
               onOpenTeamSubmission: (TeamModel team, String competitionTitle) =>
-                  _openTeamSubmission(teamId: team.id, competitionTitle: competitionTitle),
+                  _openTeamSubmission(
+                      teamId: team.id, competitionTitle: competitionTitle),
             ),
-          if (_isGuest) const SizedBox.shrink() else ChatView(viewModel: _tabs.chat),
+          if (_isGuest)
+            const SizedBox.shrink()
+          else
+            ChatView(viewModel: _tabs.chat),
           if (_isGuest)
             const SizedBox.shrink()
           else
@@ -738,6 +793,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
               viewModel: _tabs.notification,
               onOpenTarget: _openNotificationTarget,
               onOpenSettings: _openNotificationSettings,
+              onExploreOpportunities: () => _selectTab(AppTabs.opportunities),
             ),
           if (_isGuest)
             const SizedBox.shrink()
@@ -751,43 +807,76 @@ class _ScholinkAppState extends State<ScholinkApp> {
             ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentTabIndex,
-        onDestinationSelected: _selectTab,
-        destinations: <NavigationDestination>[
-          const NavigationDestination(
-            icon: Icon(Icons.search_rounded),
-            selectedIcon: Icon(Icons.search_rounded, color: AppColors.primary),
-            label: 'Cơ hội',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group_rounded, color: AppColors.primary),
-            label: 'Đội thi',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon: Icon(Icons.chat_bubble_rounded, color: AppColors.primary),
-            label: 'Chat',
-          ),
-          // F29: unread count on the tab, so reminders are seen without opening the inbox.
-          NavigationDestination(
-            icon: _UnreadBadge(
-              viewModel: _isGuest ? null : _tabs.notification,
-              child: const Icon(Icons.notifications_none_rounded),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          height: 56,
+          backgroundColor: Colors.white,
+          indicatorColor: Colors.transparent,
+          labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
+            (Set<WidgetState> states) => TextStyle(
+              fontSize: 11,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : const Color(0xFF64748B),
             ),
-            selectedIcon: _UnreadBadge(
-              viewModel: _isGuest ? null : _tabs.notification,
-              child: const Icon(Icons.notifications_rounded, color: AppColors.primary),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith<IconThemeData>(
+            (Set<WidgetState> states) => IconThemeData(
+              size: 21,
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : const Color(0xFF64748B),
             ),
-            label: 'Thông báo',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle_rounded, color: AppColors.primary),
-            label: 'Passport',
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            border:
+                Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 0.8)),
           ),
-        ],
+          child: NavigationBar(
+            selectedIndex: _currentTabIndex,
+            onDestinationSelected: _selectTab,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: <NavigationDestination>[
+              const NavigationDestination(
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore_rounded),
+                label: 'Cơ hội',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.group_outlined),
+                selectedIcon: Icon(Icons.group_rounded),
+                label: 'Đội thi',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.chat_bubble_outline_rounded),
+                selectedIcon: Icon(Icons.chat_bubble_rounded),
+                label: 'Chat',
+              ),
+              // F29: unread count on the tab, so reminders are seen without opening the inbox.
+              NavigationDestination(
+                icon: _UnreadBadge(
+                  viewModel: _isGuest ? null : _tabs.notification,
+                  child: const Icon(Icons.notifications_none_rounded),
+                ),
+                selectedIcon: _UnreadBadge(
+                  viewModel: _isGuest ? null : _tabs.notification,
+                  child: const Icon(Icons.notifications_rounded),
+                ),
+                label: 'Thông báo',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.account_circle_outlined),
+                selectedIcon: Icon(Icons.account_circle_rounded),
+                label: 'Passport',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -810,7 +899,8 @@ class _UnreadBadge extends StatelessWidget {
         final int n = vm.unreadCount;
         return Badge(
           isLabelVisible: n > 0,
-          label: Text(n > 99 ? '99+' : '$n', semanticsLabel: '$n thông báo chưa đọc'),
+          label: Text(n > 99 ? '99+' : '$n',
+              semanticsLabel: '$n thông báo chưa đọc'),
           child: child,
         );
       },
@@ -828,4 +918,3 @@ class _TabViewModels {
   late final NotificationViewModel notification = sl<NotificationViewModel>();
   late final PassportViewModel passport = sl<PassportViewModel>();
 }
-

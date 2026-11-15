@@ -73,14 +73,18 @@ export class TeamUseCase {
       joinedAt: new Date(),
     });
 
-    // Automatically create Group Chat Room for the team
+    // Automatically create Group Chat Room for the team with team name
     const chatRoom = new ChatRoom(`room_${crypto.randomUUID()}`, {
       type: 'TEAM',
       refId: teamId,
+      name: dto.name,
       participants: [studentId],
       lastSeq: 0,
     });
     await this.chatRepo.saveRoom(chatRoom);
+
+    // T2: Tự động hủy các yêu cầu gia nhập PENDING khác của người tạo đội trong cùng cuộc thi
+    await this.teamRepo.cancelPendingJoinRequests(studentId, dto.competitionId);
 
     return {
       ...team.props,
@@ -94,9 +98,31 @@ export class TeamUseCase {
     if (!team) {
       throw DomainException.notFound('Đội thi');
     }
+
+    // T5: Kèm tên đầy đủ và avatar cho từng thành viên
+    const membersWithProfiles = await Promise.all(
+      team.members.map(async (m) => {
+        let fullName: string | undefined;
+        let avatarUrl: string | undefined;
+        try {
+          if (this.identityClient?.getProfileView) {
+            const profile = (await this.identityClient.getProfileView(m.studentId, 'TEAMMATES')) as any;
+            fullName = profile?.fullName || undefined;
+            avatarUrl = profile?.avatarUrl || undefined;
+          }
+        } catch {}
+        return {
+          ...m,
+          fullName,
+          avatarUrl,
+        };
+      }),
+    );
+
     return {
       ...team.props,
       id: team.id,
+      members: membersWithProfiles,
     };
   }
 
@@ -139,6 +165,25 @@ export class TeamUseCase {
 
     await this.teamRepo.saveJoinRequest(joinRequest);
 
+    // T6: Ghi Outbox thông báo cho đội trưởng khi có người gửi yêu cầu gia nhập
+    await this.teamRepo.saveOutboxEvent({
+      id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      aggregateType: 'TEAM',
+      aggregateId: team.id,
+      eventType: 'TEAM_JOIN_REQUEST',
+      payload: {
+        userId: team.leaderId,
+        businessKey: `join_request:${joinRequest.id}:created`,
+        type: 'TEAM_JOIN_REQUEST',
+        title: `Có người xin vào đội ${team.props.name}`,
+        body: dto.message ? `Lời nhắn: "${dto.message}"` : `Một sinh viên muốn tham gia đội ${team.props.name}`,
+        refUrl: `/teams/${team.id}/join-requests`,
+      },
+      status: 'PENDING',
+      retryCount: 0,
+      createdAt: new Date(),
+    });
+
     return {
       ...joinRequest.props,
       id: joinRequest.id,
@@ -156,7 +201,40 @@ export class TeamUseCase {
     }
 
     const requests = await this.teamRepo.findJoinRequestsByTeam(teamId);
-    return requests.map((r) => ({ ...r.props, id: r.id }));
+
+    // T4: Kèm tóm tắt hồ sơ người xin cho từng yêu cầu
+    const enriched = await Promise.all(
+      requests.map(async (r) => {
+        let applicant: Record<string, any> | undefined;
+        try {
+          if (this.identityClient?.getProfileView) {
+            const profile = (await this.identityClient.getProfileView(r.applicantId, 'TEAMMATES')) as any;
+            if (profile) {
+              const edu = profile.education || {};
+              applicant = {
+                fullName: profile.fullName || '',
+                avatarUrl: profile.avatarUrl || '',
+                institution: edu.institution || '',
+                major: edu.major || '',
+                startYear: edu.startYear,
+                endYear: edu.endYear,
+                gpa: edu.gpa,
+                gpaScale: edu.gpaScale,
+              };
+            }
+          }
+        } catch {
+          // Lỗi Identity thì bỏ qua tóm tắt, không làm hỏng cả danh sách
+        }
+        return {
+          ...r.props,
+          id: r.id,
+          applicant,
+        };
+      }),
+    );
+
+    return enriched;
   }
 
   async reviewJoinRequest(teamId: string, requestId: string, leaderId: string, dto: ReviewJoinRequestDto) {
@@ -195,29 +273,63 @@ export class TeamUseCase {
       }
 
       team.addMember(joinRequest.applicantId);
-      await this.teamRepo.update(team);
-
-      await this.teamRepo.saveActiveMembership({
-        id: `mem_${crypto.randomUUID()}`,
-        studentId: joinRequest.applicantId,
-        competitionId: team.competitionId,
-        teamId: team.id,
-        role: 'MEMBER',
-        joinedAt: new Date(),
-      });
-
       joinRequest.accept(leaderId);
-      await this.teamRepo.updateJoinRequest(joinRequest);
 
-      // Add member to Team Chat Room
-      const room = await this.chatRepo.findRoomByRefId(team.id);
-      if (room) {
-        room.addParticipant(joinRequest.applicantId);
-        await this.chatRepo.updateRoom(room);
-      }
+      // T6: Chuẩn bị outbox event duyệt thành công
+      const outboxEvent = {
+        id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        aggregateType: 'TEAM',
+        aggregateId: team.id,
+        eventType: 'TEAM_JOIN_REVIEWED',
+        payload: {
+          userId: joinRequest.applicantId,
+          businessKey: `join_request:${joinRequest.id}:ACCEPTED`,
+          type: 'TEAM_JOIN_REVIEWED',
+          title: `Yêu cầu vào đội ${team.props.name} đã được chấp thuận!`,
+          body: `Chúc mừng bạn đã trở thành thành viên chính thức của đội ${team.props.name}.`,
+          refUrl: `/teams/${team.id}`,
+        },
+        status: 'PENDING',
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      // T3: Gói việc ghi active_memberships + cập nhật team + joinRequest + chat room + outbox vào transaction
+      await this.teamRepo.acceptJoinRequestInTransaction({
+        team,
+        joinRequest,
+        activeMembership: {
+          id: `mem_${crypto.randomUUID()}`,
+          studentId: joinRequest.applicantId,
+          competitionId: team.competitionId,
+          teamId: team.id,
+          role: 'MEMBER',
+          joinedAt: new Date(),
+        },
+        outboxEvent,
+      });
     } else {
       joinRequest.reject(leaderId);
       await this.teamRepo.updateJoinRequest(joinRequest);
+
+      // T6: Ghi outbox thông báo từ chối
+      await this.teamRepo.saveOutboxEvent({
+        id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        aggregateType: 'TEAM',
+        aggregateId: team.id,
+        eventType: 'TEAM_JOIN_REVIEWED',
+        payload: {
+          userId: joinRequest.applicantId,
+          businessKey: `join_request:${joinRequest.id}:REJECTED`,
+          type: 'TEAM_JOIN_REVIEWED',
+          title: `Yêu cầu vào đội ${team.props.name} đã bị từ chối`,
+          body: `Rất tiếc, yêu cầu gia nhập đội ${team.props.name} của bạn không được phê duyệt.`,
+          refUrl: `/teams/${team.id}`,
+        },
+        status: 'PENDING',
+        retryCount: 0,
+        createdAt: new Date(),
+      });
     }
 
     return {
@@ -320,7 +432,34 @@ export class TeamUseCase {
 
   async getCompetitionTeams(competitionId: string) {
     const teams = await this.teamRepo.findManyByCompetition(competitionId);
-    return teams.map((t) => ({ ...t.props, id: t.id }));
+
+    // T5: Kèm tên và avatar cho từng thành viên
+    const studentIds = Array.from(new Set(teams.flatMap((t) => t.members.map((m) => m.studentId))));
+    const profileMap = new Map<string, { fullName?: string; avatarUrl?: string }>();
+
+    await Promise.all(
+      studentIds.map(async (studentId) => {
+        try {
+          if (this.identityClient?.getProfileView) {
+            const p = (await this.identityClient.getProfileView(studentId, 'TEAMMATES')) as any;
+            profileMap.set(studentId, {
+              fullName: p?.fullName || undefined,
+              avatarUrl: p?.avatarUrl || undefined,
+            });
+          }
+        } catch {}
+      }),
+    );
+
+    return teams.map((t) => ({
+      ...t.props,
+      id: t.id,
+      members: t.members.map((m) => ({
+        ...m,
+        fullName: profileMap.get(m.studentId)?.fullName,
+        avatarUrl: profileMap.get(m.studentId)?.avatarUrl,
+      })),
+    }));
   }
 
   // ==========================================
@@ -564,10 +703,26 @@ export class TeamUseCase {
       throw DomainException.notFound('Đội thi');
     }
     const isMember = (id: string) => team.members.some((m) => m.studentId === id);
-    if (!isMember(viewerId) || !isMember(studentId)) {
+    const viewerIsMember = isMember(viewerId);
+    if (!viewerIsMember) {
       throw new DomainException(
         ErrorCode.FORBIDDEN_RESOURCE,
-        'Chỉ thành viên trong cùng đội mới xem được hồ sơ đồng đội',
+        'Chỉ thành viên trong cùng đội mới xem được hồ sơ',
+        403,
+      );
+    }
+
+    let canView = isMember(studentId);
+    // Leader is allowed to review profile/CV of candidates who applied to join this team (T4: Join request must be PENDING)
+    if (!canView && team.leaderId === viewerId) {
+      const requests = await this.teamRepo.findJoinRequestsByTeam(teamId);
+      canView = requests.some((r) => r.applicantId === studentId && r.status === 'PENDING');
+    }
+
+    if (!canView) {
+      throw new DomainException(
+        ErrorCode.FORBIDDEN_RESOURCE,
+        'Chỉ thành viên trong cùng đội hoặc ứng viên xin gia nhập mới có thể xem hồ sơ',
         403,
       );
     }
@@ -665,6 +820,41 @@ export class TeamUseCase {
       reservationId: reservation.id,
       status: reservation.status,
       teamStatus: team ? team.status : 'ACTIVE',
+    };
+  }
+
+  async deleteTeam(teamId: string, studentId: string) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+
+    if (team.leaderId !== studentId) {
+      throw DomainException.forbidden('Chỉ trưởng đội mới có quyền giải tán và xoá đội thi');
+    }
+
+    if (team.status === 'SUBMITTING' || team.status === 'SUBMITTED') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Không thể xoá đội thi đã hoặc đang trong tiến trình nộp hồ sơ',
+      );
+    }
+
+    // Delete active memberships for all members in the team
+    await this.teamRepo.deleteActiveMembershipsByTeam(teamId);
+
+    // Delete all join requests related to this team
+    await this.teamRepo.deleteJoinRequestsByTeam(teamId);
+
+    // Delete team entity
+    await this.teamRepo.delete(teamId);
+
+    this.logger.log(`[TeamDeleted] Đội thi ${teamId} đã bị giải tán bởi Trưởng đội ${studentId}`);
+
+    return {
+      success: true,
+      teamId,
+      message: 'Đã giải tán và xoá đội thi thành công',
     };
   }
 }

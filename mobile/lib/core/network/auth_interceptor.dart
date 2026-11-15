@@ -48,7 +48,8 @@ class AuthInterceptor extends QueuedInterceptor {
     ErrorInterceptorHandler handler,
   ) async {
     final RequestOptions request = err.requestOptions;
-    final bool hadSession = request.headers['Authorization'] != null && !_authPaths.contains(request.path);
+    final bool hadSession = request.headers['Authorization'] != null &&
+        !_authPaths.contains(request.path);
     if (err.response?.statusCode != 401 || !hadSession) {
       handler.next(err);
       return;
@@ -62,13 +63,19 @@ class AuthInterceptor extends QueuedInterceptor {
           data: <String, dynamic>{'refreshToken': refreshToken},
         );
         final dynamic resData = refreshResponse.data;
-        final dynamic payload = (resData is Map<String, dynamic>) ? (resData['data'] ?? resData) : null;
-        final String? newAccessToken = (payload is Map<String, dynamic>) ? (payload['accessToken'] as String?) : null;
-        final String? newRefreshToken =
-            (payload is Map<String, dynamic>) ? (payload['refreshToken'] as String?) : null;
+        final dynamic payload = (resData is Map<String, dynamic>)
+            ? (resData['data'] ?? resData)
+            : null;
+        final String? newAccessToken = (payload is Map<String, dynamic>)
+            ? (payload['accessToken'] as String?)
+            : null;
+        final String? newRefreshToken = (payload is Map<String, dynamic>)
+            ? (payload['refreshToken'] as String?)
+            : null;
 
         if (newAccessToken != null && newRefreshToken != null) {
-          await _secureStorage.saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken);
+          await _secureStorage.saveTokens(
+              accessToken: newAccessToken, refreshToken: newRefreshToken);
           request.headers['Authorization'] = 'Bearer $newAccessToken';
           try {
             return handler.resolve(await _plainDio.fetch<dynamic>(request));

@@ -83,13 +83,17 @@ class _ResetPasswordViewState extends State<ResetPasswordView> {
                 ),
                 if (errors.otp != null) ...<Widget>[
                   const SizedBox(height: 6),
-                  Text(errors.otp!, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error)),
+                  Text(errors.otp!,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.error)),
                 ],
               ],
             ),
             if (locked)
               AuthMessageBanner(
-                message: 'Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau khoảng ${vm.lockMinutesLeft} phút.',
+                message:
+                    'Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau khoảng ${vm.lockMinutesLeft} phút.',
               )
             else if (vm.hasError && vm.errorMessage != null)
               AuthMessageBanner(message: vm.errorMessage!)

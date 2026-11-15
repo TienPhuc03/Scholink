@@ -24,7 +24,8 @@ class ForgotPasswordView extends StatefulWidget {
 }
 
 class _ForgotPasswordViewState extends State<ForgotPasswordView> {
-  late final TextEditingController _email = TextEditingController(text: widget.initialEmail);
+  late final TextEditingController _email =
+      TextEditingController(text: widget.initialEmail);
 
   @override
   void dispose() {
@@ -51,7 +52,8 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           children: <Widget>[
             const AuthTitle(
               title: 'Quên mật khẩu',
-              subtitle: 'Nhập email đã đăng ký. Nếu tài khoản tồn tại, Scholink sẽ gửi mã OTP để đặt lại mật khẩu.',
+              subtitle:
+                  'Nhập email đã đăng ký. Nếu tài khoản tồn tại, Scholink sẽ gửi mã OTP để đặt lại mật khẩu.',
             ),
             AuthFormSection(
               children: <Widget>[
@@ -70,14 +72,18 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
                 ),
               ],
             ),
-            if (vm.hasError && vm.errorMessage != null) AuthMessageBanner(message: vm.errorMessage!),
+            if (vm.hasError && vm.errorMessage != null)
+              AuthMessageBanner(message: vm.errorMessage!),
             AuthPrimaryButton(
               key: const Key('forgot_submit'),
               label: 'Gửi mã OTP',
               isLoading: vm.isLoading,
               onPressed: _submit,
             ),
-            AuthLinkText(prefix: 'Nhớ ra mật khẩu? ', link: 'Đăng nhập', onTap: widget.onBack),
+            AuthLinkText(
+                prefix: 'Nhớ ra mật khẩu? ',
+                link: 'Đăng nhập',
+                onTap: widget.onBack),
           ],
         );
       },

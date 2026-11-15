@@ -29,7 +29,7 @@ export const TransferLeaderDtoSchema = z.object({
 export type TransferLeaderDto = z.infer<typeof TransferLeaderDtoSchema>;
 
 export const SendMessageDtoSchema = z.object({
-  content: z.string().min(1, 'Nội dung tin nhắn không được rỗng').max(4000),
+  content: z.string().min(1, 'Nội dung tin nhắn không được rỗng').max(10 * 1024 * 1024, 'Nội dung tin nhắn không được vượt quá 10MB'),
   assetId: z.string().optional(),
   clientMsgId: z.string().optional(),
 });

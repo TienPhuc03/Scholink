@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import * as path from 'path';
+import { json, urlencoded } from 'express';
 import { CollaborationServiceModule } from './collaboration-service.module';
 import { GlobalExceptionFilter, CorrelationIdInterceptor } from '@shared';
 
@@ -10,6 +11,8 @@ async function bootstrap() {
   const logger = new Logger('CollaborationMicroservice');
   const app = await NestFactory.create(CollaborationServiceModule);
 
+  app.use(json({ limit: '15mb' }));
+  app.use(urlencoded({ extended: true, limit: '15mb' }));
   app.enableCors({ origin: '*' });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());

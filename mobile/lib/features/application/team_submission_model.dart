@@ -4,7 +4,8 @@
 
 String _str(dynamic v) => v is String ? v : (v?.toString() ?? '');
 int _int(dynamic v) => (v as num?)?.toInt() ?? 0;
-DateTime? _date(dynamic v) => _str(v).isEmpty ? null : DateTime.tryParse(_str(v))?.toLocal();
+DateTime? _date(dynamic v) =>
+    _str(v).isEmpty ? null : DateTime.tryParse(_str(v))?.toLocal();
 
 /// A member preview stays valid for 10 minutes; consents older than this need to be given again
 /// before the leader can commit (Q16). A small margin covers clock drift and the request time.
@@ -29,7 +30,8 @@ class TeamMemberConsentInfo {
     required this.confirmedAt,
   });
 
-  factory TeamMemberConsentInfo.fromJson(Map<String, dynamic> json) => TeamMemberConsentInfo(
+  factory TeamMemberConsentInfo.fromJson(Map<String, dynamic> json) =>
+      TeamMemberConsentInfo(
         studentId: _str(json['studentId']),
         previewId: _str(json['previewId']),
         identityConsentId: _str(json['identityConsentId']),
@@ -43,7 +45,9 @@ class TeamMemberConsentInfo {
   bool get hasIds => previewId.isNotEmpty && identityConsentId.isNotEmpty;
 
   bool isUsableAt(DateTime now) =>
-      hasIds && confirmedAt != null && now.difference(confirmedAt!) < memberConsentLifetime;
+      hasIds &&
+      confirmedAt != null &&
+      now.difference(confirmedAt!) < memberConsentLifetime;
 
   Map<String, dynamic> toSubmitJson() => <String, dynamic>{
         'studentId': studentId,
@@ -86,7 +90,8 @@ class TeamSubmissionStatus {
     this.consents = const <TeamMemberConsentInfo>[],
   });
 
-  factory TeamSubmissionStatus.fromJson(Map<String, dynamic> json) => TeamSubmissionStatus(
+  factory TeamSubmissionStatus.fromJson(Map<String, dynamic> json) =>
+      TeamSubmissionStatus(
         active: json['active'] == true,
         teamId: _str(json['teamId']),
         teamStatus: _str(json['teamStatus']).toUpperCase(),
@@ -98,7 +103,10 @@ class TeamSubmissionStatus {
         fencingToken: _int(json['fencingToken']),
         rosterVersion: _int(json['rosterVersion']),
         members: json['members'] is List
-            ? (json['members'] as List<dynamic>).map(_str).where((String s) => s.isNotEmpty).toList()
+            ? (json['members'] as List<dynamic>)
+                .map(_str)
+                .where((String s) => s.isNotEmpty)
+                .toList()
             : const <String>[],
         consents: json['consents'] is List
             ? (json['consents'] as List<dynamic>)
@@ -113,7 +121,8 @@ class TeamSubmissionStatus {
   bool isLeader(String? userId) => userId != null && userId == leaderId;
 
   /// The lease is over: by the server flag or by the local clock.
-  bool isLeaseOver(DateTime now) => expired || (leaseExpiresAt != null && !now.isBefore(leaseExpiresAt!));
+  bool isLeaseOver(DateTime now) =>
+      expired || (leaseExpiresAt != null && !now.isBefore(leaseExpiresAt!));
 
   TeamMemberConsentInfo? consentOf(String studentId) {
     for (final TeamMemberConsentInfo c in consents) {
@@ -125,24 +134,31 @@ class TeamSubmissionStatus {
   MemberConsentState stateOf(String studentId, DateTime now) {
     final TeamMemberConsentInfo? c = consentOf(studentId);
     if (c == null) return MemberConsentState.missing;
-    return c.isUsableAt(now) ? MemberConsentState.given : MemberConsentState.needsRenewal;
+    return c.isUsableAt(now)
+        ? MemberConsentState.given
+        : MemberConsentState.needsRenewal;
   }
 
   bool allReady(DateTime now) =>
-      members.isNotEmpty && members.every((String m) => stateOf(m, now) == MemberConsentState.given);
+      members.isNotEmpty &&
+      members.every((String m) => stateOf(m, now) == MemberConsentState.given);
 
-  List<String> missingMembers(DateTime now) =>
-      members.where((String m) => stateOf(m, now) == MemberConsentState.missing).toList();
+  List<String> missingMembers(DateTime now) => members
+      .where((String m) => stateOf(m, now) == MemberConsentState.missing)
+      .toList();
 
-  List<String> staleMembers(DateTime now) =>
-      members.where((String m) => stateOf(m, now) == MemberConsentState.needsRenewal).toList();
+  List<String> staleMembers(DateTime now) => members
+      .where((String m) => stateOf(m, now) == MemberConsentState.needsRenewal)
+      .toList();
 
-  List<String> readyMembers(DateTime now) =>
-      members.where((String m) => stateOf(m, now) == MemberConsentState.given).toList();
+  List<String> readyMembers(DateTime now) => members
+      .where((String m) => stateOf(m, now) == MemberConsentState.given)
+      .toList();
 
   /// Exact body for `POST /api/v1/applications` (TEAM). Stored with its Idempotency-Key so a
   /// retry after a lost response resends the same request (Q17).
-  Map<String, dynamic> buildSubmitBody({required int expectedRuleVersion}) => <String, dynamic>{
+  Map<String, dynamic> buildSubmitBody({required int expectedRuleVersion}) =>
+      <String, dynamic>{
         'opportunityId': competitionId,
         'submissionType': 'TEAM',
         'teamId': teamId,

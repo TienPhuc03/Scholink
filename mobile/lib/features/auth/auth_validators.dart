@@ -18,7 +18,8 @@ abstract final class AuthValidators {
   static String? email(String value) {
     final String v = value.trim();
     if (v.isEmpty) return 'Vui lòng nhập email.';
-    if (v.length > 150 || !_emailPattern.hasMatch(v)) return 'Email không đúng định dạng.';
+    if (v.length > 150 || !_emailPattern.hasMatch(v))
+      return 'Email không đúng định dạng.';
     return null;
   }
 
@@ -40,7 +41,8 @@ abstract final class AuthValidators {
   }
 
   static String? otp(String value) {
-    if (!_otpPattern.hasMatch(value.trim())) return 'Mã OTP phải gồm đúng 6 chữ số.';
+    if (!_otpPattern.hasMatch(value.trim()))
+      return 'Mã OTP phải gồm đúng 6 chữ số.';
     return null;
   }
 }

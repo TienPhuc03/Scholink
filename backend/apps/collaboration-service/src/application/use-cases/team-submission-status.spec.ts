@@ -110,7 +110,14 @@ describe('TeamUseCase teammate profile (FR-PROF-05)', () => {
       validateMemberProfile: jest.fn(),
       getProfileView: jest.fn(async (studentId: string, audience: string) => ({ studentId, audience })),
     };
-    const useCase = new TeamUseCase({ findById: jest.fn(async () => team) } as never, {} as never, identity as never);
+    const useCase = new TeamUseCase(
+      {
+        findById: jest.fn(async () => team),
+        findJoinRequestsByTeam: jest.fn(async () => []),
+      } as never,
+      {} as never,
+      identity as never,
+    );
     return { useCase, identity };
   };
 

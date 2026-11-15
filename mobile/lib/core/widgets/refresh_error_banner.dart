@@ -7,7 +7,8 @@ class RefreshErrorBanner extends StatelessWidget {
   final String? message;
   final VoidCallback onRetry;
 
-  const RefreshErrorBanner({super.key, required this.message, required this.onRetry});
+  const RefreshErrorBanner(
+      {super.key, required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +22,14 @@ class RefreshErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.warning),
+          const Icon(Icons.cloud_off_rounded,
+              size: 18, color: AppColors.warning),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Chưa cập nhật được dữ liệu mới. ${message ?? ''}'.trim(),
-              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style:
+                  const TextStyle(fontSize: 13, color: AppColors.textPrimary),
             ),
           ),
           TextButton(onPressed: onRetry, child: const Text('Thử lại')),

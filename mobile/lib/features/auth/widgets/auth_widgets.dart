@@ -32,7 +32,8 @@ class AuthHeader extends StatelessWidget {
             IconButton(
               tooltip: 'Quay lại',
               onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 22),
+              icon: const Icon(Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary, size: 22),
             ),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -41,12 +42,14 @@ class AuthHeader extends StatelessWidget {
               width: 32,
               height: 32,
               fit: BoxFit.contain,
-              errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
+              errorBuilder:
+                  (BuildContext context, Object error, StackTrace? stack) {
                 return Container(
                   width: 32,
                   height: 32,
                   color: AppColors.primaryLight,
-                  child: const Icon(Icons.school_rounded, size: 20, color: AppColors.primary),
+                  child: const Icon(Icons.school_rounded,
+                      size: 20, color: AppColors.primary),
                 );
               },
             ),
@@ -100,8 +103,10 @@ class AuthScaffold extends StatelessWidget {
             AuthHeader(onBack: onBack),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: _withGaps(children, 20),
@@ -221,7 +226,8 @@ class AuthTextField extends StatefulWidget {
 class _AuthTextFieldState extends State<AuthTextField> {
   bool _obscured = true;
 
-  OutlineInputBorder _border(Color color, [double width = 1]) => OutlineInputBorder(
+  OutlineInputBorder _border(Color color, [double width = 1]) =>
+      OutlineInputBorder(
         borderRadius: BorderRadius.circular(4),
         borderSide: BorderSide(color: color, width: width),
       );
@@ -266,21 +272,30 @@ class _AuthTextFieldState extends State<AuthTextField> {
             filled: true,
             fillColor: AppColors.surface,
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: widget.icon == null ? 12 : 0),
-            prefixIcon: widget.icon == null ? null : Icon(widget.icon, size: 16, color: AppColors.textMuted),
-            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 46),
+            contentPadding: EdgeInsets.symmetric(
+                vertical: 14, horizontal: widget.icon == null ? 12 : 0),
+            prefixIcon: widget.icon == null
+                ? null
+                : Icon(widget.icon, size: 16, color: AppColors.textMuted),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 38, minHeight: 46),
             suffixIcon: widget.obscurable
                 ? IconButton(
                     tooltip: _obscured ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
                     icon: Icon(
-                      _obscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscured
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       size: 16,
                       color: AppColors.textMuted,
                     ),
                     onPressed: () => setState(() => _obscured = !_obscured),
                   )
                 : null,
-            hintStyle: const TextStyle(fontFamily: _bodyFont, fontSize: 14, color: AppColors.textMuted),
+            hintStyle: const TextStyle(
+                fontFamily: _bodyFont,
+                fontSize: 14,
+                color: AppColors.textMuted),
             border: _border(AppColors.border),
             enabledBorder: _border(AppColors.border),
             disabledBorder: _border(AppColors.borderLight),
@@ -348,7 +363,8 @@ class AuthPrimaryButton extends StatelessWidget {
           ? const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textOnPrimary),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.textOnPrimary),
             )
           : Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -405,7 +421,9 @@ class AuthGoogleSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đăng nhập bằng Google chưa có trong bản MVP.')),
+                const SnackBar(
+                    content:
+                        Text('Đăng nhập bằng Google chưa có trong bản MVP.')),
               );
             },
             child: const SizedBox(
@@ -449,7 +467,11 @@ class AuthLinkText extends StatelessWidget {
   final String link;
   final VoidCallback onTap;
 
-  const AuthLinkText({super.key, required this.prefix, required this.link, required this.onTap});
+  const AuthLinkText(
+      {super.key,
+      required this.prefix,
+      required this.link,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +493,8 @@ class AuthLinkText extends StatelessWidget {
                 TextSpan(text: prefix),
                 TextSpan(
                   text: link,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, color: AppColors.primary),
                 ),
               ],
             ),
@@ -490,14 +513,18 @@ class AuthMessageBanner extends StatelessWidget {
   final String message;
   final AuthBannerTone tone;
 
-  const AuthMessageBanner({super.key, required this.message, this.tone = AuthBannerTone.error});
+  const AuthMessageBanner(
+      {super.key, required this.message, this.tone = AuthBannerTone.error});
 
   @override
   Widget build(BuildContext context) {
     final (Color color, IconData icon) = switch (tone) {
       AuthBannerTone.error => (AppColors.error, Icons.error_outline_rounded),
       AuthBannerTone.info => (AppColors.primary, Icons.info_outline_rounded),
-      AuthBannerTone.success => (AppColors.success, Icons.check_circle_outline_rounded),
+      AuthBannerTone.success => (
+          AppColors.success,
+          Icons.check_circle_outline_rounded
+        ),
     };
     return Container(
       padding: const EdgeInsets.all(10),
@@ -514,7 +541,11 @@ class AuthMessageBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontFamily: _bodyFont, fontSize: 12, height: 18 / 12, color: color),
+              style: TextStyle(
+                  fontFamily: _bodyFont,
+                  fontSize: 12,
+                  height: 18 / 12,
+                  color: color),
             ),
           ),
         ],
@@ -599,10 +630,14 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                 maxLength: OtpCodeField.length,
                 showCursor: false,
                 enableInteractiveSelection: false,
-                inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(counterText: '', border: InputBorder.none),
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly
+                ],
+                decoration: const InputDecoration(
+                    counterText: '', border: InputBorder.none),
                 onChanged: (String value) {
-                  if (value.length == OtpCodeField.length) widget.onCompleted?.call(value);
+                  if (value.length == OtpCodeField.length)
+                    widget.onCompleted?.call(value);
                 },
               ),
             ),
@@ -612,7 +647,8 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List<Widget>.generate(OtpCodeField.length, (int i) {
                 final bool filled = i < code.length;
-                final bool active = _focusNode.hasFocus && i == code.length.clamp(0, OtpCodeField.length - 1);
+                final bool active = _focusNode.hasFocus &&
+                    i == code.length.clamp(0, OtpCodeField.length - 1);
                 final Color borderColor = widget.hasError
                     ? AppColors.error
                     : active
@@ -623,9 +659,12 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                   height: 52,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: widget.enabled ? AppColors.surface : AppColors.borderLight,
+                    color: widget.enabled
+                        ? AppColors.surface
+                        : AppColors.borderLight,
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: borderColor, width: active ? 1.5 : 1),
+                    border:
+                        Border.all(color: borderColor, width: active ? 1.5 : 1),
                   ),
                   child: Text(
                     filled ? code[i] : '',
@@ -667,7 +706,10 @@ class OtpResendRow extends StatelessWidget {
       children: <Widget>[
         const Text(
           'Chưa nhận được mã? ',
-          style: TextStyle(fontFamily: _bodyFont, fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(
+              fontFamily: _bodyFont,
+              fontSize: 14,
+              color: AppColors.textSecondary),
         ),
         TextButton(
           onPressed: canResend ? onResend : null,

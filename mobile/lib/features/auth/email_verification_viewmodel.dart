@@ -21,14 +21,19 @@ class EmailVerificationViewModel extends OtpFlowViewModel {
   bool _needsManualLogin = false;
   bool get needsManualLogin => _needsManualLogin;
 
-  void start({required String email, required String password, OtpTicket? ticket, String? initialError}) {
+  void start(
+      {required String email,
+      required String password,
+      OtpTicket? ticket,
+      String? initialError}) {
     _password = password;
     startWithTicket(email, ticket, initialError: initialError);
   }
 
   @override
   Future<({OtpTicket? ticket, Failure? failure})> requestOtp() async {
-    final Result<OtpTicket, Failure> r = await _repository.sendOtp(email: email);
+    final Result<OtpTicket, Failure> r =
+        await _repository.sendOtp(email: email);
     return (ticket: r.dataOrNull, failure: r.errorOrNull);
   }
 
@@ -42,14 +47,16 @@ class EmailVerificationViewModel extends OtpFlowViewModel {
     if (isLocked || isLoading) return false;
 
     setLoading();
-    final Result<void, Failure> verified = await _repository.verifyOtp(email: email, otpCode: code);
+    final Result<void, Failure> verified =
+        await _repository.verifyOtp(email: email, otpCode: code);
     final Failure? verifyError = verified.errorOrNull;
     if (verifyError != null) {
       handleOtpFailure(verifyError);
       return false;
     }
 
-    final Result<UserModel, Failure> login = await _repository.login(email: email, password: _password);
+    final Result<UserModel, Failure> login =
+        await _repository.login(email: email, password: _password);
     _password = '';
     return login.fold<bool>(
       onSuccess: (UserModel u) {

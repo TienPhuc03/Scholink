@@ -13,7 +13,8 @@ class ResetFieldErrors {
 
   const ResetFieldErrors({this.otp, this.password, this.confirmPassword});
 
-  bool get isEmpty => otp == null && password == null && confirmPassword == null;
+  bool get isEmpty =>
+      otp == null && password == null && confirmPassword == null;
 }
 
 /// FR-AUTH-03 / FR-AUTH-04: request a reset OTP by email, then submit OTP + new password
@@ -31,7 +32,8 @@ class PasswordResetViewModel extends OtpFlowViewModel {
 
   @override
   Future<({OtpTicket? ticket, Failure? failure})> requestOtp() async {
-    final Result<OtpTicket, Failure> r = await _repository.forgotPassword(email: email);
+    final Result<OtpTicket, Failure> r =
+        await _repository.forgotPassword(email: email);
     return (ticket: r.dataOrNull, failure: r.errorOrNull);
   }
 
@@ -43,7 +45,8 @@ class PasswordResetViewModel extends OtpFlowViewModel {
       return false;
     }
     setLoading();
-    final Result<OtpTicket, Failure> r = await _repository.forgotPassword(email: rawEmail.trim());
+    final Result<OtpTicket, Failure> r =
+        await _repository.forgotPassword(email: rawEmail.trim());
     return r.fold<bool>(
       onSuccess: (OtpTicket ticket) {
         startWithTicket(ticket.email, ticket);
@@ -86,7 +89,8 @@ class PasswordResetViewModel extends OtpFlowViewModel {
     _fieldErrors = ResetFieldErrors(
       otp: AuthValidators.otp(otpCode),
       password: AuthValidators.newPassword(newPassword),
-      confirmPassword: AuthValidators.confirmPassword(newPassword, confirmPassword),
+      confirmPassword:
+          AuthValidators.confirmPassword(newPassword, confirmPassword),
     );
     if (!_fieldErrors.isEmpty) {
       setIdle();

@@ -183,6 +183,44 @@ class InMemoryTeamRepository implements ITeamRepository {
   async updateReservation(reservation: SubmissionReservation): Promise<void> {
     this.reservations.set(reservation.id, reservation);
   }
+
+  async cancelPendingJoinRequests(studentId: string, competitionId: string, exceptRequestId?: string): Promise<void> {
+    for (const req of this.joinRequests.values()) {
+      if (req.applicantId === studentId && req.competitionId === competitionId && req.id !== exceptRequestId && req.status === 'PENDING') {
+        req.withdraw(studentId);
+      }
+    }
+  }
+
+  async acceptJoinRequestInTransaction(params: {
+    team: Team;
+    joinRequest: JoinRequest;
+    activeMembership: ActiveMembershipRecord;
+    outboxEvent?: any;
+  }): Promise<void> {
+    await this.saveActiveMembership(params.activeMembership);
+    await this.update(params.team);
+    await this.updateJoinRequest(params.joinRequest);
+    await this.cancelPendingJoinRequests(params.joinRequest.applicantId, params.team.competitionId, params.joinRequest.id);
+  }
+
+  async saveOutboxEvent(_event: any): Promise<void> {}
+
+  async delete(id: string): Promise<void> {
+    this.teams.delete(id);
+  }
+
+  async deleteActiveMembershipsByTeam(teamId: string): Promise<void> {
+    for (const [key, mem] of this.memberships.entries()) {
+      if (mem.teamId === teamId) this.memberships.delete(key);
+    }
+  }
+
+  async deleteJoinRequestsByTeam(teamId: string): Promise<void> {
+    for (const [key, req] of this.joinRequests.entries()) {
+      if (req.teamId === teamId) this.joinRequests.delete(key);
+    }
+  }
 }
 
 /**

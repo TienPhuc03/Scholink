@@ -15,12 +15,14 @@ class OpportunityQuery {
   final String? applyMode; // IN_APP | EXTERNAL
   final bool bookmarkedOnly;
 
-  const OpportunityQuery({this.type, this.keyword, this.applyMode, this.bookmarkedOnly = false});
+  const OpportunityQuery(
+      {this.type, this.keyword, this.applyMode, this.bookmarkedOnly = false});
 
   bool matches(OpportunityModel o) {
     if (type == 'SCHOLARSHIP' && !o.isScholarship) return false;
     if (type == 'COMPETITION' && !o.isCompetition) return false;
-    if (applyMode != null && o.applyMode.toUpperCase() != applyMode) return false;
+    if (applyMode != null && o.applyMode.toUpperCase() != applyMode)
+      return false;
     final String q = (keyword ?? '').trim().toLowerCase();
     if (q.isEmpty) return true;
     return o.title.toLowerCase().contains(q) ||
@@ -56,7 +58,8 @@ class OpportunityDetail {
   final bool fromCache;
   final Failure? refreshFailure;
 
-  const OpportunityDetail(this.item, {this.fromCache = false, this.refreshFailure});
+  const OpportunityDetail(this.item,
+      {this.fromCache = false, this.refreshFailure});
 }
 
 /// Catalog, bookmark and external-mark data for the Opportunity feature (F11/F29).
@@ -81,8 +84,9 @@ class OpportunityRepository {
 
   static Future<bool> _assumeSignedIn() async => true;
 
-  static Failure _asFailure(Object e) =>
-      e is Failure ? e : ServerFailure(message: 'Dữ liệu cơ hội không hợp lệ: $e');
+  static Failure _asFailure(Object e) => e is Failure
+      ? e
+      : ServerFailure(message: 'Dữ liệu cơ hội không hợp lệ: $e');
 
   // ---------------------------------------------------------------- catalog
 
@@ -96,30 +100,38 @@ class OpportunityRepository {
     try {
       final Map<String, dynamic> params = <String, dynamic>{'limit': limit};
       if (query.type != null) params['type'] = query.type;
-      if ((query.keyword ?? '').trim().isNotEmpty) params['keyword'] = query.keyword!.trim();
+      if ((query.keyword ?? '').trim().isNotEmpty)
+        params['keyword'] = query.keyword!.trim();
       if (query.applyMode != null) params['applyMode'] = query.applyMode;
       if (cursor != null) params['cursor'] = cursor;
 
-      final Response<dynamic> response =
-          await _apiClient.get<dynamic>(ApiEndpoints.opportunities, queryParameters: params);
+      final Response<dynamic> response = await _apiClient
+          .get<dynamic>(ApiEndpoints.opportunities, queryParameters: params);
       final dynamic body = response.data;
 
       final List<dynamic> raw = switch (body) {
         List<dynamic> l => l,
-        Map<String, dynamic> m when m['items'] is List => m['items'] as List<dynamic>,
-        Map<String, dynamic> m when m['data'] is List => m['data'] as List<dynamic>,
+        Map<String, dynamic> m when m['items'] is List =>
+          m['items'] as List<dynamic>,
+        Map<String, dynamic> m when m['data'] is List =>
+          m['data'] as List<dynamic>,
         _ => <dynamic>[],
       };
       final List<OpportunityModel> items = raw
           .whereType<Map<dynamic, dynamic>>()
-          .map((Map<dynamic, dynamic> e) => OpportunityModel.fromJson(Map<String, dynamic>.from(e)))
+          .map((Map<dynamic, dynamic> e) =>
+              OpportunityModel.fromJson(Map<String, dynamic>.from(e)))
           .where((OpportunityModel o) => o.id.isNotEmpty)
           .toList();
 
-      await _roomDb?.opportunityDao.insertAll(items.map((OpportunityModel m) => m.toJson()).toList());
+      await _roomDb?.opportunityDao
+          .insertAll(items.map((OpportunityModel m) => m.toJson()).toList());
 
       final String? next = body is Map ? body['nextCursor']?.toString() : null;
-      final bool hasMore = body is Map && body['hasMore'] == true && next != null && next.isNotEmpty;
+      final bool hasMore = body is Map &&
+          body['hasMore'] == true &&
+          next != null &&
+          next.isNotEmpty;
       return SuccessResult<OpportunityPage, Failure>(OpportunityPage(
         items: await _withUserFlags(items),
         nextCursor: hasMore ? next : null,
@@ -128,14 +140,17 @@ class OpportunityRepository {
     } catch (e) {
       final Failure failure = _asFailure(e);
       // Next pages need the server; the first page can fall back to the cache.
-      if (cursor != null || _roomDb == null) return FailureResult<OpportunityPage, Failure>(failure);
+      if (cursor != null || _roomDb == null)
+        return FailureResult<OpportunityPage, Failure>(failure);
 
-      final List<OpportunityModel> cached = (await _roomDb.opportunityDao.getAll(type: query.type))
+      final List<OpportunityModel> cached = (await _roomDb.opportunityDao
+              .getAll(type: query.type))
           .map(OpportunityModel.fromJson)
           .where(query.matches)
           .toList()
         ..sort(_byDeadline);
-      if (cached.isEmpty) return FailureResult<OpportunityPage, Failure>(failure);
+      if (cached.isEmpty)
+        return FailureResult<OpportunityPage, Failure>(failure);
 
       return SuccessResult<OpportunityPage, Failure>(OpportunityPage(
         items: await _withUserFlags(cached),
@@ -158,9 +173,12 @@ class OpportunityRepository {
     return da.compareTo(db);
   }
 
-  Future<Result<OpportunityPage, Failure>> _bookmarkedPage(OpportunityQuery query) async {
+  Future<Result<OpportunityPage, Failure>> _bookmarkedPage(
+      OpportunityQuery query) async {
     final RoomDatabase? db = _roomDb;
-    if (db == null) return const SuccessResult<OpportunityPage, Failure>(OpportunityPage(items: <OpportunityModel>[]));
+    if (db == null)
+      return const SuccessResult<OpportunityPage, Failure>(
+          OpportunityPage(items: <OpportunityModel>[]));
 
     Failure? syncFailure;
     if (await _isSignedIn()) {
@@ -180,18 +198,24 @@ class OpportunityRepository {
     }
 
     return SuccessResult<OpportunityPage, Failure>(OpportunityPage(
-      items: await _withUserFlags(items.where(query.matches).toList()..sort(_byDeadline)),
+      items: await _withUserFlags(
+          items.where(query.matches).toList()..sort(_byDeadline)),
       fromCache: syncFailure != null,
-      cachedAt: syncFailure != null ? await db.opportunityDao.getLastUpdatedAt() : null,
+      cachedAt: syncFailure != null
+          ? await db.opportunityDao.getLastUpdatedAt()
+          : null,
       refreshFailure: syncFailure,
     ));
   }
 
-  Future<List<OpportunityModel>> _withUserFlags(List<OpportunityModel> items) async {
+  Future<List<OpportunityModel>> _withUserFlags(
+      List<OpportunityModel> items) async {
     final RoomDatabase? db = _roomDb;
     if (db == null) return items;
-    final Set<String> bookmarked = (await db.opportunityDao.getAllBookmarkedIds()).toSet();
-    final Set<String> marked = (await db.opportunityDao.getAllExternalMarkedIds()).toSet();
+    final Set<String> bookmarked =
+        (await db.opportunityDao.getAllBookmarkedIds()).toSet();
+    final Set<String> marked =
+        (await db.opportunityDao.getAllExternalMarkedIds()).toSet();
     return items
         .map((OpportunityModel o) => o.copyWith(
               isBookmarked: bookmarked.contains(o.id),
@@ -204,23 +228,34 @@ class OpportunityRepository {
 
   Future<Result<OpportunityDetail, Failure>> getDetail(String id) async {
     try {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.opportunityDetail(id));
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.opportunityDetail(id));
       final dynamic body = response.data;
-      final dynamic payload = body is Map && body['data'] is Map ? body['data'] : body;
+      final dynamic payload =
+          body is Map && body['data'] is Map ? body['data'] : body;
       if (payload is! Map || (payload['id'] ?? payload['_id']) == null) {
-        throw const ServerFailure(message: 'Không tìm thấy thông tin cơ hội yêu cầu.', statusCode: 404);
+        throw const ServerFailure(
+            message: 'Không tìm thấy thông tin cơ hội yêu cầu.',
+            statusCode: 404);
       }
-      final OpportunityModel model = OpportunityModel.fromJson(Map<String, dynamic>.from(payload));
+      final OpportunityModel model =
+          OpportunityModel.fromJson(Map<String, dynamic>.from(payload));
       await _roomDb?.opportunityDao.insertOrUpdate(model.toJson());
-      if (model.isExternal && await _isSignedIn()) await _refreshExternalMark(id);
+      if (model.isExternal && await _isSignedIn())
+        await _refreshExternalMark(id);
       return SuccessResult<OpportunityDetail, Failure>(
-        OpportunityDetail((await _withUserFlags(<OpportunityModel>[model])).first),
+        OpportunityDetail(
+            (await _withUserFlags(<OpportunityModel>[model])).first),
       );
     } catch (e) {
       final Failure failure = _asFailure(e);
-      final Map<String, dynamic>? cached = await _roomDb?.opportunityDao.findById(id);
-      if (cached == null) return FailureResult<OpportunityDetail, Failure>(failure);
-      final OpportunityModel model = (await _withUserFlags(<OpportunityModel>[OpportunityModel.fromJson(cached)])).first;
+      final Map<String, dynamic>? cached =
+          await _roomDb?.opportunityDao.findById(id);
+      if (cached == null)
+        return FailureResult<OpportunityDetail, Failure>(failure);
+      final OpportunityModel model = (await _withUserFlags(
+              <OpportunityModel>[OpportunityModel.fromJson(cached)]))
+          .first;
       return SuccessResult<OpportunityDetail, Failure>(
         OpportunityDetail(model, fromCache: true, refreshFailure: failure),
       );
@@ -228,10 +263,12 @@ class OpportunityRepository {
   }
 
   /// Kept for callers that only need the model.
-  Future<Result<OpportunityModel, Failure>> getOpportunityById(String id) async {
+  Future<Result<OpportunityModel, Failure>> getOpportunityById(
+      String id) async {
     final Result<OpportunityDetail, Failure> r = await getDetail(id);
     return r.fold(
-      onSuccess: (OpportunityDetail d) => SuccessResult<OpportunityModel, Failure>(d.item),
+      onSuccess: (OpportunityDetail d) =>
+          SuccessResult<OpportunityModel, Failure>(d.item),
       onFailure: (Failure f) => FailureResult<OpportunityModel, Failure>(f),
     );
   }
@@ -241,12 +278,15 @@ class OpportunityRepository {
   /// Pulls the signed-in user's bookmarks from the server and replaces the local list.
   Future<Result<List<String>, Failure>> syncBookmarks() async {
     try {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.myBookmarks);
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.myBookmarks);
       final dynamic body = response.data;
-      final dynamic raw = body is Map ? (body['opportunityIds'] ?? body['items']) : body;
+      final dynamic raw =
+          body is Map ? (body['opportunityIds'] ?? body['items']) : body;
       final List<String> ids = raw is List
           ? raw
-              .map((dynamic e) => e is Map ? (e['opportunityId'] ?? e['id']) : e)
+              .map(
+                  (dynamic e) => e is Map ? (e['opportunityId'] ?? e['id']) : e)
               .where((dynamic e) => e != null)
               .map((dynamic e) => e.toString())
               .toList()
@@ -260,10 +300,12 @@ class OpportunityRepository {
 
   /// Saves or removes a bookmark on the server, then locally. Sends the target state, so a
   /// retry after a lost response cannot flip it back. Nothing changes locally on failure.
-  Future<Result<bool, Failure>> setBookmark(String opportunityId, bool bookmarked) async {
+  Future<Result<bool, Failure>> setBookmark(
+      String opportunityId, bool bookmarked) async {
     if (!await _isSignedIn()) {
       return const FailureResult<bool, Failure>(
-        UnauthorizedFailure(message: 'Đăng nhập để lưu cơ hội và nhận nhắc hạn.'),
+        UnauthorizedFailure(
+            message: 'Đăng nhập để lưu cơ hội và nhận nhắc hạn.'),
       );
     }
     try {
@@ -272,7 +314,9 @@ class OpportunityRepository {
         data: <String, dynamic>{'bookmarked': bookmarked},
       );
       final dynamic body = response.data;
-      final bool saved = body is Map && body['bookmarked'] is bool ? body['bookmarked'] as bool : bookmarked;
+      final bool saved = body is Map && body['bookmarked'] is bool
+          ? body['bookmarked'] as bool
+          : bookmarked;
       if (saved) {
         await _roomDb?.opportunityDao.saveBookmark(opportunityId);
       } else {
@@ -285,10 +329,12 @@ class OpportunityRepository {
   }
 
   /// APP-04: self-mark "đã nộp tại nguồn" for an EXTERNAL opportunity (no Application is made).
-  Future<Result<bool, Failure>> setExternalMark(String opportunityId, bool marked) async {
+  Future<Result<bool, Failure>> setExternalMark(
+      String opportunityId, bool marked) async {
     if (!await _isSignedIn()) {
       return const FailureResult<bool, Failure>(
-        UnauthorizedFailure(message: 'Đăng nhập để ghi nhận bạn đã nộp tại nguồn.'),
+        UnauthorizedFailure(
+            message: 'Đăng nhập để ghi nhận bạn đã nộp tại nguồn.'),
       );
     }
     try {
@@ -297,9 +343,11 @@ class OpportunityRepository {
         data: <String, dynamic>{'marked': marked},
       );
       final dynamic body = response.data;
-      final bool saved =
-          body is Map && body['isExternalMarked'] is bool ? body['isExternalMarked'] as bool : marked;
-      await _roomDb?.opportunityDao.markExternalRegistered(opportunityId, saved);
+      final bool saved = body is Map && body['isExternalMarked'] is bool
+          ? body['isExternalMarked'] as bool
+          : marked;
+      await _roomDb?.opportunityDao
+          .markExternalRegistered(opportunityId, saved);
       return SuccessResult<bool, Failure>(saved);
     } catch (e) {
       return FailureResult<bool, Failure>(_asFailure(e));
@@ -310,11 +358,12 @@ class OpportunityRepository {
   /// Best effort: the detail still opens when this call fails.
   Future<void> _refreshExternalMark(String opportunityId) async {
     try {
-      final Response<dynamic> response =
-          await _apiClient.get<dynamic>(ApiEndpoints.opportunityExternalMark(opportunityId));
+      final Response<dynamic> response = await _apiClient
+          .get<dynamic>(ApiEndpoints.opportunityExternalMark(opportunityId));
       final dynamic body = response.data;
       if (body is Map && body['isExternalMarked'] is bool) {
-        await _roomDb?.opportunityDao.markExternalRegistered(opportunityId, body['isExternalMarked'] as bool);
+        await _roomDb?.opportunityDao.markExternalRegistered(
+            opportunityId, body['isExternalMarked'] as bool);
       }
     } catch (_) {
       // Keep the local value.
@@ -322,5 +371,6 @@ class OpportunityRepository {
   }
 
   /// Check last cache update timestamp (FR-OPP-06: cache có updatedAt)
-  Future<DateTime?> getLastCachedTimestamp() async => _roomDb?.opportunityDao.getLastUpdatedAt();
+  Future<DateTime?> getLastCachedTimestamp() async =>
+      _roomDb?.opportunityDao.getLastUpdatedAt();
 }

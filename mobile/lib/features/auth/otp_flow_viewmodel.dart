@@ -9,7 +9,8 @@ import 'auth_model.dart';
 /// resend cooldown countdown, 15-minute lock after 5 wrong codes, expiry notice
 /// and the dev-only OTP preview echoed by a non-production backend.
 abstract class OtpFlowViewModel extends BaseViewModel {
-  OtpFlowViewModel({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  OtpFlowViewModel({DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   final DateTime Function() _clock;
   Timer? _ticker;
@@ -44,10 +45,12 @@ abstract class OtpFlowViewModel extends BaseViewModel {
   static const bool _showDevOtpInRelease = bool.fromEnvironment('SHOW_DEV_OTP');
 
   /// Only surfaced in debug builds or demo APKs; a production backend never sends a preview.
-  String? get devOtpHint => (kDebugMode || _showDevOtpInRelease) ? _devOtpPreview : null;
+  String? get devOtpHint =>
+      (kDebugMode || _showDevOtpInRelease) ? _devOtpPreview : null;
 
   @protected
-  void startWithTicket(String email, OtpTicket? ticket, {String? initialError}) {
+  void startWithTicket(String email, OtpTicket? ticket,
+      {String? initialError}) {
     _email = email;
     if (ticket != null) {
       _applyTicket(ticket);
@@ -67,7 +70,8 @@ abstract class OtpFlowViewModel extends BaseViewModel {
     _devOtpPreview = ticket.devOtpPreview;
     _isExpired = false;
     _codeRejected = false;
-    _notice = 'Mã gồm 6 chữ số, có hiệu lực ${(ticket.expiresInSeconds / 60).round()} phút.';
+    _notice =
+        'Mã gồm 6 chữ số, có hiệu lực ${(ticket.expiresInSeconds / 60).round()} phút.';
     _startCooldown(ticket.cooldownSeconds);
   }
 
@@ -114,7 +118,8 @@ abstract class OtpFlowViewModel extends BaseViewModel {
         _codeRejected = true;
       case 'RATE_LIMITED':
       case 'OTP_COOLDOWN':
-        final RegExpMatch? m = RegExp(r'(\d+)\s*giây').firstMatch(failure.message);
+        final RegExpMatch? m =
+            RegExp(r'(\d+)\s*giây').firstMatch(failure.message);
         _startCooldown(int.tryParse(m?.group(1) ?? '') ?? 60);
       default:
         break;

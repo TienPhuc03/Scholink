@@ -96,7 +96,8 @@ class _LoginViewState extends State<LoginView> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 24.0),
                 child: ListenableBuilder(
                   listenable: widget.viewModel,
                   builder: (BuildContext context, Widget? child) {
@@ -171,7 +172,8 @@ class _LoginViewState extends State<LoginView> {
                 child: Image.asset(
                   'assets/images/scholink_logo.png',
                   fit: BoxFit.contain,
-                  errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
+                  errorBuilder:
+                      (BuildContext context, Object error, StackTrace? stack) {
                     return Container(
                       color: AppColors.primaryLight,
                       child: const Icon(
@@ -358,7 +360,9 @@ class _LoginViewState extends State<LoginView> {
             ),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: AppColors.textMuted,
                 size: 20,
               ),
@@ -379,47 +383,48 @@ class _LoginViewState extends State<LoginView> {
             // Remember me checkbox (Flexible: large system text must not push the row off screen, F37)
             Flexible(
               child: InkWell(
-              borderRadius: BorderRadius.circular(4),
-              onTap: () {
-                setState(() {
-                  _rememberMe = !_rememberMe;
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: <Widget>[
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: Checkbox(
-                        value: _rememberMe,
-                        activeColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        side: const BorderSide(color: AppColors.border, width: 1.5),
-                        onChanged: (bool? val) {
-                          setState(() {
-                            _rememberMe = val ?? false;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Flexible(
-                      child: Text(
-                        'Ghi nhớ đăng nhập',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+                borderRadius: BorderRadius.circular(4),
+                onTap: () {
+                  setState(() {
+                    _rememberMe = !_rememberMe;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          activeColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          side: const BorderSide(
+                              color: AppColors.border, width: 1.5),
+                          onChanged: (bool? val) {
+                            setState(() {
+                              _rememberMe = val ?? false;
+                            });
+                          },
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Ghi nhớ đăng nhập',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               ),
             ),
             const SizedBox(width: 8),
@@ -430,7 +435,8 @@ class _LoginViewState extends State<LoginView> {
                   () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Tính năng khôi phục mật khẩu qua OTP (FR-AUTH-03)'),
+                        content: Text(
+                            'Tính năng khôi phục mật khẩu qua OTP (FR-AUTH-03)'),
                       ),
                     );
                   },
@@ -459,11 +465,13 @@ class _LoginViewState extends State<LoginView> {
             ),
             child: Row(
               children: <Widget>[
-                const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+                const Icon(Icons.error_outline_rounded,
+                    color: AppColors.error, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.viewModel.errorMessage ?? 'Đăng nhập không thành công',
+                    widget.viewModel.errorMessage ??
+                        'Đăng nhập không thành công',
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       color: AppColors.error,
@@ -502,7 +510,8 @@ class _LoginViewState extends State<LoginView> {
               : const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+                    Icon(Icons.arrow_forward_rounded,
+                        size: 18, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
                       'Đăng nhập',
@@ -541,7 +550,8 @@ class _LoginViewState extends State<LoginView> {
               : () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Tính năng đăng nhập với Google (FR-AUTH-02)'),
+                      content:
+                          Text('Tính năng đăng nhập với Google (FR-AUTH-02)'),
                     ),
                   );
                 },
@@ -590,7 +600,8 @@ class _LoginViewState extends State<LoginView> {
             () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Chuyển hướng đến màn hình Đăng ký tài khoản (Bắt đầu cùng Scholink)'),
+                  content: Text(
+                      'Chuyển hướng đến màn hình Đăng ký tài khoản (Bắt đầu cùng Scholink)'),
                 ),
               );
             },
@@ -665,16 +676,20 @@ class _LoginViewState extends State<LoginView> {
               children: <Widget>[
                 Flexible(
                   child: Text(
-                  _showDemoQuickFill ? 'Ẩn tài khoản Demo' : 'Hiển thị tài khoản Demo (Kiểm thử nhanh)',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                    decoration: TextDecoration.underline,
-                  ),
+                    _showDemoQuickFill
+                        ? 'Ẩn tài khoản Demo'
+                        : 'Hiển thị tài khoản Demo (Kiểm thử nhanh)',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
                 Icon(
-                  _showDemoQuickFill ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  _showDemoQuickFill
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
                   size: 16,
                   color: AppColors.textMuted,
                 ),
@@ -708,21 +723,24 @@ class _LoginViewState extends State<LoginView> {
                   runSpacing: 4,
                   children: <Widget>[
                     ActionChip(
-                      label: const Text('Student', style: TextStyle(fontSize: 11)),
+                      label:
+                          const Text('Student', style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'student@scholink.edu.vn',
                         'Student@2026',
                       ),
                     ),
                     ActionChip(
-                      label: const Text('Applicant 1', style: TextStyle(fontSize: 11)),
+                      label: const Text('Applicant 1',
+                          style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'applicant1@scholink.edu.vn',
                         'Student@2026',
                       ),
                     ),
                     ActionChip(
-                      label: const Text('Applicant 2', style: TextStyle(fontSize: 11)),
+                      label: const Text('Applicant 2',
+                          style: TextStyle(fontSize: 11)),
                       onPressed: () => _fillPersona(
                         'applicant2@scholink.edu.vn',
                         'Student@2026',

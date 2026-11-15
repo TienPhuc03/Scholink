@@ -14,6 +14,7 @@ class ChatRoomModel {
   final String id;
   final ChatRoomType type;
   final String? refId; // contextId (e.g. teamId)
+  final String? name; // Friendly display name (e.g. team name)
   final List<String> participants;
   final String? lastMessageSnippet;
   final DateTime? lastMessageAt;
@@ -25,6 +26,7 @@ class ChatRoomModel {
     required this.id,
     required this.type,
     this.refId,
+    this.name,
     required this.participants,
     this.lastMessageSnippet,
     this.lastMessageAt,
@@ -34,7 +36,10 @@ class ChatRoomModel {
   });
 
   bool get isTeamRoom => type == ChatRoomType.team;
-  String get title => isTeamRoom ? 'Đội thi #$refId' : 'Tin nhắn Trực tiếp';
+  String get title {
+    if (name != null && name!.trim().isNotEmpty) return name!.trim();
+    return isTeamRoom ? 'Phòng đội thi' : 'Tin nhắn trực tiếp';
+  }
 
   bool isMember(String studentId) => participants.contains(studentId);
 
@@ -42,6 +47,7 @@ class ChatRoomModel {
     String? id,
     ChatRoomType? type,
     String? refId,
+    String? name,
     List<String>? participants,
     String? lastMessageSnippet,
     DateTime? lastMessageAt,
@@ -53,6 +59,7 @@ class ChatRoomModel {
       id: id ?? this.id,
       type: type ?? this.type,
       refId: refId ?? this.refId,
+      name: name ?? this.name,
       participants: participants ?? this.participants,
       lastMessageSnippet: lastMessageSnippet ?? this.lastMessageSnippet,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
@@ -63,7 +70,9 @@ class ChatRoomModel {
   }
 
   factory ChatRoomModel.fromJson(Map<String, dynamic> json) {
-    final String typeStr = (json['contextType'] ?? json['type'] ?? 'DIRECT').toString().toUpperCase();
+    final String typeStr = (json['contextType'] ?? json['type'] ?? 'DIRECT')
+        .toString()
+        .toUpperCase();
     final ChatRoomType type =
         typeStr == 'TEAM' ? ChatRoomType.team : ChatRoomType.direct;
 
@@ -72,10 +81,13 @@ class ChatRoomModel {
         ? rawParticipants.map((dynamic e) => e.toString()).toList()
         : <String>[];
 
+    final String? roomName = (json['name'] ?? json['title']) as String?;
+
     return ChatRoomModel(
       id: (json['id'] ?? '') as String,
       type: type,
       refId: (json['contextId'] ?? json['refId']) as String?,
+      name: roomName,
       participants: participants,
       lastMessageSnippet: json['lastMessageSnippet'] as String?,
       lastMessageAt: json['lastMessageAt'] != null

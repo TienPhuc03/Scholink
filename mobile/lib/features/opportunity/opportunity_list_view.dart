@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/errors/failures.dart';
@@ -7,22 +9,16 @@ import 'opportunity_model.dart';
 import 'opportunity_viewmodel.dart';
 import 'widgets/opportunity_card.dart';
 
-/// Opportunity List View implementing MVVM pattern.
-/// Satisfies Tuần 1 (F02), Tuần 2 (F11) and Tuần 4 (F29):
-/// - FR-OPP-01: Separate display of Scholarships and Competitions, with common schema & components.
-/// - FR-OPP-02: Search & Filter (search waits for the user to stop typing).
-/// - FR-OPP-04: Deadlines, source, applyMode.
-/// - FR-OPP-06: Local cache with updatedAt, offline support, bookmarking synced to the account.
-/// - FR-UX-02: loading / empty / error / offline states; retry keeps filters; data on screen stays
-///   visible when a refresh fails.
-/// - UX-03: works with TalkBack and large font sizes.
+/// Professional, LinkedIn-style Opportunity Feed.
+/// Features rich visual banners, organization branding, clear typography, and zero clutter.
 class OpportunityListView extends StatefulWidget {
   final OpportunityViewModel viewModel;
   final bool isGuest;
   final void Function(OpportunityModel opportunity)? onOpportunityTap;
   final VoidCallback? onOpenNotificationInbox;
+  final VoidCallback? onOpenAiChat;
 
-  /// Guests tapping the bookmark are sent here (login, then the bookmark is saved: F10/AUTH-05).
+  /// Guests tapping the bookmark are prompted to login (F10/AUTH-05).
   final void Function(OpportunityModel opportunity)? onBookmarkNeedsLogin;
 
   const OpportunityListView({
@@ -31,6 +27,7 @@ class OpportunityListView extends StatefulWidget {
     this.isGuest = false,
     this.onOpportunityTap,
     this.onOpenNotificationInbox,
+    this.onOpenAiChat,
     this.onBookmarkNeedsLogin,
   });
 
@@ -49,9 +46,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
   void initState() {
     super.initState();
     _scroll.addListener(_maybeLoadMore);
-    // The view model outlives this widget (tab view models live per session): only load once.
     if (_vm.items.isEmpty && !_vm.isLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _vm.loadOpportunities());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _vm.loadOpportunities());
     }
   }
 
@@ -63,7 +60,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
   }
 
   void _maybeLoadMore() {
-    if (_scroll.hasClients && _scroll.position.extentAfter < 400) _vm.loadMore();
+    if (_scroll.hasClients && _scroll.position.extentAfter < 400) {
+      _vm.loadMore();
+    }
   }
 
   void _navigateToDetail(OpportunityModel opp) {
@@ -98,7 +97,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     if (failure != null) {
       _snack('Chưa lưu được thay đổi: ${failure.message}', error: true);
     } else {
-      _snack(willSave ? 'Đã lưu. Scholink sẽ nhắc bạn trước hạn 7, 3 và 1 ngày.' : 'Đã bỏ lưu cơ hội.');
+      _snack(willSave
+          ? 'Đã lưu cơ hội vào danh sách của bạn.'
+          : 'Đã bỏ lưu cơ hội.');
     }
   }
 
@@ -107,8 +108,10 @@ class _OpportunityListViewState extends State<OpportunityListView> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         content: Text(message),
-        backgroundColor: error ? AppColors.error : null,
-        duration: const Duration(seconds: 3),
+        backgroundColor: error ? AppColors.error : AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 2),
       ));
   }
 
@@ -120,17 +123,47 @@ class _OpportunityListViewState extends State<OpportunityListView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor:
+          const Color(0xFFF3F2EF), // LinkedIn signature background tint
       appBar: AppBar(
-        title: const Text('Khám phá Cơ hội'),
+        title: Row(
+          children: <Widget>[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.school_rounded,
+                  color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Scholink',
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+                letterSpacing: -0.4,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1.0,
         actions: <Widget>[
           if (widget.onOpenNotificationInbox != null)
             IconButton(
-              icon: const Icon(Icons.notifications_none_rounded),
+              icon: const Icon(Icons.notifications_none_rounded,
+                  color: Color(0xFF334155)),
               tooltip: 'Hộp thư thông báo',
               onPressed: widget.onOpenNotificationInbox,
             ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF334155)),
             tooltip: 'Làm mới danh sách',
             onPressed: () => _vm.loadOpportunities(forceRefresh: true),
           ),
@@ -141,12 +174,29 @@ class _OpportunityListViewState extends State<OpportunityListView> {
         builder: (BuildContext context, Widget? _) {
           return Column(
             children: <Widget>[
-              _buildSearchField(),
-              _buildTypeChips(),
-              _buildApplyModeChips(),
-              if (_vm.isRefreshing) const LinearProgressIndicator(minHeight: 2),
+              // Search & Filter header container
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: Column(
+                  children: <Widget>[
+                    _buildSearchBar(),
+                    const SizedBox(height: 8),
+                    _buildTypeChips(),
+                    const SizedBox(height: 6),
+                    _buildApplyModeChips(),
+                  ],
+                ),
+              ),
+
+              // Status / Offline Banners
               ..._buildStatusBanners(),
-              const Divider(height: 1),
+
+              if (_vm.isRefreshing) const LinearProgressIndicator(minHeight: 2),
+
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+              // Main Feed: LinkedIn-style Post stream
               Expanded(child: _buildBody()),
             ],
           );
@@ -155,21 +205,28 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     );
   }
 
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+  Widget _buildSearchBar() {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDF3F8), // LinkedIn search input background
+        borderRadius: BorderRadius.circular(6),
+      ),
       child: TextField(
         key: const Key('opportunity_search'),
         controller: _searchController,
         textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
-          hintText: 'Tìm theo tên, đơn vị, lĩnh vực...',
-          labelText: 'Tìm kiếm cơ hội',
-          floatingLabelBehavior: FloatingLabelBehavior.never,
-          prefixIcon: const Icon(Icons.search, size: 22),
+          hintText: 'Tìm kiếm học bổng, trường, ngành...',
+          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: Color(0xFF64748B)),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 20),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.clear_rounded,
+                      size: 16, color: Color(0xFF64748B)),
                   tooltip: 'Xóa từ khóa',
                   onPressed: () {
                     _searchController.clear();
@@ -178,17 +235,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                   },
                 )
               : null,
-          filled: true,
-          fillColor: Colors.grey.shade100,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
+          border: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(vertical: 9),
         ),
         onChanged: (String val) {
           _vm.setSearchQuery(val);
@@ -199,37 +248,34 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     );
   }
 
-  // Primary Filter Chips: ALL, SCHOLARSHIP, COMPETITION, BOOKMARKED (FR-OPP-01 & FR-OPP-06)
   Widget _buildTypeChips() {
     final String current = _vm.selectedTypeFilter;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
       child: Row(
         children: <Widget>[
-          _buildFilterChip('ALL', 'Tất cả', current),
-          const SizedBox(width: 8),
-          _buildFilterChip('SCHOLARSHIP', '🎓 Học bổng', current),
-          const SizedBox(width: 8),
-          _buildFilterChip('COMPETITION', '🏆 Cuộc thi', current),
+          _buildChip('ALL', 'Tất cả', current == 'ALL'),
+          const SizedBox(width: 6),
+          _buildChip('SCHOLARSHIP', '🎓 Học bổng', current == 'SCHOLARSHIP'),
+          const SizedBox(width: 6),
+          _buildChip('COMPETITION', '🏆 Cuộc thi', current == 'COMPETITION'),
           if (!widget.isGuest) ...<Widget>[
-            const SizedBox(width: 8),
-            _buildFilterChip('BOOKMARKED', '⭐ Đã lưu', current),
+            const SizedBox(width: 6),
+            _buildChip('BOOKMARKED', '⭐ Đã lưu', current == 'BOOKMARKED'),
           ],
         ],
       ),
     );
   }
 
-  // Secondary Filter: Apply Mode (ALL, IN_APP, EXTERNAL)
   Widget _buildApplyModeChips() {
     final String mode = _vm.selectedApplyMode;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 2.0),
       child: Row(
         children: <Widget>[
-          const Text('Chế độ nộp: ', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          const Text('Chế độ: ',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
           const SizedBox(width: 4),
           _buildSmallModeChip('ALL', 'Tất cả', mode),
           const SizedBox(width: 6),
@@ -241,7 +287,57 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     );
   }
 
-  /// Offline / cache notice with its update time (FR-OPP-06) and the refresh error with a retry.
+  Widget _buildChip(String value, String label, bool isSelected) {
+    return GestureDetector(
+      onTap: () => _vm.setTypeFilter(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF334155),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmallModeChip(String value, String label, String currentMode) {
+    final bool isSelected = currentMode == value;
+    return GestureDetector(
+      onTap: () => _vm.setApplyModeFilter(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildStatusBanners() {
     if (_vm.items.isEmpty) return const <Widget>[];
     final List<Widget> banners = <Widget>[];
@@ -249,18 +345,22 @@ class _OpportunityListViewState extends State<OpportunityListView> {
       banners.add(Container(
         key: const Key('opportunity_cache_banner'),
         width: double.infinity,
-        color: Colors.amber.shade100,
+        color: Colors.amber.shade50,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
           children: <Widget>[
-            Icon(_vm.isOffline ? Icons.wifi_off_rounded : Icons.history_rounded, size: 16, color: Colors.brown),
-            const SizedBox(width: 8),
+            Icon(_vm.isOffline ? Icons.wifi_off_rounded : Icons.history_rounded,
+                size: 14, color: Colors.brown),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 _vm.lastUpdatedAtText != null
                     ? '${_vm.isOffline ? 'Đang ngoại tuyến. ' : ''}Dữ liệu lưu trên máy, cập nhật lúc ${_vm.lastUpdatedAtText}.'
                     : 'Đang xem dữ liệu đã lưu trên máy.',
-                style: const TextStyle(fontSize: 12, color: Colors.brown, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.brown,
+                    fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -269,33 +369,25 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     }
     if (_vm.refreshError != null) {
       banners.add(Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-        child: RefreshErrorBanner(message: _vm.refreshError, onRetry: _vm.retry),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+        child:
+            RefreshErrorBanner(message: _vm.refreshError, onRetry: _vm.retry),
       ));
     }
     return banners;
   }
 
-  // Main Content: Loading, Error, Empty, Success States (FR-UX-02)
   Widget _buildBody() {
     if (_vm.isLoading && _vm.items.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            CircularProgressIndicator(),
-            SizedBox(height: 14),
-            Text('Đang tải danh sách cơ hội...', style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
 
-    // Error State (with retry retaining filters)
     if (_vm.hasError && _vm.items.isEmpty) {
       return _CenteredMessage(
         key: const Key('opportunity_error_state'),
-        icon: _vm.isOffline ? Icons.wifi_off_outlined : Icons.error_outline_rounded,
+        icon: _vm.isOffline
+            ? Icons.wifi_off_outlined
+            : Icons.error_outline_rounded,
         iconColor: AppColors.error,
         title: _vm.errorMessage ?? 'Không thể kết nối đến máy chủ.',
         message: _vm.hasActiveFilters
@@ -303,41 +395,52 @@ class _OpportunityListViewState extends State<OpportunityListView> {
             : 'Kiểm tra kết nối mạng rồi thử lại.',
         action: ElevatedButton.icon(
           key: const Key('opportunity_retry'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white),
           onPressed: _vm.retry,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(Icons.refresh_rounded, size: 16),
           label: const Text('Thử lại'),
         ),
       );
     }
 
-    // Empty State (distinct from error, per FR-UX-02)
     final List<OpportunityModel> items = _vm.items;
     if (items.isEmpty) {
       final bool bookmarks = _vm.selectedTypeFilter == 'BOOKMARKED';
       return _CenteredMessage(
         key: const Key('opportunity_empty_state'),
-        icon: bookmarks ? Icons.bookmark_border_rounded : Icons.search_off_rounded,
-        iconColor: AppColors.textMuted,
-        title: bookmarks ? 'Bạn chưa lưu cơ hội nào' : 'Không tìm thấy cơ hội phù hợp',
+        icon: bookmarks
+            ? Icons.bookmark_border_rounded
+            : Icons.search_off_rounded,
+        iconColor: const Color(0xFF94A3B8),
+        title: bookmarks
+            ? 'Bạn chưa lưu cơ hội nào'
+            : 'Không tìm thấy cơ hội phù hợp',
         message: bookmarks
             ? 'Nhấn biểu tượng lưu trên một cơ hội để theo dõi và nhận nhắc hạn.'
             : 'Hãy thử điều chỉnh từ khóa tìm kiếm hoặc chọn bộ lọc "Tất cả".',
         action: _vm.hasActiveFilters
-            ? OutlinedButton(onPressed: _resetFilters, child: const Text('Đặt lại bộ lọc'))
+            ? OutlinedButton(
+                onPressed: _resetFilters,
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary),
+                child: const Text('Đặt lại bộ lọc'),
+              )
             : null,
       );
     }
 
-    // Success List State
     return RefreshIndicator(
+      color: AppColors.primary,
       onRefresh: () => _vm.loadOpportunities(forceRefresh: true),
       child: ListView.separated(
         key: const PageStorageKey<String>('opportunity_list'),
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
         itemCount: items.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (BuildContext context, int index) {
           if (index == items.length) return _buildListFooter();
           final OpportunityModel item = items[index];
@@ -355,8 +458,8 @@ class _OpportunityListViewState extends State<OpportunityListView> {
   Widget _buildListFooter() {
     if (_vm.isLoadingMore) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.symmetric(vertical: 14),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
     if (_vm.loadMoreError != null) {
@@ -365,55 +468,27 @@ class _OpportunityListViewState extends State<OpportunityListView> {
           Text(
             'Không tải thêm được: ${_vm.loadMoreError}',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
           ),
-          TextButton(onPressed: _vm.loadMore, child: const Text('Thử tải thêm')),
+          TextButton(
+              onPressed: _vm.loadMore,
+              child: const Text('Thử tải thêm',
+                  style: TextStyle(color: AppColors.primary))),
         ],
       );
     }
     if (_vm.hasMore) {
-      return Center(child: TextButton(onPressed: _vm.loadMore, child: const Text('Xem thêm')));
+      return Center(
+        child: TextButton(
+            onPressed: _vm.loadMore,
+            child: const Text('Xem thêm bài viết',
+                style: TextStyle(color: AppColors.primary))),
+      );
     }
-    return const SizedBox(height: 24);
-  }
-
-  Widget _buildFilterChip(String value, String label, String currentFilter) {
-    final bool isSelected = currentFilter == value;
-    return FilterChip(
-      selected: isSelected,
-      label: Text(label),
-      labelStyle: TextStyle(
-        fontSize: 13,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? Colors.white : AppColors.textPrimary,
-      ),
-      selectedColor: AppColors.primary,
-      checkmarkColor: Colors.white,
-      backgroundColor: AppColors.surface,
-      side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
-      onSelected: (_) => _vm.setTypeFilter(value),
-    );
-  }
-
-  Widget _buildSmallModeChip(String value, String label, String currentMode) {
-    final bool isSelected = currentMode == value;
-    return ChoiceChip(
-      selected: isSelected,
-      label: Text(label),
-      labelStyle: TextStyle(
-        fontSize: 11.5,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? AppColors.primary : AppColors.textSecondary,
-      ),
-      selectedColor: AppColors.primary.withValues(alpha: 0.15),
-      backgroundColor: Colors.transparent,
-      side: BorderSide(color: isSelected ? AppColors.primary : Colors.grey.shade300),
-      onSelected: (_) => _vm.setApplyModeFilter(value),
-    );
+    return const SizedBox(height: 16);
   }
 }
 
-/// Scrollable so large text never pushes the action off screen.
 class _CenteredMessage extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -438,20 +513,26 @@ class _CenteredMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 54, color: iconColor),
-            const SizedBox(height: 12),
+            Icon(icon, size: 44, color: iconColor),
+            const SizedBox(height: 10),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A)),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
             ),
-            if (action != null) ...<Widget>[const SizedBox(height: 16), action!],
+            if (action != null) ...<Widget>[
+              const SizedBox(height: 14),
+              action!
+            ],
           ],
         ),
       ),

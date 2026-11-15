@@ -43,7 +43,9 @@ class PushListener {
     if (!_mqtt.isConnected) {
       // MqttManager subscribes users/<userId>/notifications when it connects.
       final bool ok = await _mqtt.connect(userId);
-      if (!ok) debugPrint('[Push] MQTT chưa kết nối được; nhắc hạn vẫn có trong Hộp thư.');
+      if (!ok)
+        debugPrint(
+            '[Push] MQTT chưa kết nối được; nhắc hạn vẫn có trong Hộp thư.');
     } else {
       _mqtt.subscribe('users/$userId/notifications');
     }
@@ -69,7 +71,9 @@ class PushListener {
       return;
     }
     if (decoded is! Map) return;
-    final String key = (decoded['notificationKey'] ?? decoded['notificationId'] ?? '').toString();
+    final String key =
+        (decoded['notificationKey'] ?? decoded['notificationId'] ?? '')
+            .toString();
     final String title = (decoded['title'] ?? '').toString();
     if (key.isEmpty || title.isEmpty || !_shown.add(key)) return;
 

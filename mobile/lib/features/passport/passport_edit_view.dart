@@ -65,9 +65,11 @@ class _PassportEditViewState extends State<PassportEditView> {
     _startYear.text = edu != null ? '${edu.startYear}' : '';
     _endYear.text = edu?.endYear?.toString() ?? '';
     // A saved end year that is not the default (or a saved "still studying") is the user's choice.
-    _endYearTouched = edu != null && _endYear.text != PassportValidators.defaultEndYear(_startYear.text);
+    _endYearTouched = edu != null &&
+        _endYear.text != PassportValidators.defaultEndYear(_startYear.text);
     _gpaScale = edu?.gpaScale == 10 ? 10 : 4;
-    final String gpa = edu?.gpa != null ? PassportValidators.formatGpa(edu!.gpa!) : '';
+    final String gpa =
+        edu?.gpa != null ? PassportValidators.formatGpa(edu!.gpa!) : '';
     _gpa.text = gpa;
     _syncGpa(gpa);
     _syncDraftFromFields();
@@ -102,7 +104,8 @@ class _PassportEditViewState extends State<PassportEditView> {
       ..bio = _bio.text
       ..regionCode = _region.text
       ..phone = _phone.text;
-    final bool hasEducation = _institution.text.trim().isNotEmpty || _major.text.trim().isNotEmpty;
+    final bool hasEducation =
+        _institution.text.trim().isNotEmpty || _major.text.trim().isNotEmpty;
     _draft.education = hasEducation
         ? EducationModel(
             institution: _institution.text.trim(),
@@ -147,8 +150,13 @@ class _PassportEditViewState extends State<PassportEditView> {
   }
 
   bool _validate() {
-    final ({String? institution, String? major, String? startYear, String? endYear, String? gpa}) edu =
-        PassportValidators.education(
+    final ({
+      String? institution,
+      String? major,
+      String? startYear,
+      String? endYear,
+      String? gpa
+    }) edu = PassportValidators.education(
       institution: _institution.text,
       major: _major.text,
       startYear: _startYear.text,
@@ -175,7 +183,8 @@ class _PassportEditViewState extends State<PassportEditView> {
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!_validate()) {
-      _showSnack('Vui lòng kiểm tra lại các trường được đánh dấu.', isError: true);
+      _showSnack('Vui lòng kiểm tra lại các trường được đánh dấu.',
+          isError: true);
       return;
     }
     _syncDraftFromFields();
@@ -183,7 +192,8 @@ class _PassportEditViewState extends State<PassportEditView> {
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop(true);
-    } else if (widget.viewModel.hadVersionConflict && widget.viewModel.passport != null) {
+    } else if (widget.viewModel.hadVersionConflict &&
+        widget.viewModel.passport != null) {
       // Server data changed: keep the user's typed values for fields they touched is risky
       // across versions, so reload the fresh copy and let them re-apply edits.
       setState(() => _loadFrom(widget.viewModel.passport!));
@@ -198,7 +208,9 @@ class _PassportEditViewState extends State<PassportEditView> {
         title: const Text('Bỏ thay đổi?'),
         content: const Text('Các thay đổi chưa lưu sẽ bị mất.'),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Tiếp tục sửa')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Tiếp tục sửa')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
@@ -212,12 +224,15 @@ class _PassportEditViewState extends State<PassportEditView> {
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: isError ? AppColors.error : null),
+      SnackBar(
+          content: Text(msg),
+          backgroundColor: isError ? AppColors.error : null),
     );
   }
 
   void _addSkill() {
-    final String? err = PassportValidators.newSkill(_newSkill.text, _draft.skills);
+    final String? err =
+        PassportValidators.newSkill(_newSkill.text, _draft.skills);
     if (err != null) {
       setState(() => _errors['skill'] = err);
       return;
@@ -230,7 +245,8 @@ class _PassportEditViewState extends State<PassportEditView> {
   }
 
   void _addAchievement() {
-    final String? err = PassportValidators.newAchievement(_newAchievement.text, _draft.achievements);
+    final String? err = PassportValidators.newAchievement(
+        _newAchievement.text, _draft.achievements);
     if (err != null) {
       setState(() => _errors['achievement'] = err);
       return;
@@ -243,16 +259,21 @@ class _PassportEditViewState extends State<PassportEditView> {
   }
 
   Future<void> _editCertificate([int? index]) async {
-    if (index == null && _draft.certificates.length >= PassportValidators.maxCertificates) {
-      _showSnack('Tối đa ${PassportValidators.maxCertificates} chứng chỉ.', isError: true);
+    if (index == null &&
+        _draft.certificates.length >= PassportValidators.maxCertificates) {
+      _showSnack('Tối đa ${PassportValidators.maxCertificates} chứng chỉ.',
+          isError: true);
       return;
     }
-    final CertificateModel? result = await showModalBottomSheet<CertificateModel>(
+    final CertificateModel? result =
+        await showModalBottomSheet<CertificateModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-      builder: (BuildContext ctx) => _CertificateSheet(initial: index != null ? _draft.certificates[index] : null),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+      builder: (BuildContext ctx) => _CertificateSheet(
+          initial: index != null ? _draft.certificates[index] : null),
     );
     if (result == null) return;
     setState(() {
@@ -288,7 +309,8 @@ class _PassportEditViewState extends State<PassportEditView> {
               children: <Widget>[
                 Expanded(
                   child: ListView(
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: <Widget>[
                       _buildBasic(),
@@ -399,7 +421,8 @@ class _PassportEditViewState extends State<PassportEditView> {
     return _Section(
       title: 'Học vấn',
       icon: Icons.school_outlined,
-      subtitle: 'Không bắt buộc. Đã nhập thì cần đủ trường, ngành và năm bắt đầu.',
+      subtitle:
+          'Không bắt buộc. Đã nhập thì cần đủ trường, ngành và năm bắt đầu.',
       children: <Widget>[
         SuggestField(
           key: const Key('passport_institution'),
@@ -418,7 +441,8 @@ class _PassportEditViewState extends State<PassportEditView> {
           controller: _major,
           errorText: _errors['major'],
           suggestWhenEmpty: true,
-          load: (String q) => widget.viewModel.suggest('major', q, institution: _institution.text),
+          load: (String q) => widget.viewModel
+              .suggest('major', q, institution: _institution.text),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,9 +489,12 @@ class _PassportEditViewState extends State<PassportEditView> {
     );
   }
 
-  Widget _gpaField(double scale, TextEditingController controller, String hint) => AuthTextField(
+  Widget _gpaField(
+          double scale, TextEditingController controller, String hint) =>
+      AuthTextField(
         key: Key('passport_gpa_${scale.toStringAsFixed(0)}'),
-        label: 'GPA hệ ${scale.toStringAsFixed(0)}${_gpaScale == scale ? ' (đang dùng)' : ''}',
+        label:
+            'GPA hệ ${scale.toStringAsFixed(0)}${_gpaScale == scale ? ' (đang dùng)' : ''}',
         hint: hint,
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -492,7 +519,8 @@ class _PassportEditViewState extends State<PassportEditView> {
             children: <Widget>[
               for (int i = 0; i < _draft.skills.length; i++)
                 InputChip(
-                  label: Text(_draft.skills[i], style: const TextStyle(fontSize: 12)),
+                  label: Text(_draft.skills[i],
+                      style: const TextStyle(fontSize: 12)),
                   backgroundColor: AppColors.primaryLight,
                   side: BorderSide.none,
                   deleteIconColor: AppColors.textSecondary,
@@ -559,7 +587,8 @@ class _PassportEditViewState extends State<PassportEditView> {
             backgroundColor: AppColors.surface,
             side: const BorderSide(color: AppColors.border),
             minimumSize: const Size.fromHeight(44),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
         ),
       ],
@@ -567,11 +596,15 @@ class _PassportEditViewState extends State<PassportEditView> {
   }
 
   Widget _buildPreferences() {
-    Widget tile(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    Widget tile(String title, String subtitle, bool value,
+        ValueChanged<bool> onChanged) {
       return SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: Text(title, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        title: Text(title,
+            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+        subtitle: Text(subtitle,
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         value: value,
         activeThumbColor: AppColors.primary,
         onChanged: (bool v) => setState(() => onChanged(v)),
@@ -582,11 +615,20 @@ class _PassportEditViewState extends State<PassportEditView> {
       title: 'Tùy chọn hiển thị',
       icon: Icons.tune_rounded,
       children: <Widget>[
-        tile('Đang tìm đồng đội', 'Cho phép trưởng đội thấy bạn khi ghép đội thi.', _draft.isLookingForTeammate,
+        tile(
+            'Đang tìm đồng đội',
+            'Cho phép trưởng đội thấy bạn khi ghép đội thi.',
+            _draft.isLookingForTeammate,
             (bool v) => _draft.isLookingForTeammate = v),
-        tile('Quan tâm học bổng', 'Ưu tiên gợi ý học bổng phù hợp với hồ sơ.', _draft.isOpenForScholarship,
+        tile(
+            'Quan tâm học bổng',
+            'Ưu tiên gợi ý học bổng phù hợp với hồ sơ.',
+            _draft.isOpenForScholarship,
             (bool v) => _draft.isOpenForScholarship = v),
-        tile('Sẵn sàng nhận cố vấn', 'Nhận lời mời từ mentor trong tương lai.', _draft.isOpenForMentoring,
+        tile(
+            'Sẵn sàng nhận cố vấn',
+            'Nhận lời mời từ mentor trong tương lai.',
+            _draft.isOpenForMentoring,
             (bool v) => _draft.isOpenForMentoring = v),
       ],
     );
@@ -597,21 +639,29 @@ class _PassportEditViewState extends State<PassportEditView> {
     return _Section(
       title: 'Quyền hiển thị',
       icon: Icons.visibility_outlined,
-      subtitle: 'Họ tên và ảnh đại diện luôn hiển thị. Hồ sơ ứng tuyển chỉ gửi bản bạn đã đồng ý khi nộp.',
+      subtitle:
+          'Họ tên và ảnh đại diện luôn hiển thị. Hồ sơ ứng tuyển chỉ gửi bản bạn đã đồng ý khi nộp.',
       children: <Widget>[
         for (final PrivacyFieldInfo f in privacyFields)
           Row(
             key: Key('privacy_row_${f.key}'),
             children: <Widget>[
-              Expanded(child: Text(f.label, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary))),
+              Expanded(
+                  child: Text(f.label,
+                      style: const TextStyle(
+                          fontSize: 14, color: AppColors.textPrimary))),
               DropdownButton<FieldVisibility>(
                 key: Key('privacy_${f.key}'),
                 value: _draft.fieldPrivacy[f.key] ?? f.byDefault,
                 underline: const SizedBox.shrink(),
-                style: const TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600),
                 items: <DropdownMenuItem<FieldVisibility>>[
                   for (final FieldVisibility v in FieldVisibility.values)
-                    DropdownMenuItem<FieldVisibility>(value: v, child: Text(v.label)),
+                    DropdownMenuItem<FieldVisibility>(
+                        value: v, child: Text(v.label)),
                 ],
                 onChanged: (FieldVisibility? v) {
                   if (v != null) setState(() => _draft.fieldPrivacy[f.key] = v);
@@ -635,7 +685,11 @@ class _Section extends StatelessWidget {
   final String? subtitle;
   final List<Widget> children;
 
-  const _Section({required this.title, required this.icon, this.subtitle, required this.children});
+  const _Section(
+      {required this.title,
+      required this.icon,
+      this.subtitle,
+      required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +727,9 @@ class _Section extends StatelessWidget {
             ),
             if (subtitle != null) ...<Widget>[
               const SizedBox(height: 4),
-              Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text(subtitle!,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMuted)),
             ],
             const SizedBox(height: 14),
             ...spaced,
@@ -701,8 +757,9 @@ class _AddRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    OutlineInputBorder border(Color c) =>
-        OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: c));
+    OutlineInputBorder border(Color c) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4),
+        borderSide: BorderSide(color: c));
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -719,7 +776,8 @@ class _AddRow extends StatelessWidget {
               isDense: true,
               filled: true,
               fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               border: border(AppColors.border),
               enabledBorder: border(AppColors.border),
               focusedBorder: border(AppColors.primary),
@@ -734,7 +792,8 @@ class _AddRow extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primaryLight,
               foregroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6)),
             ),
             child: const Text('Thêm'),
           ),
@@ -750,7 +809,8 @@ class _ListEntry extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onTap;
 
-  const _ListEntry({required this.text, this.detail, required this.onDelete, this.onTap});
+  const _ListEntry(
+      {required this.text, this.detail, required this.onDelete, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -768,16 +828,21 @@ class _ListEntry extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(text, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                    Text(text,
+                        style: const TextStyle(
+                            fontSize: 14, color: AppColors.textPrimary)),
                     if (detail != null && detail!.isNotEmpty)
-                      Text(detail!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text(detail!,
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               IconButton(
                 tooltip: 'Xóa',
                 onPressed: onDelete,
-                icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                icon: const Icon(Icons.close_rounded,
+                    size: 18, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -798,11 +863,22 @@ class _CertificateSheet extends StatefulWidget {
 }
 
 class _CertificateSheetState extends State<_CertificateSheet> {
-  static const List<String> _types = <String>['IELTS', 'TOEIC', 'TOEFL', 'VSTEP', 'JLPT', 'TIN_HOC', 'OTHER'];
+  static const List<String> _types = <String>[
+    'IELTS',
+    'TOEIC',
+    'TOEFL',
+    'VSTEP',
+    'JLPT',
+    'TIN_HOC',
+    'OTHER'
+  ];
 
-  late final TextEditingController _name = TextEditingController(text: widget.initial?.name ?? '');
-  late final TextEditingController _score = TextEditingController(text: widget.initial?.score ?? '');
-  late String _type = _types.contains(widget.initial?.type) ? widget.initial!.type : 'OTHER';
+  late final TextEditingController _name =
+      TextEditingController(text: widget.initial?.name ?? '');
+  late final TextEditingController _score =
+      TextEditingController(text: widget.initial?.score ?? '');
+  late String _type =
+      _types.contains(widget.initial?.type) ? widget.initial!.type : 'OTHER';
   late DateTime? _issued = widget.initial?.issuedDate;
   late DateTime? _expiry = widget.initial?.expiryDate;
   String? _nameError;
@@ -866,13 +942,15 @@ class _CertificateSheetState extends State<_CertificateSheet> {
               backgroundColor: AppColors.surface,
               side: const BorderSide(color: AppColors.border),
               minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4)),
             ),
           ),
         );
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: Column(
@@ -881,7 +959,10 @@ class _CertificateSheetState extends State<_CertificateSheet> {
           children: <Widget>[
             Text(
               widget.initial == null ? 'Thêm chứng chỉ' : 'Sửa chứng chỉ',
-              style: const TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 18, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                  fontFamily: 'Be Vietnam Pro',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
             AuthTextField(
@@ -893,18 +974,22 @@ class _CertificateSheetState extends State<_CertificateSheet> {
               onChanged: (_) => setState(() => _nameError = null),
             ),
             const SizedBox(height: 14),
-            const Text('Loại', style: TextStyle(fontSize: 12, color: AppColors.textPrimary)),
+            const Text('Loại',
+                style: TextStyle(fontSize: 12, color: AppColors.textPrimary)),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               initialValue: _type,
               items: _types
-                  .map((String t) => DropdownMenuItem<String>(value: t, child: Text(t == 'OTHER' ? 'Khác' : t)))
+                  .map((String t) => DropdownMenuItem<String>(
+                      value: t, child: Text(t == 'OTHER' ? 'Khác' : t)))
                   .toList(),
               onChanged: (String? v) => setState(() => _type = v ?? 'OTHER'),
               decoration: InputDecoration(
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
               ),
             ),
             const SizedBox(height: 14),
@@ -924,10 +1009,12 @@ class _CertificateSheetState extends State<_CertificateSheet> {
             ),
             if (_dateError != null) ...<Widget>[
               const SizedBox(height: 6),
-              Text(_dateError!, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+              Text(_dateError!,
+                  style: const TextStyle(fontSize: 12, color: AppColors.error)),
             ],
             const SizedBox(height: 20),
-            AuthPrimaryButton(label: 'Xong', icon: Icons.check_rounded, onPressed: _submit),
+            AuthPrimaryButton(
+                label: 'Xong', icon: Icons.check_rounded, onPressed: _submit),
           ],
         ),
       ),

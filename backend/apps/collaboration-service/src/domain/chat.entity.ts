@@ -43,6 +43,7 @@ export class Message extends Entity<string> {
 export interface ChatRoomProps {
   type: 'DIRECT' | 'TEAM';
   refId?: string;
+  name?: string;
   participants: string[];
   lastSeq: number;
   lastMessageSnippet?: string;

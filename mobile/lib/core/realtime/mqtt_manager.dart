@@ -69,8 +69,10 @@ class MqttManagerImpl implements MqttManager {
   }
 
   Future<bool> _connect(String userId) async {
-    final String clientId = 'scholink_flutter_${userId}_${DateTime.now().millisecondsSinceEpoch}';
-    final MqttServerClient client = MqttServerClient.withPort(_server, clientId, _port);
+    final String clientId =
+        'scholink_flutter_${userId}_${DateTime.now().millisecondsSinceEpoch}';
+    final MqttServerClient client =
+        MqttServerClient.withPort(_server, clientId, _port);
     _client = client;
 
     client.logging(on: false);
@@ -123,7 +125,8 @@ class MqttManagerImpl implements MqttManager {
         subscribe('users/$userId/chat');
 
         // Listen for incoming messages
-        client.updates?.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
+        client.updates
+            ?.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
           for (final MqttReceivedMessage<MqttMessage> msg in messages) {
             final MqttPublishMessage pubMsg = msg.payload as MqttPublishMessage;
             final String payload = MqttPublishPayload.bytesToStringAsString(

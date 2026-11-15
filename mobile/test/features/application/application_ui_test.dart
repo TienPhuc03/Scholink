@@ -19,8 +19,18 @@ void main() {
         'revision': 1,
         'teamId': '',
         'events': <Map<String, dynamic>>[
-          <String, dynamic>{'id': 'e2', 'toStatus': 'REVIEWING', 'fromStatus': 'SUBMITTED', 'createdAt': '2026-11-07T05:00:00.000Z'},
-          <String, dynamic>{'id': 'e1', 'toStatus': 'SUBMITTED', 'fromStatus': '', 'createdAt': '2026-11-07T02:00:00.000Z'},
+          <String, dynamic>{
+            'id': 'e2',
+            'toStatus': 'REVIEWING',
+            'fromStatus': 'SUBMITTED',
+            'createdAt': '2026-11-07T05:00:00.000Z'
+          },
+          <String, dynamic>{
+            'id': 'e1',
+            'toStatus': 'SUBMITTED',
+            'fromStatus': '',
+            'createdAt': '2026-11-07T02:00:00.000Z'
+          },
         ],
       });
       expect(d.events.map((ApplicationEvent e) => e.id), <String>['e1', 'e2']);
@@ -31,7 +41,8 @@ void main() {
     });
   });
 
-  testWidgets('Nộp hồ sơ button is disabled until consent is ticked', (WidgetTester tester) async {
+  testWidgets('Nộp hồ sơ button is disabled until consent is ticked',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -42,7 +53,8 @@ void main() {
       home: ApplyView(
         viewModel: h.build(),
         onEditPassport: () async {},
-        onOpenApplication: (String id, {required bool justSubmitted}) => opened.add('$id:$justSubmitted'),
+        onOpenApplication: (String id, {required bool justSubmitted}) =>
+            opened.add('$id:$justSubmitted'),
       ),
     ));
     await tester.pump();
@@ -55,7 +67,9 @@ void main() {
     await tester.pump();
 
     ElevatedButton submit() => tester.widget<ElevatedButton>(
-          find.descendant(of: find.byKey(const Key('apply_submit')), matching: find.byType(ElevatedButton)),
+          find.descendant(
+              of: find.byKey(const Key('apply_submit')),
+              matching: find.byType(ElevatedButton)),
         );
     expect(find.text('Nguyễn Văn A'), findsOneWidget);
     expect(submit().onPressed, isNull);

@@ -60,7 +60,10 @@ class DioApiClient implements ApiClient {
 
     // Add interceptors
     _dio.interceptors.addAll(<Interceptor>[
-      AuthInterceptor(secureStorage: secureStorage, dio: _dio, sessionEvents: sessionEvents),
+      AuthInterceptor(
+          secureStorage: secureStorage,
+          dio: _dio,
+          sessionEvents: sessionEvents),
       IdempotencyInterceptor(),
       LogInterceptor(
         requestHeader: false,

@@ -11,19 +11,29 @@ abstract final class PassportValidators {
 
   static String? fullName(String v) => AuthValidators.fullName(v);
 
-  static String? bio(String v) => v.trim().length > maxBio ? 'Giới thiệu tối đa $maxBio ký tự.' : null;
+  static String? bio(String v) =>
+      v.trim().length > maxBio ? 'Giới thiệu tối đa $maxBio ký tự.' : null;
 
-  static String? regionCode(String v) => v.trim().length > 20 ? 'Mã khu vực tối đa 20 ký tự.' : null;
+  static String? regionCode(String v) =>
+      v.trim().length > 20 ? 'Mã khu vực tối đa 20 ký tự.' : null;
 
   /// Optional; same rule as the server: digits with spaces, dots or dashes, optional leading +.
   static String? phone(String v) {
     final String t = v.trim();
     if (t.isEmpty) return null;
-    return RegExp(r'^\+?[0-9][0-9 .-]{7,18}[0-9]$').hasMatch(t) ? null : 'Số điện thoại không hợp lệ.';
+    return RegExp(r'^\+?[0-9][0-9 .-]{7,18}[0-9]$').hasMatch(t)
+        ? null
+        : 'Số điện thoại không hợp lệ.';
   }
 
   /// Education is optional, but once started it needs institution, major and a valid start year.
-  static ({String? institution, String? major, String? startYear, String? endYear, String? gpa}) education({
+  static ({
+    String? institution,
+    String? major,
+    String? startYear,
+    String? endYear,
+    String? gpa
+  }) education({
     required String institution,
     required String major,
     required String startYear,
@@ -31,17 +41,30 @@ abstract final class PassportValidators {
     required String gpa,
     required double gpaScale,
   }) {
-    final bool any = <String>[institution, major, startYear, endYear, gpa].any((String s) => s.trim().isNotEmpty);
-    if (!any) return (institution: null, major: null, startYear: null, endYear: null, gpa: null);
+    final bool any = <String>[institution, major, startYear, endYear, gpa]
+        .any((String s) => s.trim().isNotEmpty);
+    if (!any)
+      return (
+        institution: null,
+        major: null,
+        startYear: null,
+        endYear: null,
+        gpa: null
+      );
 
     final int? start = int.tryParse(startYear.trim());
-    final int? end = endYear.trim().isEmpty ? null : int.tryParse(endYear.trim());
-    final double? gpaValue = gpa.trim().isEmpty ? null : double.tryParse(gpa.trim().replaceAll(',', '.'));
+    final int? end =
+        endYear.trim().isEmpty ? null : int.tryParse(endYear.trim());
+    final double? gpaValue = gpa.trim().isEmpty
+        ? null
+        : double.tryParse(gpa.trim().replaceAll(',', '.'));
 
     return (
       institution: institution.trim().isEmpty ? 'Nhập tên trường.' : null,
       major: major.trim().isEmpty ? 'Nhập chuyên ngành.' : null,
-      startYear: (start == null || start < 2000 || start > 2100) ? 'Năm từ 2000 đến 2100.' : null,
+      startYear: (start == null || start < 2000 || start > 2100)
+          ? 'Năm từ 2000 đến 2100.'
+          : null,
       endYear: endYear.trim().isEmpty
           ? null
           : (end == null || end < 2000 || end > 2100)
@@ -63,7 +86,9 @@ abstract final class PassportValidators {
   /// End year to pre-fill for [startYear], or null while it is not a valid year yet.
   static String? defaultEndYear(String startYear) {
     final int? start = int.tryParse(startYear.trim());
-    return start == null || start < 2000 || start > 2100 ? null : '${start + defaultStudyYears}';
+    return start == null || start < 2000 || start > 2100
+        ? null
+        : '${start + defaultStudyYears}';
   }
 
   /// GPA [text] on the [from] scale (4 or 10) converted linearly to the other one (× or ÷ 2.5),
@@ -76,23 +101,29 @@ abstract final class PassportValidators {
   }
 
   /// 2 decimals at most, no trailing zeros: 8.75, 3.28, 9.
-  static String formatGpa(double v) =>
-      v.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  static String formatGpa(double v) => v
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 
   static String? newSkill(String v, List<String> existing) {
     final String s = v.trim();
     if (s.isEmpty) return 'Nhập tên kỹ năng.';
-    if (s.length > maxSkillLength) return 'Kỹ năng tối đa $maxSkillLength ký tự.';
+    if (s.length > maxSkillLength)
+      return 'Kỹ năng tối đa $maxSkillLength ký tự.';
     if (existing.length >= maxSkills) return 'Tối đa $maxSkills kỹ năng.';
-    if (existing.any((String e) => e.toLowerCase() == s.toLowerCase())) return 'Kỹ năng này đã có.';
+    if (existing.any((String e) => e.toLowerCase() == s.toLowerCase()))
+      return 'Kỹ năng này đã có.';
     return null;
   }
 
   static String? newAchievement(String v, List<String> existing) {
     final String s = v.trim();
     if (s.isEmpty) return 'Nhập nội dung thành tích.';
-    if (s.length > maxAchievementLength) return 'Thành tích tối đa $maxAchievementLength ký tự.';
-    if (existing.length >= maxAchievements) return 'Tối đa $maxAchievements thành tích.';
+    if (s.length > maxAchievementLength)
+      return 'Thành tích tối đa $maxAchievementLength ký tự.';
+    if (existing.length >= maxAchievements)
+      return 'Tối đa $maxAchievements thành tích.';
     return null;
   }
 
@@ -103,10 +134,13 @@ abstract final class PassportValidators {
     return null;
   }
 
-  static String? certificateDates(DateTime? issued, DateTime? expiry, {DateTime? now}) {
+  static String? certificateDates(DateTime? issued, DateTime? expiry,
+      {DateTime? now}) {
     if (issued == null) return 'Chọn ngày cấp.';
-    if (issued.isAfter(now ?? DateTime.now())) return 'Ngày cấp không được ở tương lai.';
-    if (expiry != null && expiry.isBefore(issued)) return 'Ngày hết hạn phải sau ngày cấp.';
+    if (issued.isAfter(now ?? DateTime.now()))
+      return 'Ngày cấp không được ở tương lai.';
+    if (expiry != null && expiry.isBefore(issued))
+      return 'Ngày hết hạn phải sau ngày cấp.';
     return null;
   }
 }

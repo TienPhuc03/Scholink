@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/widgets/refresh_error_banner.dart';
@@ -21,7 +23,8 @@ class PassportView extends StatefulWidget {
   final VoidCallback? onPreviewProfile;
 
   /// F40: deletes the account; returns an error message, or null once the app has signed out.
-  final Future<String?> Function(String currentPassword, {required bool purgeSnapshots})? onDeleteAccount;
+  final Future<String?> Function(String currentPassword,
+      {required bool purgeSnapshots})? onDeleteAccount;
 
   const PassportView({
     super.key,
@@ -57,12 +60,19 @@ class _PassportViewState extends State<PassportView> {
     );
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu Passport.'), backgroundColor: AppColors.success),
+        const SnackBar(
+            content: Text('Đã lưu Passport.'),
+            backgroundColor: AppColors.success),
       );
     }
   }
 
   Future<void> _uploadDocument(PassportDocument doc) async {
+    if (doc == PassportDocument.avatar) {
+      _showAvatarPickerBottomSheet();
+      return;
+    }
+
     final bool ok = await widget.viewModel.uploadDocument(doc);
     if (!mounted) return;
     final String? error = widget.viewModel.documentError;
@@ -76,8 +86,107 @@ class _PassportViewState extends State<PassportView> {
     }
   }
 
+  void _showAvatarPickerBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Cập nhật Ảnh đại diện',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppColors.primary,
+                    child: Icon(Icons.camera_alt_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                  title: const Text('Chụp ảnh từ Máy ảnh'),
+                  subtitle: const Text('Mở camera và chụp ảnh đại diện mới'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickAndUploadAvatar(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF10B981),
+                    child: Icon(Icons.photo_library_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                  title: const Text('Chọn từ Thư viện ảnh'),
+                  subtitle: const Text('Tải ảnh chân dung từ album của bạn'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickAndUploadAvatar(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+
+      final Uint8List bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
+
+      final bool ok = await widget.viewModel.uploadDocumentFromBytes(
+        PassportDocument.avatar,
+        fileName: file.name.isNotEmpty ? file.name : 'avatar.jpg',
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+      final String? error = widget.viewModel.documentError;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(ok
+              ? 'Đã cập nhật Ảnh đại diện thành công!'
+              : (error ?? 'Tải ảnh thất bại')),
+          backgroundColor: ok ? AppColors.success : AppColors.error,
+        ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải ảnh đại diện: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _confirmDeleteAccount() async {
-    final Future<String?> Function(String, {required bool purgeSnapshots})? delete = widget.onDeleteAccount;
+    final Future<String?> Function(String, {required bool purgeSnapshots})?
+        delete = widget.onDeleteAccount;
     if (delete == null) return;
     await showDialog<void>(
       context: context,
@@ -90,9 +199,12 @@ class _PassportViewState extends State<PassportView> {
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
         title: const Text('Đăng xuất?'),
-        content: const Text('Bạn sẽ cần đăng nhập lại để nộp hồ sơ và xem dữ liệu cá nhân.'),
+        content: const Text(
+            'Bạn sẽ cần đăng nhập lại để nộp hồ sơ và xem dữ liệu cá nhân.'),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Hủy')),
           TextButton(
             key: const Key('logout_confirm'),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -153,7 +265,9 @@ class _PassportViewState extends State<PassportView> {
               padding: const EdgeInsets.all(16.0),
               children: <Widget>[
                 if (vm.hasError) ...<Widget>[
-                  RefreshErrorBanner(message: vm.errorMessage, onRetry: () => vm.loadPassport()),
+                  RefreshErrorBanner(
+                      message: vm.errorMessage,
+                      onRetry: () => vm.loadPassport()),
                   const SizedBox(height: 12),
                 ],
                 _buildCompletionCard(passport),
@@ -184,7 +298,8 @@ class _PassportViewState extends State<PassportView> {
                       runSpacing: 8,
                       children: passport.skills
                           .map((String s) => Chip(
-                                label: Text(s, style: const TextStyle(fontSize: 12)),
+                                label: Text(s,
+                                    style: const TextStyle(fontSize: 12)),
                                 backgroundColor: AppColors.primaryLight,
                                 side: BorderSide.none,
                               ))
@@ -205,8 +320,13 @@ class _PassportViewState extends State<PassportView> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
-                                    const Text('•  ', style: TextStyle(color: AppColors.primary)),
-                                    Expanded(child: Text(a, style: const TextStyle(fontSize: 14))),
+                                    const Text('•  ',
+                                        style: TextStyle(
+                                            color: AppColors.primary)),
+                                    Expanded(
+                                        child: Text(a,
+                                            style:
+                                                const TextStyle(fontSize: 14))),
                                   ],
                                 ),
                               ))
@@ -220,7 +340,9 @@ class _PassportViewState extends State<PassportView> {
                     icon: Icons.workspace_premium_outlined,
                     title: 'Chứng chỉ',
                     child: Column(
-                      children: passport.certificates.map(_buildCertificateRow).toList(),
+                      children: passport.certificates
+                          .map(_buildCertificateRow)
+                          .toList(),
                     ),
                   ),
                 ],
@@ -253,7 +375,8 @@ class _PassportViewState extends State<PassportView> {
             Text(
               message ?? 'Không thể tải thông tin Passport',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+              style:
+                  const TextStyle(color: AppColors.textPrimary, fontSize: 15),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -268,7 +391,11 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
-  Widget _card({required IconData icon, required String title, required Widget child, Widget? trailing}) {
+  Widget _card(
+      {required IconData icon,
+      required String title,
+      required Widget child,
+      Widget? trailing}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -320,11 +447,17 @@ class _PassportViewState extends State<PassportView> {
             children: <Widget>[
               const Text(
                 'Độ hoàn thiện Passport',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary),
               ),
               Text(
                 '${passport.completionScore}%',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary),
               ),
             ],
           ),
@@ -336,7 +469,9 @@ class _PassportViewState extends State<PassportView> {
               minHeight: 8,
               backgroundColor: AppColors.border,
               valueColor: AlwaysStoppedAnimation<Color>(
-                passport.isHighQualityProfile ? AppColors.success : AppColors.primary,
+                passport.isHighQualityProfile
+                    ? AppColors.success
+                    : AppColors.primary,
               ),
             ),
           ),
@@ -345,17 +480,20 @@ class _PassportViewState extends State<PassportView> {
             passport.isHighQualityProfile
                 ? 'Tuyệt vời! Hồ sơ đạt chuẩn cao (≥80%) tối ưu xét duyệt học bổng & ghép đội.'
                 : 'Hồ sơ cần hoàn thiện trên 80% để tăng cơ hội nhận học bổng & ghép đội thi.',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             key: const Key('passport_edit'),
             onPressed: _openEditor,
             icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Chỉnh sửa hồ sơ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            label: const Text('Chỉnh sửa hồ sơ',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6)),
             ),
           ),
         ],
@@ -380,17 +518,22 @@ class _PassportViewState extends State<PassportView> {
           ),
           child: const Row(
             children: <Widget>[
-              Icon(Icons.assignment_turned_in_outlined, color: AppColors.primary),
+              Icon(Icons.assignment_turned_in_outlined,
+                  color: AppColors.primary),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text('Hồ sơ ứng tuyển của tôi',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary)),
                     SizedBox(height: 2),
                     Text('Theo dõi trạng thái các hồ sơ đã nộp',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -411,17 +554,45 @@ class _PassportViewState extends State<PassportView> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              PassportAvatar(key: const Key('passport_avatar'), name: passport.fullName, url: passport.avatarUrl, radius: 26),
+              GestureDetector(
+                onTap: _showAvatarPickerBottomSheet,
+                child: Stack(
+                  children: <Widget>[
+                    PassportAvatar(
+                        key: const Key('passport_avatar'),
+                        name: passport.fullName,
+                        url: passport.avatarUrl,
+                        radius: 28),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt,
+                            size: 11, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(passport.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(passport.fullName,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w700)),
                     if (passport.regionCode != null)
                       Text(
                         'Khu vực: ${passport.regionCode}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
                       ),
                   ],
                 ),
@@ -430,16 +601,24 @@ class _PassportViewState extends State<PassportView> {
           ),
           if (passport.email != null || passport.phone != null) ...<Widget>[
             const SizedBox(height: 12),
-            if (passport.email != null) _contactRow(Icons.mail_outline_rounded, passport.email!, passport.visibilityOf('email')),
-            if (passport.phone != null) _contactRow(Icons.phone_outlined, passport.phone!, passport.visibilityOf('phone')),
+            if (passport.email != null)
+              _contactRow(Icons.mail_outline_rounded, passport.email!,
+                  passport.visibilityOf('email')),
+            if (passport.phone != null)
+              _contactRow(Icons.phone_outlined, passport.phone!,
+                  passport.visibilityOf('phone')),
           ],
           const Divider(height: 24, color: AppColors.borderLight),
           Text(
-            passport.bio ?? 'Chưa có phần giới thiệu. Thêm vài dòng để nhà tài trợ hiểu bạn hơn.',
+            passport.bio ??
+                'Chưa có phần giới thiệu. Thêm vài dòng để nhà tài trợ hiểu bạn hơn.',
             style: TextStyle(
               fontSize: 14,
-              color: passport.bio != null ? AppColors.textSecondary : AppColors.textMuted,
-              fontStyle: passport.bio != null ? FontStyle.normal : FontStyle.italic,
+              color: passport.bio != null
+                  ? AppColors.textSecondary
+                  : AppColors.textMuted,
+              fontStyle:
+                  passport.bio != null ? FontStyle.normal : FontStyle.italic,
             ),
           ),
         ],
@@ -448,14 +627,20 @@ class _PassportViewState extends State<PassportView> {
   }
 
   /// Contact detail with who can see it (FR-PROF-05).
-  Widget _contactRow(IconData icon, String value, FieldVisibility visibility) => Padding(
+  Widget _contactRow(IconData icon, String value, FieldVisibility visibility) =>
+      Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Row(
           children: <Widget>[
             Icon(icon, size: 16, color: AppColors.textSecondary),
             const SizedBox(width: 8),
-            Expanded(child: Text(value, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
-            Text(visibility.label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            Expanded(
+                child: Text(value,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis)),
+            Text(visibility.label,
+                style:
+                    const TextStyle(fontSize: 12, color: AppColors.textMuted)),
           ],
         ),
       );
@@ -468,21 +653,30 @@ class _PassportViewState extends State<PassportView> {
       child: edu == null
           ? const Text(
               'Chưa cập nhật học vấn.',
-              style: TextStyle(fontSize: 14, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  fontStyle: FontStyle.italic),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(edu.institution, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(edu.institution,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(
                   '${edu.major} · ${edu.yearsDisplay}',
-                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                      fontSize: 14, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'GPA: ${edu.gpaDisplay}',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.primary),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary),
                 ),
               ],
             ),
@@ -499,14 +693,17 @@ class _PassportViewState extends State<PassportView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(c.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(c.name,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
                 Text(
                   <String>[
                     c.type == 'OTHER' ? 'Khác' : c.type,
                     if (c.score != null) c.score!,
                     'Cấp ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}',
                   ].join(' · '),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -514,7 +711,8 @@ class _PassportViewState extends State<PassportView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: (c.isVerified ? AppColors.success : AppColors.warning).withValues(alpha: 0.12),
+              color: (c.isVerified ? AppColors.success : AppColors.warning)
+                  .withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -537,7 +735,9 @@ class _PassportViewState extends State<PassportView> {
           child: Row(
             children: <Widget>[
               Icon(
-                on ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                on
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
                 size: 18,
                 color: on ? AppColors.success : AppColors.textMuted,
               ),
@@ -568,7 +768,9 @@ class _PassportViewState extends State<PassportView> {
         child: Row(
           children: <Widget>[
             Icon(
-              doc == PassportDocument.cv ? Icons.description_outlined : Icons.account_circle_outlined,
+              doc == PassportDocument.cv
+                  ? Icons.description_outlined
+                  : Icons.account_circle_outlined,
               color: AppColors.primary,
             ),
             const SizedBox(width: 10),
@@ -576,19 +778,30 @@ class _PassportViewState extends State<PassportView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(doc.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(doc.label,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
                   Text(
                     assetId == null ? 'Chưa có tệp' : 'Đã tải lên',
-                    style: TextStyle(fontSize: 12, color: assetId == null ? AppColors.textMuted : AppColors.success),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: assetId == null
+                            ? AppColors.textMuted
+                            : AppColors.success),
                   ),
                 ],
               ),
             ),
             TextButton(
               key: Key('passport_upload_${doc.name}'),
-              onPressed: vm.uploading != null || vm.isSaving ? null : () => _uploadDocument(doc),
+              onPressed: vm.uploading != null || vm.isSaving
+                  ? null
+                  : () => _uploadDocument(doc),
               child: busy
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(assetId == null ? 'Tải lên' : 'Thay tệp'),
             ),
           ],
@@ -604,7 +817,10 @@ class _PassportViewState extends State<PassportView> {
         children: <Widget>[
           row(PassportDocument.cv, passport.cvAssetId),
           if (passport.cvFile != null)
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: FileLinkTile(file: passport.cvFile!, refresh: vm.freshCvLink)),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: FileLinkTile(
+                    file: passport.cvFile!, refresh: vm.freshCvLink)),
           row(PassportDocument.avatar, passport.avatarAssetId),
           const Text(
             'Tệp được lưu riêng tư, tối đa 5 MB và được quét trước khi dùng.',
@@ -640,7 +856,10 @@ class _PassportViewState extends State<PassportView> {
       key: const Key('logout_button'),
       onPressed: _loggingOut ? null : _confirmLogout,
       icon: _loggingOut
-          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.logout_rounded, size: 18),
       label: const Text('Đăng xuất'),
       style: OutlinedButton.styleFrom(
@@ -656,7 +875,8 @@ class _PassportViewState extends State<PassportView> {
 
 /// F40 / FR-AUTH-08: re-enter the password, choose what happens to submitted snapshots, confirm.
 class _DeleteAccountDialog extends StatefulWidget {
-  final Future<String?> Function(String currentPassword, {required bool purgeSnapshots}) onDelete;
+  final Future<String?> Function(String currentPassword,
+      {required bool purgeSnapshots}) onDelete;
 
   const _DeleteAccountDialog({required this.onDelete});
 
@@ -685,7 +905,8 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       _busy = true;
       _error = null;
     });
-    final String? error = await widget.onDelete(_password.text, purgeSnapshots: _purge);
+    final String? error =
+        await widget.onDelete(_password.text, purgeSnapshots: _purge);
     if (!mounted) return;
     if (error == null) {
       Navigator.of(context).pop();
@@ -723,26 +944,36 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               key: const Key('delete_account_purge'),
               contentPadding: EdgeInsets.zero,
               value: _purge,
-              onChanged: _busy ? null : (bool? v) => setState(() => _purge = v ?? false),
-              title: const Text('Xoá cả bản hồ sơ đã nộp', style: TextStyle(fontSize: 14)),
+              onChanged: _busy
+                  ? null
+                  : (bool? v) => setState(() => _purge = v ?? false),
+              title: const Text('Xoá cả bản hồ sơ đã nộp',
+                  style: TextStyle(fontSize: 14)),
               subtitle: const Text(
                 'Nếu không chọn, bản đã nộp được giữ theo chính sách lưu trữ để đơn vị tổ chức xét duyệt.',
                 style: TextStyle(fontSize: 12),
               ),
             ),
             if (_error != null)
-              Text(_error!, key: const Key('delete_account_error'), style: const TextStyle(color: AppColors.error)),
+              Text(_error!,
+                  key: const Key('delete_account_error'),
+                  style: const TextStyle(color: AppColors.error)),
           ],
         ),
       ),
       actions: <Widget>[
-        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Huỷ')),
+        TextButton(
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: const Text('Huỷ')),
         TextButton(
           key: const Key('delete_account_confirm'),
           onPressed: _busy ? null : _submit,
           style: TextButton.styleFrom(foregroundColor: AppColors.error),
           child: _busy
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : const Text('Xoá vĩnh viễn'),
         ),
       ],

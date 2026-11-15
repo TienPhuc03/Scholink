@@ -8,15 +8,19 @@ import 'package:scholink_mobile/features/opportunity/opportunity_viewmodel.dart'
 
 import '../tv2_test_support.dart';
 
-Map<String, dynamic> page(List<String> ids) =>
-    <String, dynamic>{'items': ids.map((String id) => oppJson(id)).toList(), 'hasMore': false};
+Map<String, dynamic> page(List<String> ids) => <String, dynamic>{
+      'items': ids.map((String id) => oppJson(id)).toList(),
+      'hasMore': false
+    };
 
 void main() {
   group('F29 OpportunityViewModel', () {
-    test('a late answer for an old filter never replaces the current one', () async {
+    test('a late answer for an old filter never replaces the current one',
+        () async {
       final DelayedApiClient api = DelayedApiClient();
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
       );
 
       final Future<void> first = vm.loadOpportunities(); // "Tất cả"
@@ -34,10 +38,13 @@ void main() {
       expect(vm.selectedTypeFilter, 'COMPETITION');
     });
 
-    test('typing sends one search after the user pauses, with the last text', () async {
-      final ScriptedApiClient api = ScriptedApiClient()..reply(ApiEndpoints.opportunities, page(<String>['a']));
+    test('typing sends one search after the user pauses, with the last text',
+        () async {
+      final ScriptedApiClient api = ScriptedApiClient()
+        ..reply(ApiEndpoints.opportunities, page(<String>['a']));
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
         searchDebounce: const Duration(milliseconds: 30),
       );
 
@@ -52,10 +59,13 @@ void main() {
       vm.dispose();
     });
 
-    test('retry keeps every filter (UX-02: không mất filter khi retry)', () async {
-      final ScriptedApiClient api = ScriptedApiClient()..reply(ApiEndpoints.opportunities, const NetworkFailure());
+    test('retry keeps every filter (UX-02: không mất filter khi retry)',
+        () async {
+      final ScriptedApiClient api = ScriptedApiClient()
+        ..reply(ApiEndpoints.opportunities, const NetworkFailure());
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
         searchDebounce: Duration.zero,
       );
       vm.setTypeFilter('SCHOLARSHIP');
@@ -67,7 +77,8 @@ void main() {
       api.reply(ApiEndpoints.opportunities, page(<String>['s1']));
       await vm.retry();
 
-      final Map<String, dynamic> q = api.callsTo(ApiEndpoints.opportunities).last.query!;
+      final Map<String, dynamic> q =
+          api.callsTo(ApiEndpoints.opportunities).last.query!;
       expect(q['type'], 'SCHOLARSHIP');
       expect(q['applyMode'], 'EXTERNAL');
       expect(vm.selectedTypeFilter, 'SCHOLARSHIP');
@@ -75,9 +86,11 @@ void main() {
     });
 
     test('a failed refresh keeps the list on screen and explains it', () async {
-      final ScriptedApiClient api = ScriptedApiClient()..reply(ApiEndpoints.opportunities, page(<String>['a', 'b']));
+      final ScriptedApiClient api = ScriptedApiClient()
+        ..reply(ApiEndpoints.opportunities, page(<String>['a', 'b']));
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
       );
       await vm.loadOpportunities();
 
@@ -94,9 +107,11 @@ void main() {
     test('bookmark icon goes back when the server refuses', () async {
       final ScriptedApiClient api = ScriptedApiClient()
         ..reply(ApiEndpoints.opportunities, page(<String>['a']))
-        ..reply(ApiEndpoints.opportunityBookmark('a'), const ServerFailure(message: 'Lỗi máy chủ', statusCode: 500));
+        ..reply(ApiEndpoints.opportunityBookmark('a'),
+            const ServerFailure(message: 'Lỗi máy chủ', statusCode: 500));
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
       );
       await vm.loadOpportunities();
 
@@ -108,25 +123,29 @@ void main() {
 
     test('loads the next page with the cursor and skips duplicates', () async {
       final ScriptedApiClient api = ScriptedApiClient();
-      api.handlers[ApiEndpoints.opportunities] = (RecordedCall c) => c.query!['cursor'] == null
-          ? <String, dynamic>{
-              'items': <dynamic>[oppJson('a'), oppJson('b')],
-              'nextCursor': 'c2',
-              'hasMore': true,
-            }
-          : <String, dynamic>{
-              'items': <dynamic>[oppJson('b'), oppJson('c')],
-              'hasMore': false,
-            };
+      api.handlers[ApiEndpoints.opportunities] =
+          (RecordedCall c) => c.query!['cursor'] == null
+              ? <String, dynamic>{
+                  'items': <dynamic>[oppJson('a'), oppJson('b')],
+                  'nextCursor': 'c2',
+                  'hasMore': true,
+                }
+              : <String, dynamic>{
+                  'items': <dynamic>[oppJson('b'), oppJson('c')],
+                  'hasMore': false,
+                };
       final OpportunityViewModel vm = OpportunityViewModel(
-        OpportunityRepository(apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
+        OpportunityRepository(
+            apiClient: api, roomDb: RoomDatabaseImpl(InMemoryCacheManager())),
       );
       await vm.loadOpportunities();
       await vm.loadMore();
 
-      expect(vm.items.map((OpportunityModel o) => o.id), <String>['a', 'b', 'c']);
+      expect(
+          vm.items.map((OpportunityModel o) => o.id), <String>['a', 'b', 'c']);
       expect(vm.hasMore, isFalse);
-      expect(api.callsTo(ApiEndpoints.opportunities).last.query!['cursor'], 'c2');
+      expect(
+          api.callsTo(ApiEndpoints.opportunities).last.query!['cursor'], 'c2');
     });
   });
 }

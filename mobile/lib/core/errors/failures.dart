@@ -11,7 +11,8 @@ abstract class Failure {
   });
 
   @override
-  String toString() => '$runtimeType(message: $message, code: $code, correlationId: $correlationId)';
+  String toString() =>
+      '$runtimeType(message: $message, code: $code, correlationId: $correlationId)';
 }
 
 class ServerFailure extends Failure {

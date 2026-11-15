@@ -1,12 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import { GatewayModule } from './gateway.module';
 import { GlobalExceptionFilter, CorrelationIdInterceptor } from '@shared';
 
 async function bootstrap() {
   const logger = new Logger('ScholinkApiGateway');
   const app = await NestFactory.create(GatewayModule);
+
+  app.use(json({ limit: '15mb' }));
+  app.use(urlencoded({ extended: true, limit: '15mb' }));
 
   app.enableCors({
     origin: '*',

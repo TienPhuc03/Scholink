@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Connection, ClientSession } from 'mongoose';
 import {
   ITeamRepository,
   ActiveMembershipRecord,
@@ -8,6 +8,7 @@ import {
 import { Team, TeamStatus } from '../../domain/team.entity';
 import { JoinRequest, JoinRequestStatus } from '../../domain/join-request.entity';
 import { SubmissionReservation, ReservationStatus } from '../../domain/reservation.entity';
+import { DomainException, ErrorCode } from '@shared';
 import {
   TeamModel,
   TeamDocument,
@@ -18,14 +19,45 @@ import {
   SubmissionReservationModel,
   SubmissionReservationDocument,
 } from './team.schema';
+import {
+  ChatRoomModel,
+  ChatRoomDocument,
+  OutboxModel,
+  OutboxDocument,
+} from './chat.schema';
+
+const isDuplicateKeyError = (err: unknown): boolean =>
+  Boolean(
+    err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code?: number }).code === 11000,
+  );
+
+const isTransactionUnsupportedError = (err: unknown): boolean => {
+  if (!err || typeof err !== 'object') return false;
+  const msg = String((err as { message?: string }).message ?? '');
+  return (
+    msg.includes('Transaction numbers are only allowed on a replica set') ||
+    msg.includes('replica set') ||
+    msg.includes('transactions are not supported') ||
+    (err as { code?: number }).code === 20 ||
+    (err as { code?: number }).code === 263
+  );
+};
 
 @Injectable()
 export class MongooseTeamRepository implements ITeamRepository {
+  private readonly logger = new Logger(MongooseTeamRepository.name);
+
   constructor(
+    @InjectConnection() private readonly connection: Connection,
     @InjectModel(TeamModel.name) private readonly teamModel: Model<TeamDocument>,
     @InjectModel(ActiveMembershipModel.name) private readonly membershipModel: Model<ActiveMembershipDocument>,
     @InjectModel(JoinRequestModel.name) private readonly joinRequestModel: Model<JoinRequestDocument>,
     @InjectModel(SubmissionReservationModel.name) private readonly reservationModel: Model<SubmissionReservationDocument>,
+    @InjectModel(ChatRoomModel.name) private readonly roomModel: Model<ChatRoomDocument>,
+    @InjectModel(OutboxModel.name) private readonly outboxModel: Model<OutboxDocument>,
   ) {}
 
   async findById(id: string): Promise<Team | null> {
@@ -69,21 +101,36 @@ export class MongooseTeamRepository implements ITeamRepository {
   }
 
   async update(team: Team): Promise<void> {
-    await this.teamModel
+    const expectedVersion = team.version - 1;
+    const res = await this.teamModel
       .updateOne(
-        { id: team.id },
+        { id: team.id, version: { $in: [team.version, expectedVersion] } },
         {
-          name: team.props.name,
-          description: team.props.description,
-          status: team.status,
-          members: team.members as any,
-          rosterVersion: team.rosterVersion,
-          fencingToken: team.fencingToken,
-          currentReservationId: team.currentReservationId,
-          version: team.version,
+          $set: {
+            name: team.props.name,
+            description: team.props.description,
+            status: team.status,
+            members: team.members as any,
+            rosterVersion: team.rosterVersion,
+            fencingToken: team.fencingToken,
+            currentReservationId: team.currentReservationId,
+            version: team.version,
+          },
         },
       )
       .exec();
+
+    if (res.matchedCount === 0) {
+      const existing = await this.teamModel.findOne({ id: team.id }).exec();
+      if (!existing) {
+        throw DomainException.notFound('Đội thi');
+      }
+      throw new DomainException(
+        ErrorCode.STATE_CONFLICT,
+        'Đội thi vừa được cập nhật bởi thao tác khác. Vui lòng tải lại trang.',
+        409,
+      );
+    }
   }
 
   async conditionalPrepareSubmission(
@@ -216,6 +263,155 @@ export class MongooseTeamRepository implements ITeamRepository {
       .exec();
   }
 
+  async cancelPendingJoinRequests(studentId: string, competitionId: string, exceptRequestId?: string): Promise<void> {
+    const filter: any = {
+      applicantId: studentId,
+      competitionId,
+      status: 'PENDING',
+    };
+    if (exceptRequestId) {
+      filter.id = { $ne: exceptRequestId };
+    }
+    await this.joinRequestModel
+      .updateMany(filter, {
+        $set: {
+          status: 'WITHDRAWN',
+          reviewedAt: new Date(),
+        },
+      })
+      .exec();
+  }
+
+  async acceptJoinRequestInTransaction(params: {
+    team: Team;
+    joinRequest: JoinRequest;
+    activeMembership: ActiveMembershipRecord;
+    outboxEvent?: any;
+  }): Promise<void> {
+    const { team, joinRequest, activeMembership, outboxEvent } = params;
+
+    const runWork = async (session?: ClientSession) => {
+      // 1. Ghi active_memberships TRƯỚC (kiểm tra unique constraint {competitionId, studentId})
+      try {
+        await this.membershipModel.create(
+          [activeMembership],
+          session ? { session } : undefined,
+        );
+      } catch (err: unknown) {
+        if (isDuplicateKeyError(err)) {
+          throw new DomainException(
+            ErrorCode.STATE_CONFLICT,
+            'Ứng viên đã gia nhập đội thi khác trong cuộc thi này',
+            409,
+          );
+        }
+        throw err;
+      }
+
+      // 2. Cập nhật Team với Optimistic Locking theo version
+      const expectedVersion = team.version - 1; // version đã increment trong entity addMember
+      const teamUpdateRes = await this.teamModel.updateOne(
+        { id: team.id, version: { $in: [team.version, expectedVersion] } },
+        {
+          $set: {
+            members: team.members as any,
+            rosterVersion: team.rosterVersion,
+            status: team.status,
+            version: team.version,
+          },
+        },
+        session ? { session } : undefined,
+      );
+
+      if (teamUpdateRes.matchedCount === 0) {
+        throw new DomainException(
+          ErrorCode.STATE_CONFLICT,
+          'Đội thi vừa được cập nhật bởi thao tác khác. Vui lòng tải lại trang.',
+          409,
+        );
+      }
+
+      // 3. Cập nhật JoinRequest sang ACCEPTED
+      await this.joinRequestModel.updateOne(
+        { id: joinRequest.id },
+        {
+          $set: {
+            status: 'ACCEPTED',
+            reviewedAt: joinRequest.props.reviewedAt || new Date(),
+            reviewedBy: joinRequest.props.reviewedBy,
+          },
+        },
+        session ? { session } : undefined,
+      );
+
+      // 4. Thêm thành viên vào ChatRoom của đội
+      await this.roomModel.updateOne(
+        { refId: team.id },
+        {
+          $addToSet: { participants: joinRequest.applicantId },
+        },
+        session ? { session } : undefined,
+      );
+
+      // 5. Tự động hủy các yêu cầu gia nhập PENDING khác của ứng viên trong cùng cuộc thi (T2)
+      await this.joinRequestModel.updateMany(
+        {
+          applicantId: joinRequest.applicantId,
+          competitionId: team.competitionId,
+          status: 'PENDING',
+          id: { $ne: joinRequest.id },
+        },
+        {
+          $set: {
+            status: 'WITHDRAWN',
+            reviewedAt: new Date(),
+          },
+        },
+        session ? { session } : undefined,
+      );
+
+      // 6. Ghi Outbox thông báo nếu có (T6)
+      if (outboxEvent) {
+        await this.outboxModel.create(
+          [outboxEvent],
+          session ? { session } : undefined,
+        );
+      }
+    };
+
+    let session: ClientSession | null = null;
+    try {
+      session = await this.connection.startSession();
+      await session.withTransaction(async () => {
+        await runWork(session!);
+      });
+    } catch (err: unknown) {
+      if (err instanceof DomainException) {
+        throw err;
+      }
+      if (isDuplicateKeyError(err)) {
+        throw new DomainException(
+          ErrorCode.STATE_CONFLICT,
+          'Ứng viên đã gia nhập đội thi khác trong cuộc thi này',
+          409,
+        );
+      }
+      if (isTransactionUnsupportedError(err)) {
+        await runWork(undefined);
+        return;
+      }
+      throw err;
+    } finally {
+      if (session) {
+        await session.endSession().catch(() => {});
+      }
+    }
+  }
+
+  async saveOutboxEvent(event: any): Promise<void> {
+    await this.outboxModel.create(event);
+  }
+
   // Submission Reservations
   async saveReservation(reservation: SubmissionReservation): Promise<void> {
     await this.reservationModel.create({
@@ -300,6 +496,18 @@ export class MongooseTeamRepository implements ITeamRepository {
         },
       )
       .exec();
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.teamModel.deleteOne({ id }).exec();
+  }
+
+  async deleteActiveMembershipsByTeam(teamId: string): Promise<void> {
+    await this.membershipModel.deleteMany({ teamId }).exec();
+  }
+
+  async deleteJoinRequestsByTeam(teamId: string): Promise<void> {
+    await this.joinRequestModel.deleteMany({ teamId }).exec();
   }
 
   private toDomain(doc: TeamDocument): Team {

@@ -67,6 +67,16 @@ export class ChatOutboxWorkerService implements OnModuleInit, OnModuleDestroy {
    * Publish event to MQTT broker & coordinate with Notification Service
    */
   private async publishEvent(record: any): Promise<void> {
+    // T6: Xử lý sự kiện Team (TEAM_JOIN_REQUEST, TEAM_JOIN_REVIEWED)
+    if (
+      record.aggregateType === 'TEAM' ||
+      record.eventType === 'TEAM_JOIN_REQUEST' ||
+      record.eventType === 'TEAM_JOIN_REVIEWED'
+    ) {
+      await this.notifyTeamEvent(record);
+      return;
+    }
+
     const payload = record.payload;
     const roomId = record.aggregateId;
 
@@ -91,6 +101,35 @@ export class ChatOutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     // 2. Coordinate with Notification Service without duplicate inbox spam
     // Business key: chat_msg_{messageId} ensures exact-once notification per user
     await this.notifyOfflineParticipants(payload);
+  }
+
+  /**
+   * T6: Dispatch Team events (Join Request, Review) to Notification Service
+   */
+  private async notifyTeamEvent(record: any): Promise<void> {
+    const notiUrl = this.configService.get<string>('NOTIFICATION_SERVICE_URL', 'http://localhost:3005');
+    const payload = record.payload;
+
+    try {
+      if (process.env.NODE_ENV !== 'test') {
+        await fetch(`${notiUrl}/api/v1/notifications/transactional`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: payload.userId,
+            businessKey: payload.businessKey,
+            type: payload.type,
+            title: payload.title,
+            body: payload.body,
+            refUrl: payload.refUrl,
+          }),
+        }).catch((err) => {
+          this.logger.warn(`[OutboxWorker] Lỗi gửi thông báo transactional: ${err.message}`);
+        });
+      }
+    } catch {
+      // Fail-safe notification dispatch
+    }
   }
 
   /**

@@ -20,12 +20,14 @@ abstract interface class OpportunityDao {
   Future<void> insertOrUpdate(Map<String, dynamic> record);
   Future<void> insertAll(List<Map<String, dynamic>> records);
   Future<Map<String, dynamic>?> findById(String id);
-  Future<List<Map<String, dynamic>>> getAll({String? type, String? searchQuery});
+  Future<List<Map<String, dynamic>>> getAll(
+      {String? type, String? searchQuery});
   Future<void> deleteById(String id);
   Future<DateTime?> getLastUpdatedAt();
 
   // Bookmarks
-  Future<void> saveBookmark(String opportunityId, {Map<String, dynamic>? metadata});
+  Future<void> saveBookmark(String opportunityId,
+      {Map<String, dynamic>? metadata});
   Future<void> removeBookmark(String opportunityId);
   Future<bool> isBookmarked(String opportunityId);
   Future<List<String>> getAllBookmarkedIds();
@@ -55,7 +57,8 @@ abstract interface class CalendarDao {
     List<int> reminderMinutes = const <int>[],
   });
   Future<Map<String, dynamic>?> findByEventId(String eventId);
-  Future<List<Map<String, dynamic>>> getEventsByOpportunityId(String opportunityId);
+  Future<List<Map<String, dynamic>>> getEventsByOpportunityId(
+      String opportunityId);
   Future<void> deleteEvent(String eventId);
 }
 
@@ -179,10 +182,13 @@ class _OpportunityDaoImpl implements OpportunityDao {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getAll({String? type, String? searchQuery}) async {
+  Future<List<Map<String, dynamic>>> getAll(
+      {String? type, String? searchQuery}) async {
     final Map<String, dynamic> table = await _getTable();
-    List<Map<String, dynamic>> results =
-        table.values.whereType<Map<dynamic, dynamic>>().map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e)).toList();
+    List<Map<String, dynamic>> results = table.values
+        .whereType<Map<dynamic, dynamic>>()
+        .map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e))
+        .toList();
 
     if (type != null && type.isNotEmpty && type != 'ALL') {
       results = results.where((Map<String, dynamic> item) {
@@ -195,9 +201,13 @@ class _OpportunityDaoImpl implements OpportunityDao {
       final String queryNorm = searchQuery.trim().toLowerCase();
       results = results.where((Map<String, dynamic> item) {
         final String title = (item['title'] ?? '').toString().toLowerCase();
-        final String desc = (item['description'] ?? '').toString().toLowerCase();
-        final String org = (item['organizerName'] ?? '').toString().toLowerCase();
-        return title.contains(queryNorm) || desc.contains(queryNorm) || org.contains(queryNorm);
+        final String desc =
+            (item['description'] ?? '').toString().toLowerCase();
+        final String org =
+            (item['organizerName'] ?? '').toString().toLowerCase();
+        return title.contains(queryNorm) ||
+            desc.contains(queryNorm) ||
+            org.contains(queryNorm);
       }).toList();
     }
 
@@ -221,7 +231,8 @@ class _OpportunityDaoImpl implements OpportunityDao {
   }
 
   @override
-  Future<void> saveBookmark(String opportunityId, {Map<String, dynamic>? metadata}) async {
+  Future<void> saveBookmark(String opportunityId,
+      {Map<String, dynamic>? metadata}) async {
     final List<String> list = await getAllBookmarkedIds();
     if (!list.contains(opportunityId)) {
       list.add(opportunityId);
@@ -243,7 +254,8 @@ class _OpportunityDaoImpl implements OpportunityDao {
   }
 
   @override
-  Future<List<String>> getAllBookmarkedIds() async => _stringList(await _cache.getJson(_tableBookmarks));
+  Future<List<String>> getAllBookmarkedIds() async =>
+      _stringList(await _cache.getJson(_tableBookmarks));
 
   @override
   Future<void> replaceBookmarks(List<String> opportunityIds) async {
@@ -267,9 +279,11 @@ class _OpportunityDaoImpl implements OpportunityDao {
   }
 
   @override
-  Future<List<String>> getAllExternalMarkedIds() async => _stringList(await _cache.getJson(_tableExternalMarks));
+  Future<List<String>> getAllExternalMarkedIds() async =>
+      _stringList(await _cache.getJson(_tableExternalMarks));
 
-  Future<Map<String, dynamic>> _getTable() async => _stringMap(await _cache.getJson(_tableOpportunities));
+  Future<Map<String, dynamic>> _getTable() async =>
+      _stringMap(await _cache.getJson(_tableOpportunities));
 }
 
 class _CalendarDaoImpl implements CalendarDao {
@@ -291,8 +305,9 @@ class _CalendarDaoImpl implements CalendarDao {
     List<int> reminderMinutes = const <int>[],
   }) async {
     final Map<String, dynamic> table = await _getTable();
-    final Map<String, dynamic>? previous =
-        table[eventId] is Map ? Map<String, dynamic>.from(table[eventId] as Map) : null;
+    final Map<String, dynamic>? previous = table[eventId] is Map
+        ? Map<String, dynamic>.from(table[eventId] as Map)
+        : null;
     // Idempotent upsert by unique eventId to prevent duplication
     table[eventId] = <String, dynamic>{
       'eventId': eventId,
@@ -318,12 +333,14 @@ class _CalendarDaoImpl implements CalendarDao {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getEventsByOpportunityId(String opportunityId) async {
+  Future<List<Map<String, dynamic>>> getEventsByOpportunityId(
+      String opportunityId) async {
     final Map<String, dynamic> table = await _getTable();
     return table.values
         .whereType<Map<dynamic, dynamic>>()
         .map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e))
-        .where((Map<String, dynamic> item) => item['opportunityId'] == opportunityId)
+        .where((Map<String, dynamic> item) =>
+            item['opportunityId'] == opportunityId)
         .toList();
   }
 
@@ -335,7 +352,8 @@ class _CalendarDaoImpl implements CalendarDao {
     }
   }
 
-  Future<Map<String, dynamic>> _getTable() async => _stringMap(await _cache.getJson(_tableCalendar));
+  Future<Map<String, dynamic>> _getTable() async =>
+      _stringMap(await _cache.getJson(_tableCalendar));
 }
 
 class _NotificationDaoImpl implements NotificationDao {
@@ -343,7 +361,8 @@ class _NotificationDaoImpl implements NotificationDao {
   static const String _tableNotifications = 'room_table_notifications';
   static const String _keyLastSynced = 'room_notifications_synced_at';
   static const String _tablePendingReads = 'room_notifications_pending_reads';
-  static const String _keyPendingReadAll = 'room_notifications_pending_read_all';
+  static const String _keyPendingReadAll =
+      'room_notifications_pending_read_all';
   static const String _keyPreferences = 'room_notification_preferences';
 
   _NotificationDaoImpl(this._cache);
@@ -381,8 +400,10 @@ class _NotificationDaoImpl implements NotificationDao {
   @override
   Future<List<Map<String, dynamic>>> getAllNotifications() async {
     final Map<String, dynamic> table = await _getTable();
-    final List<Map<String, dynamic>> list =
-        table.values.whereType<Map<dynamic, dynamic>>().map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e)).toList();
+    final List<Map<String, dynamic>> list = table.values
+        .whereType<Map<dynamic, dynamic>>()
+        .map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e))
+        .toList();
     // Sort descending by createdAt
     list.sort((Map<String, dynamic> a, Map<String, dynamic> b) {
       final String timeA = (a['createdAt'] ?? '').toString();
@@ -396,7 +417,8 @@ class _NotificationDaoImpl implements NotificationDao {
   Future<void> markRead(String notificationId) async {
     final Map<String, dynamic> table = await _getTable();
     if (table[notificationId] is Map) {
-      final Map<String, dynamic> item = Map<String, dynamic>.from(table[notificationId] as Map);
+      final Map<String, dynamic> item =
+          Map<String, dynamic>.from(table[notificationId] as Map);
       item['isRead'] = true;
       item['readAt'] = DateTime.now().toIso8601String();
       table[notificationId] = item;
@@ -410,7 +432,8 @@ class _NotificationDaoImpl implements NotificationDao {
     final String nowIso = DateTime.now().toIso8601String();
     for (final String key in table.keys.toList()) {
       if (table[key] is! Map) continue;
-      final Map<String, dynamic> item = Map<String, dynamic>.from(table[key] as Map);
+      final Map<String, dynamic> item =
+          Map<String, dynamic>.from(table[key] as Map);
       item['isRead'] = true;
       item['readAt'] ??= nowIso;
       table[key] = item;
@@ -421,7 +444,10 @@ class _NotificationDaoImpl implements NotificationDao {
   @override
   Future<int> getUnreadCount() async {
     final Map<String, dynamic> table = await _getTable();
-    return table.values.whereType<Map<dynamic, dynamic>>().where((Map<dynamic, dynamic> item) => item['isRead'] != true).length;
+    return table.values
+        .whereType<Map<dynamic, dynamic>>()
+        .where((Map<dynamic, dynamic> item) => item['isRead'] != true)
+        .length;
   }
 
   @override
@@ -458,7 +484,8 @@ class _NotificationDaoImpl implements NotificationDao {
   }
 
   @override
-  Future<bool> isPendingReadAll() async => (await _cache.getString(_keyPendingReadAll)) == 'true';
+  Future<bool> isPendingReadAll() async =>
+      (await _cache.getString(_keyPendingReadAll)) == 'true';
 
   @override
   Future<void> savePreferences(Map<String, dynamic> preferences) async {
@@ -471,5 +498,6 @@ class _NotificationDaoImpl implements NotificationDao {
     return raw is Map ? Map<String, dynamic>.from(raw) : null;
   }
 
-  Future<Map<String, dynamic>> _getTable() async => _stringMap(await _cache.getJson(_tableNotifications));
+  Future<Map<String, dynamic>> _getTable() async =>
+      _stringMap(await _cache.getJson(_tableNotifications));
 }

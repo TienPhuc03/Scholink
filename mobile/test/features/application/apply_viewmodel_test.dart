@@ -20,7 +20,9 @@ Future<ApplyViewModel> toReview(ApplyHarness h) async {
 void main() {
   group('Step 1 – readiness (Q4)', () {
     test('INELIGIBLE blocks the flow', () async {
-      final ApplyHarness h = ApplyHarness()..api.reply(ApiEndpoints.readiness, readinessBody(screening: 'INELIGIBLE'));
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(
+            ApiEndpoints.readiness, readinessBody(screening: 'INELIGIBLE'));
       final ApplyViewModel vm = h.build();
       await vm.start();
       expect(vm.readiness!.canProceed, isFalse);
@@ -31,7 +33,8 @@ void main() {
 
     test('missing Passport fields block the flow', () async {
       final ApplyHarness h = ApplyHarness()
-        ..api.reply(ApiEndpoints.readiness, readinessBody(missing: <String>['education']));
+        ..api.reply(ApiEndpoints.readiness,
+            readinessBody(missing: <String>['education']));
       final ApplyViewModel vm = h.build();
       await vm.start();
       vm.goToAttachments();
@@ -42,7 +45,8 @@ void main() {
 
     test('NEEDS_REVIEW may continue', () async {
       final ApplyHarness h = ApplyHarness()
-        ..api.reply(ApiEndpoints.readiness, readinessBody(screening: 'NEEDS_REVIEW'));
+        ..api.reply(
+            ApiEndpoints.readiness, readinessBody(screening: 'NEEDS_REVIEW'));
       final ApplyViewModel vm = h.build();
       await vm.start();
       vm.goToAttachments();
@@ -50,10 +54,16 @@ void main() {
       vm.dispose();
     });
 
-    test('an active application for this opportunity skips the flow (Q15)', () async {
+    test('an active application for this opportunity skips the flow (Q15)',
+        () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
-          <String, dynamic>{'id': 'app_old', 'opportunityId': oppId, 'status': 'REVIEWING', 'submissionType': 'INDIVIDUAL'},
+          <String, dynamic>{
+            'id': 'app_old',
+            'opportunityId': oppId,
+            'status': 'REVIEWING',
+            'submissionType': 'INDIVIDUAL'
+          },
         ]);
       final ApplyViewModel vm = h.build();
       await vm.start();
@@ -62,10 +72,17 @@ void main() {
       vm.dispose();
     });
 
-    test('a cancelled application stops the flow, as the backend refuses to resubmit it', () async {
+    test(
+        'a cancelled application stops the flow, as the backend refuses to resubmit it',
+        () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
-          <String, dynamic>{'id': 'app_old', 'opportunityId': oppId, 'status': 'CANCELLED', 'submissionType': 'INDIVIDUAL'},
+          <String, dynamic>{
+            'id': 'app_old',
+            'opportunityId': oppId,
+            'status': 'CANCELLED',
+            'submissionType': 'INDIVIDUAL'
+          },
         ]);
       final ApplyViewModel vm = h.build();
       await vm.start();
@@ -76,7 +93,11 @@ void main() {
     test('a withdrawn application does not block a new one', () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
-          <String, dynamic>{'id': 'app_old', 'opportunityId': oppId, 'status': 'WITHDRAWN'},
+          <String, dynamic>{
+            'id': 'app_old',
+            'opportunityId': oppId,
+            'status': 'WITHDRAWN'
+          },
         ]);
       final ApplyViewModel vm = h.build();
       await vm.start();
@@ -86,17 +107,22 @@ void main() {
   });
 
   group('Step 2 – attachments (Q3/Q10)', () {
-    test('rejects wrong type, oversize and renamed files locally without calling the server', () async {
+    test(
+        'rejects wrong type, oversize and renamed files locally without calling the server',
+        () async {
       final ApplyHarness h = ApplyHarness();
       final ApplyViewModel vm = h.build();
       await vm.start();
       vm.goToAttachments();
 
-      h.picker.queue.add(PickedAttachment(name: 'notes.docx', bytes: Uint8List.fromList(<int>[1, 2, 3, 4])));
+      h.picker.queue.add(PickedAttachment(
+          name: 'notes.docx', bytes: Uint8List.fromList(<int>[1, 2, 3, 4])));
       await vm.pickAttachment();
       expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
 
-      h.picker.queue.add(PickedAttachment(name: 'photo.jpg', bytes: Uint8List.fromList(<int>[0xFF, 0xD8, 0xFF, 0])));
+      h.picker.queue.add(PickedAttachment(
+          name: 'photo.jpg',
+          bytes: Uint8List.fromList(<int>[0xFF, 0xD8, 0xFF, 0])));
       await vm.pickAttachment();
       expect(vm.attachmentError, contains('Chỉ nhận tệp PDF'));
 
@@ -104,7 +130,9 @@ void main() {
       await vm.pickAttachment();
       expect(vm.attachmentError, contains('5 MB'));
 
-      h.picker.queue.add(PickedAttachment(name: 'fake.pdf', bytes: Uint8List.fromList(<int>[0x89, 0x50, 0x4E, 0x47, 0])));
+      h.picker.queue.add(PickedAttachment(
+          name: 'fake.pdf',
+          bytes: Uint8List.fromList(<int>[0x89, 0x50, 0x4E, 0x47, 0])));
       await vm.pickAttachment();
       expect(vm.attachmentError, contains('không khớp'));
 
@@ -113,7 +141,8 @@ void main() {
       vm.dispose();
     });
 
-    test('a valid PDF goes through upload-url + complete and becomes READY', () async {
+    test('a valid PDF goes through upload-url + complete and becomes READY',
+        () async {
       final ApplyHarness h = ApplyHarness();
       final ApplyViewModel vm = h.build();
       await vm.start();
@@ -122,13 +151,24 @@ void main() {
       await vm.pickAttachment();
 
       expect(vm.attachments.single.state, AttachmentState.ready);
-      final RecordedCall upload = h.api.callsTo(ApiEndpoints.mediaUploadUrl).single;
+      final RecordedCall upload =
+          h.api.callsTo(ApiEndpoints.mediaUploadUrl).single;
       expect(upload.data['category'], 'ATTACHMENT');
       expect((upload.data['sha256'] as String).length, 64);
-      expect(h.api.callsTo(ApiEndpoints.mediaComplete('ast_1')).single.data['fileHeaderHex'], startsWith('25504446'));
+      expect(
+          h.api
+              .callsTo(ApiEndpoints.mediaComplete('ast_1'))
+              .single
+              .data['fileHeaderHex'],
+          startsWith('25504446'));
 
       await vm.goToReview();
-      expect(h.api.callsTo(ApiEndpoints.applicationPreviews).single.data['attachmentIds'], <String>['ast_1']);
+      expect(
+          h.api
+              .callsTo(ApiEndpoints.applicationPreviews)
+              .single
+              .data['attachmentIds'],
+          <String>['ast_1']);
       vm.dispose();
     });
 
@@ -136,7 +176,10 @@ void main() {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(
           ApiEndpoints.mediaComplete('ast_1'),
-          const ServerFailure(message: 'Phát hiện mã độc', code: 'MALICIOUS_FILE_DETECTED', statusCode: 422),
+          const ServerFailure(
+              message: 'Phát hiện mã độc',
+              code: 'MALICIOUS_FILE_DETECTED',
+              statusCode: 422),
         );
       final ApplyViewModel vm = h.build();
       await vm.start();
@@ -160,14 +203,17 @@ void main() {
       vm.dispose();
     });
 
-    test('happy path: consent (SNAPSHOT only) then submit with an Idempotency-Key, store cleared', () async {
+    test(
+        'happy path: consent (SNAPSHOT only) then submit with an Idempotency-Key, store cleared',
+        () async {
       final ApplyHarness h = ApplyHarness();
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
       await vm.submit();
 
       expect(vm.result?.applicationId, 'app_1');
-      expect(h.api.callsTo(ApiEndpoints.consents).single.data['scope'], <String>['SNAPSHOT']);
+      expect(h.api.callsTo(ApiEndpoints.consents).single.data['scope'],
+          <String>['SNAPSHOT']);
       final RecordedCall submit = h.submits.single;
       expect(submit.headers['Idempotency-Key'], isNotEmpty);
       expect(submit.data['consentId'], 'cns_1');
@@ -176,8 +222,11 @@ void main() {
       vm.dispose();
     });
 
-    test('lost response: retry resends the identical body and key, even after an app restart', () async {
-      final ApplyHarness h = ApplyHarness()..api.reply(ApiEndpoints.applications, const NetworkFailure());
+    test(
+        'lost response: retry resends the identical body and key, even after an app restart',
+        () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(ApiEndpoints.applications, const NetworkFailure());
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
       await vm.submit();
@@ -185,7 +234,8 @@ void main() {
 
       await vm.retrySubmit();
       expect(h.submits.length, 2);
-      expect(h.submits[1].headers['Idempotency-Key'], h.submits[0].headers['Idempotency-Key']);
+      expect(h.submits[1].headers['Idempotency-Key'],
+          h.submits[0].headers['Idempotency-Key']);
       expect(h.submits[1].data, h.submits[0].data);
       vm.dispose();
 
@@ -196,28 +246,37 @@ void main() {
       expect(reopened.hasUnconfirmedAttempt, isTrue);
       await reopened.retrySubmit();
       expect(h.submits.length, 3);
-      expect(h.submits[2].headers['Idempotency-Key'], h.submits[0].headers['Idempotency-Key']);
+      expect(h.submits[2].headers['Idempotency-Key'],
+          h.submits[0].headers['Idempotency-Key']);
       expect(reopened.result?.applicationId, 'app_1');
       reopened.dispose();
     });
 
-    test('expired preview blocks submit; a new preview keeps submissionId but uses a new key', () async {
-      final ApplyHarness h = ApplyHarness()..api.reply(ApiEndpoints.applications, const NetworkFailure());
+    test(
+        'expired preview blocks submit; a new preview keeps submissionId but uses a new key',
+        () async {
+      final ApplyHarness h = ApplyHarness()
+        ..api.reply(ApiEndpoints.applications, const NetworkFailure());
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
       await vm.submit();
-      final String firstKey = h.submits.single.headers['Idempotency-Key'] as String;
-      final String submissionId = h.submits.single.data['submissionId'] as String;
+      final String firstKey =
+          h.submits.single.headers['Idempotency-Key'] as String;
+      final String submissionId =
+          h.submits.single.data['submissionId'] as String;
 
       h.now = h.now.add(const Duration(minutes: 11));
       expect(vm.previewExpired, isTrue);
       expect(vm.canSubmit, isFalse);
 
       h.api.handlers[ApiEndpoints.applicationPreviews] = (RecordedCall c) =>
-          previewBody(c, previewId: 'prv_2', expiresAt: h.now.add(const Duration(minutes: 10)));
+          previewBody(c,
+              previewId: 'prv_2',
+              expiresAt: h.now.add(const Duration(minutes: 10)));
       h.api.reply(ApiEndpoints.applications, submitOk());
       await vm.createPreview();
-      expect(vm.consentAccepted, isFalse, reason: 'a new preview needs a new consent (Q9)');
+      expect(vm.consentAccepted, isFalse,
+          reason: 'a new preview needs a new consent (Q9)');
       vm.setConsent(true);
       await vm.submit();
 
@@ -231,7 +290,10 @@ void main() {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(
           ApiEndpoints.applications,
-          const ServerFailure(message: 'Bản xem trước đã hết hạn.', code: 'PREVIEW_EXPIRED', statusCode: 410),
+          const ServerFailure(
+              message: 'Bản xem trước đã hết hạn.',
+              code: 'PREVIEW_EXPIRED',
+              statusCode: 410),
         );
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
@@ -242,11 +304,16 @@ void main() {
       vm.dispose();
     });
 
-    test('SNAPSHOT_STALE when consenting asks for a new preview instead of resubmitting', () async {
+    test(
+        'SNAPSHOT_STALE when consenting asks for a new preview instead of resubmitting',
+        () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(
           ApiEndpoints.consents,
-          const ServerFailure(message: 'Hồ sơ Passport đã thay đổi', code: 'SNAPSHOT_STALE', statusCode: 409),
+          const ServerFailure(
+              message: 'Hồ sơ Passport đã thay đổi',
+              code: 'SNAPSHOT_STALE',
+              statusCode: 409),
         );
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
@@ -262,7 +329,10 @@ void main() {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(
           ApiEndpoints.applications,
-          const ServerFailure(message: 'Tệp không còn sẵn sàng', code: 'ASSET_NOT_AVAILABLE', statusCode: 409),
+          const ServerFailure(
+              message: 'Tệp không còn sẵn sàng',
+              code: 'ASSET_NOT_AVAILABLE',
+              statusCode: 409),
         );
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
@@ -274,16 +344,24 @@ void main() {
       vm.dispose();
     });
 
-    test('ALREADY_APPLIED shows the existing application instead of retrying', () async {
+    test('ALREADY_APPLIED shows the existing application instead of retrying',
+        () async {
       final ApplyHarness h = ApplyHarness()
         ..api.reply(
           ApiEndpoints.applications,
-          const ServerFailure(message: 'Bạn đã nộp hồ sơ cho cơ hội này', code: 'ALREADY_APPLIED', statusCode: 409),
+          const ServerFailure(
+              message: 'Bạn đã nộp hồ sơ cho cơ hội này',
+              code: 'ALREADY_APPLIED',
+              statusCode: 409),
         );
       final ApplyViewModel vm = await toReview(h);
       vm.setConsent(true);
       h.api.reply(ApiEndpoints.myApplications, <Map<String, dynamic>>[
-        <String, dynamic>{'id': 'app_other_device', 'opportunityId': oppId, 'status': 'SUBMITTED'},
+        <String, dynamic>{
+          'id': 'app_other_device',
+          'opportunityId': oppId,
+          'status': 'SUBMITTED'
+        },
       ]);
       await vm.submit();
       expect(vm.existingApplication?.id, 'app_other_device');

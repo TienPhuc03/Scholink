@@ -36,7 +36,8 @@ class ChatRepository {
     } on Failure catch (failure) {
       return FailureResult<List<ChatRoomModel>, Failure>(failure);
     } catch (e) {
-      return FailureResult<List<ChatRoomModel>, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<List<ChatRoomModel>, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -69,7 +70,8 @@ class ChatRepository {
     } on Failure catch (failure) {
       return FailureResult<List<ChatMessageModel>, Failure>(failure);
     } catch (e) {
-      return FailureResult<List<ChatMessageModel>, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<List<ChatMessageModel>, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
@@ -102,20 +104,24 @@ class ChatRepository {
           : resData;
 
       if (payload is Map<String, dynamic>) {
-        return SuccessResult<ChatMessageModel, Failure>(ChatMessageModel.fromJson(payload));
+        return SuccessResult<ChatMessageModel, Failure>(
+            ChatMessageModel.fromJson(payload));
       }
 
       return const FailureResult<ChatMessageModel, Failure>(
-        ServerFailure(message: 'Phản hồi gửi tin nhắn từ máy chủ không hợp lệ.'),
+        ServerFailure(
+            message: 'Phản hồi gửi tin nhắn từ máy chủ không hợp lệ.'),
       );
     } on Failure catch (failure) {
       return FailureResult<ChatMessageModel, Failure>(failure);
     } catch (e) {
-      return FailureResult<ChatMessageModel, Failure>(ServerFailure(message: e.toString()));
+      return FailureResult<ChatMessageModel, Failure>(
+          ServerFailure(message: e.toString()));
     }
   }
 
-  Future<Result<void, Failure>> markAsRead(String roomId, int lastReadSeq) async {
+  Future<Result<void, Failure>> markAsRead(
+      String roomId, int lastReadSeq) async {
     try {
       await _apiClient.post<dynamic>(
         ApiEndpoints.markChatRead(roomId),

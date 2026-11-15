@@ -16,25 +16,29 @@ class TeamViewModel extends BaseViewModel {
   String? _actionError;
 
   /// Cache of join requests per team (key: teamId, value: list of requests).
-  final Map<String, List<JoinRequestModel>> _teamJoinRequests = <String, List<JoinRequestModel>>{};
+  final Map<String, List<JoinRequestModel>> _teamJoinRequests =
+      <String, List<JoinRequestModel>>{};
 
   /// Tracks request IDs currently being reviewed to disable actions and prevent double clicks.
   final Set<String> _pendingReviewActionIds = <String>{};
 
   /// Tracks my own sent requests (key: teamId, value: JoinRequestModel).
-  final Map<String, JoinRequestModel> _mySentRequests = <String, JoinRequestModel>{};
+  final Map<String, JoinRequestModel> _mySentRequests =
+      <String, JoinRequestModel>{};
 
   List<TeamModel> get teams => _teams;
   String? get currentUserId => _currentUserId;
   String? get actionFeedback => _actionFeedback;
   String? get actionError => _actionError;
 
-  bool isRequestProcessing(String requestId) => _pendingReviewActionIds.contains(requestId);
+  bool isRequestProcessing(String requestId) =>
+      _pendingReviewActionIds.contains(requestId);
 
   List<JoinRequestModel> getJoinRequestsForTeam(String teamId) =>
       _teamJoinRequests[teamId] ?? <JoinRequestModel>[];
 
-  JoinRequestModel? getMyRequestForTeam(String teamId) => _mySentRequests[teamId];
+  JoinRequestModel? getMyRequestForTeam(String teamId) =>
+      _mySentRequests[teamId];
 
   TeamViewModel({
     required TeamRepository repository,
@@ -48,13 +52,15 @@ class TeamViewModel extends BaseViewModel {
 
   /// Formats server error codes into clear Vietnamese user messages.
   String _formatErrorMessage(String rawMessage) {
-    if (rawMessage.contains('SLOT_FULL') || rawMessage.contains('đã đủ số lượng')) {
+    if (rawMessage.contains('SLOT_FULL') ||
+        rawMessage.contains('đã đủ số lượng')) {
       return 'Đội thi đã đủ số lượng thành viên (SLOT_FULL).';
     }
     if (rawMessage.contains('403') || rawMessage.contains('FORBIDDEN')) {
       return 'Không có quyền thực hiện thao tác này (403 Forbidden).';
     }
-    if (rawMessage.contains('STATE_CONFLICT') || rawMessage.contains('đã tham gia')) {
+    if (rawMessage.contains('STATE_CONFLICT') ||
+        rawMessage.contains('đã tham gia')) {
       return 'Xung đột: Bạn đã tham gia một đội thi khác trong cuộc thi này.';
     }
     return rawMessage;
@@ -148,7 +154,8 @@ class TeamViewModel extends BaseViewModel {
     _actionFeedback = null;
     _actionError = null;
 
-    final Result<JoinRequestModel, Failure> result = await _repository.sendJoinRequest(
+    final Result<JoinRequestModel, Failure> result =
+        await _repository.sendJoinRequest(
       teamId,
       message: message,
     );
@@ -156,7 +163,8 @@ class TeamViewModel extends BaseViewModel {
     return result.fold<bool>(
       onSuccess: (JoinRequestModel req) {
         _mySentRequests[teamId] = req;
-        _actionFeedback = 'Đã gửi yêu cầu xin vào đội thành công! Đang chờ trưởng đội xét duyệt.';
+        _actionFeedback =
+            'Đã gửi yêu cầu xin vào đội thành công! Đang chờ trưởng đội xét duyệt.';
         setSuccess();
         loadTeams(competitionId);
         return true;
@@ -195,7 +203,9 @@ class TeamViewModel extends BaseViewModel {
 
     return result.fold<bool>(
       onSuccess: (_) {
-        final String actionText = decision == 'ACCEPT' ? 'Đã duyệt thành viên vào đội!' : 'Đã từ chối yêu cầu gia nhập.';
+        final String actionText = decision == 'ACCEPT'
+            ? 'Đã duyệt thành viên vào đội!'
+            : 'Đã từ chối yêu cầu gia nhập.';
         _actionFeedback = actionText;
         notifyListeners();
         // Refresh team slot and list
@@ -222,7 +232,8 @@ class TeamViewModel extends BaseViewModel {
     _actionFeedback = null;
     _actionError = null;
 
-    final Result<void, Failure> result = await _repository.withdrawJoinRequest(requestId);
+    final Result<void, Failure> result =
+        await _repository.withdrawJoinRequest(requestId);
 
     return result.fold<bool>(
       onSuccess: (_) {
@@ -251,6 +262,29 @@ class TeamViewModel extends BaseViewModel {
     return result.fold<bool>(
       onSuccess: (_) {
         _actionFeedback = 'Đã rời đội thi thành công.';
+        loadTeams(competitionId);
+        return true;
+      },
+      onFailure: (Failure failure) {
+        final String msg = _formatErrorMessage(failure.message);
+        _actionError = msg;
+        setError(msg);
+        return false;
+      },
+    );
+  }
+
+  /// Leader deletes/dissolves the team.
+  Future<bool> deleteTeam(String teamId, String competitionId) async {
+    setLoading();
+    _actionFeedback = null;
+    _actionError = null;
+
+    final Result<void, Failure> result = await _repository.deleteTeam(teamId);
+
+    return result.fold<bool>(
+      onSuccess: (_) {
+        _actionFeedback = 'Đã giải tán và xóa đội thi thành công.';
         loadTeams(competitionId);
         return true;
       },

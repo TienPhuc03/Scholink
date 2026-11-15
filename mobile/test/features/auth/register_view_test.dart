@@ -16,11 +16,12 @@ void main() {
     addTearDown(tester.view.reset);
 
     api = ScriptedApiClient()..reply(ApiEndpoints.sendOtp, otpBody());
-    final RegisterViewModel vm =
-        RegisterViewModel(AuthRepository(apiClient: api, secureStorage: InMemorySecureStorage()));
+    final RegisterViewModel vm = RegisterViewModel(
+        AuthRepository(apiClient: api, secureStorage: InMemorySecureStorage()));
     final List<RegisterOutcome> outcomes = <RegisterOutcome>[];
     await tester.pumpWidget(MaterialApp(
-      home: RegisterView(viewModel: vm, onRegistered: outcomes.add, onNavigateToLogin: () {}),
+      home: RegisterView(
+          viewModel: vm, onRegistered: outcomes.add, onNavigateToLogin: () {}),
     ));
     return outcomes;
   }
@@ -33,7 +34,8 @@ void main() {
     expect(find.text('Tiếp tục với Google'), findsOneWidget);
   });
 
-  testWidgets('empty submit shows field errors and keeps the user on the form', (WidgetTester tester) async {
+  testWidgets('empty submit shows field errors and keeps the user on the form',
+      (WidgetTester tester) async {
     final List<RegisterOutcome> outcomes = await pumpRegister(tester);
     await tester.tap(find.byKey(const Key('register_submit')));
     await tester.pump();
@@ -43,7 +45,8 @@ void main() {
     expect(api.calls, isEmpty);
   });
 
-  testWidgets('valid form registers and hands over to the OTP step', (WidgetTester tester) async {
+  testWidgets('valid form registers and hands over to the OTP step',
+      (WidgetTester tester) async {
     final List<RegisterOutcome> outcomes = await pumpRegister(tester);
     final Finder fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Sinh Viên');

@@ -73,7 +73,8 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
             ),
             if (locked)
               AuthMessageBanner(
-                message: 'Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau khoảng ${vm.lockMinutesLeft} phút.',
+                message:
+                    'Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau khoảng ${vm.lockMinutesLeft} phút.',
               )
             else if (vm.hasError && vm.errorMessage != null)
               AuthMessageBanner(message: vm.errorMessage!)
@@ -85,7 +86,8 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                 tone: AuthBannerTone.success,
               ),
             if (vm.needsManualLogin)
-              AuthPrimaryButton(label: 'Đến trang đăng nhập', onPressed: widget.onGoToLogin)
+              AuthPrimaryButton(
+                  label: 'Đến trang đăng nhập', onPressed: widget.onGoToLogin)
             else
               AuthPrimaryButton(
                 key: const Key('otp_submit'),

@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Headers,
+  HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard, Public } from '@shared';
@@ -17,6 +18,12 @@ async function forwardCollab(path: string, options: RequestInit = {}) {
   const url = `${COLLAB_URL()}${path}`;
   const res = await fetch(url, options);
   const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new HttpException(
+      data ?? { error: { code: 'UPSTREAM_ERROR', message: res.statusText } },
+      res.status,
+    );
+  }
   return data;
 }
 

@@ -68,12 +68,15 @@ class ApplyViewModel extends BaseViewModel {
 
   // ---- Step 2: attachments ----
   final List<AttachmentItem> _attachments = <AttachmentItem>[];
-  List<AttachmentItem> get attachments => List<AttachmentItem>.unmodifiable(_attachments);
+  List<AttachmentItem> get attachments =>
+      List<AttachmentItem>.unmodifiable(_attachments);
   String? _attachmentError;
   String? get attachmentError => _attachmentError;
-  bool get isUploading => _attachments.any((AttachmentItem a) => a.state == AttachmentState.uploading);
+  bool get isUploading => _attachments
+      .any((AttachmentItem a) => a.state == AttachmentState.uploading);
   List<String> get _readyAssetIds => _attachments
-      .where((AttachmentItem a) => a.state == AttachmentState.ready && a.assetId != null)
+      .where((AttachmentItem a) =>
+          a.state == AttachmentState.ready && a.assetId != null)
       .map((AttachmentItem a) => a.assetId!)
       .toList();
 
@@ -98,7 +101,8 @@ class ApplyViewModel extends BaseViewModel {
   }
 
   bool get previewExpired => _preview != null && previewSecondsLeft <= 0;
-  bool get needsNewPreview => _preview == null || previewExpired || _previewStale;
+  bool get needsNewPreview =>
+      _preview == null || previewExpired || _previewStale;
 
   bool _consentAccepted = false;
   bool get consentAccepted => _consentAccepted;
@@ -124,16 +128,22 @@ class ApplyViewModel extends BaseViewModel {
   PendingSubmission? _pending;
 
   /// A request from an earlier session (crash, app killed) whose answer never arrived.
-  bool get hasUnconfirmedAttempt => _pending?.hasSentRequest == true && _result == null;
+  bool get hasUnconfirmedAttempt =>
+      _pending?.hasSentRequest == true && _result == null;
 
   bool get canSubmit =>
-      _preview != null && !needsNewPreview && _consentAccepted && !_submitting && _terminalError == null;
+      _preview != null &&
+      !needsNewPreview &&
+      _consentAccepted &&
+      !_submitting &&
+      _terminalError == null;
 
   // ======================= Lifecycle =======================
 
   Future<void> start() async {
     setLoading();
-    final Result<List<ApplicationSummary>, Failure> mine = await _applications.getMyApplications();
+    final Result<List<ApplicationSummary>, Failure> mine =
+        await _applications.getMyApplications();
     _existing = _findActive(mine.dataOrNull);
     _resubmitRevision = _findResubmitRevision(mine.dataOrNull);
     _pending = await _store.load(opportunityId);
@@ -144,7 +154,8 @@ class ApplyViewModel extends BaseViewModel {
   ApplicationSummary? _findActive(List<ApplicationSummary>? items) {
     if (items == null) return null;
     for (final ApplicationSummary a in items) {
-      if (a.opportunityId == opportunityId && !a.isTeam && a.status.isActive) return a;
+      if (a.opportunityId == opportunityId && !a.isTeam && a.status.isActive)
+        return a;
     }
     return null;
   }
@@ -154,7 +165,8 @@ class ApplyViewModel extends BaseViewModel {
   int? _findResubmitRevision(List<ApplicationSummary>? items) {
     if (items == null) return null;
     for (final ApplicationSummary a in items) {
-      if (a.opportunityId == opportunityId && !a.isTeam && !a.status.isActive) return a.revision + 1;
+      if (a.opportunityId == opportunityId && !a.isTeam && !a.status.isActive)
+        return a.revision + 1;
     }
     return null;
   }
@@ -165,11 +177,13 @@ class ApplyViewModel extends BaseViewModel {
     _checkingReadiness = true;
     _readinessError = null;
     notifyListeners();
-    final Result<ReadinessResult, Failure> r = await _applications.checkReadiness(opportunityId);
+    final Result<ReadinessResult, Failure> r =
+        await _applications.checkReadiness(opportunityId);
     _checkingReadiness = false;
     _readiness = r.dataOrNull ?? _readiness;
     _readinessError = r.errorOrNull?.message;
-    if (_readiness != null && _readiness!.profileVersion != _preview?.profileVersion) {
+    if (_readiness != null &&
+        _readiness!.profileVersion != _preview?.profileVersion) {
       // Passport changed since the preview was made: the old snapshot is no longer what we'd send.
       _invalidatePreview();
     }
@@ -192,7 +206,8 @@ class ApplyViewModel extends BaseViewModel {
     } catch (_) {
       // F37 (Q7): storage permission denied or the picker failed. Attachments are optional,
       // so explain and let the user continue without files.
-      _attachmentError = 'Không mở được trình chọn tệp (có thể do chưa cấp quyền truy cập tệp). '
+      _attachmentError =
+          'Không mở được trình chọn tệp (có thể do chưa cấp quyền truy cập tệp). '
           'Bạn vẫn có thể nộp hồ sơ không kèm tệp.';
       notifyListeners();
       return;
@@ -204,7 +219,9 @@ class ApplyViewModel extends BaseViewModel {
     final String? invalid = AttachmentRules.validate(
       fileName: file.name,
       bytes: file.bytes,
-      alreadyAttached: _attachments.where((AttachmentItem a) => a.state != AttachmentState.rejected).length,
+      alreadyAttached: _attachments
+          .where((AttachmentItem a) => a.state != AttachmentState.rejected)
+          .length,
     );
     if (invalid != null) {
       _attachmentError = '${file.name}: $invalid';
@@ -222,12 +239,16 @@ class ApplyViewModel extends BaseViewModel {
     _invalidatePreview();
     notifyListeners();
 
-    final Result<String, Failure> uploaded = await _media.uploadAttachment(file);
-    final int i = _attachments.indexWhere((AttachmentItem a) => a.localId == item.localId);
+    final Result<String, Failure> uploaded =
+        await _media.uploadAttachment(file);
+    final int i = _attachments
+        .indexWhere((AttachmentItem a) => a.localId == item.localId);
     if (i < 0) return; // removed while uploading
     _attachments[i] = uploaded.fold<AttachmentItem>(
-      onSuccess: (String assetId) => item.copyWith(state: AttachmentState.ready, assetId: assetId),
-      onFailure: (Failure f) => item.copyWith(state: AttachmentState.rejected, error: f.message),
+      onSuccess: (String assetId) =>
+          item.copyWith(state: AttachmentState.ready, assetId: assetId),
+      onFailure: (Failure f) =>
+          item.copyWith(state: AttachmentState.rejected, error: f.message),
     );
     notifyListeners();
   }
@@ -271,7 +292,10 @@ class ApplyViewModel extends BaseViewModel {
 
   Future<void> _ensurePending() async {
     if (_pending != null) return;
-    _pending = PendingSubmission(opportunityId: opportunityId, submissionId: _newId(), createdAt: _clock());
+    _pending = PendingSubmission(
+        opportunityId: opportunityId,
+        submissionId: _newId(),
+        createdAt: _clock());
     await _store.save(_pending!);
   }
 
@@ -286,7 +310,8 @@ class ApplyViewModel extends BaseViewModel {
     notifyListeners();
 
     await _ensurePending();
-    final Result<ApplicationPreview, Failure> r = await _applications.createPreview(
+    final Result<ApplicationPreview, Failure> r =
+        await _applications.createPreview(
       opportunityId: opportunityId,
       submissionId: _pending!.submissionId,
       expectedRuleVersion: _readiness!.ruleVersion,
@@ -320,7 +345,8 @@ class ApplyViewModel extends BaseViewModel {
     notifyListeners();
 
     if (_consent?.previewId != preview.previewId) {
-      final Result<ConsentReceipt, Failure> c = await _applications.createConsent(preview);
+      final Result<ConsentReceipt, Failure> c =
+          await _applications.createConsent(preview);
       final Failure? consentError = c.errorOrNull;
       if (consentError != null) {
         _submitting = false;
@@ -331,11 +357,14 @@ class ApplyViewModel extends BaseViewModel {
       _consent = c.dataOrNull;
     }
 
-    final Map<String, dynamic> body = ApplicationRepository.buildSubmitBody(preview, _consent!);
+    final Map<String, dynamic> body =
+        ApplicationRepository.buildSubmitBody(preview, _consent!);
     await _ensurePending();
     final PendingSubmission p = _pending!;
-    final bool sameRequest = p.hasSentRequest && jsonEncode(p.body) == jsonEncode(body);
-    _pending = sameRequest ? p : p.withRequest(idempotencyKey: _newId(), body: body);
+    final bool sameRequest =
+        p.hasSentRequest && jsonEncode(p.body) == jsonEncode(body);
+    _pending =
+        sameRequest ? p : p.withRequest(idempotencyKey: _newId(), body: body);
     // Persist before sending: if the app dies mid-request we can resend the identical request.
     await _store.save(_pending!);
     await _send();
@@ -353,7 +382,8 @@ class ApplyViewModel extends BaseViewModel {
 
   Future<void> _send() async {
     final PendingSubmission p = _pending!;
-    final Result<SubmitResult, Failure> r = await _applications.submit(body: p.body!, idempotencyKey: p.idempotencyKey!);
+    final Result<SubmitResult, Failure> r = await _applications.submit(
+        body: p.body!, idempotencyKey: p.idempotencyKey!);
     _submitting = false;
     final SubmitResult? ok = r.dataOrNull;
     if (ok != null) {
@@ -385,7 +415,8 @@ class ApplyViewModel extends BaseViewModel {
     if (f.code == 'ALREADY_APPLIED') {
       _pending = null;
       await _store.clear(opportunityId);
-      final Result<List<ApplicationSummary>, Failure> mine = await _applications.getMyApplications();
+      final Result<List<ApplicationSummary>, Failure> mine =
+          await _applications.getMyApplications();
       _existing = _findActive(mine.dataOrNull);
       _submitError = f.message;
       return;
@@ -411,7 +442,8 @@ class ApplyViewModel extends BaseViewModel {
       case 'IDEMPOTENCY_CONFLICT':
         _previewStale = true;
         _consentAccepted = false;
-        _submitError = '${f.message} Hãy tạo lại bản xem trước và xác nhận lại.';
+        _submitError =
+            '${f.message} Hãy tạo lại bản xem trước và xác nhận lại.';
       case 'SNAPSHOT_STALE':
       case 'CONSENT_REQUIRED':
         // These messages already tell the user what to do.

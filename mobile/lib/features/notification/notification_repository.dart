@@ -15,7 +15,11 @@ class InboxSnapshot {
   final DateTime? syncedAt;
   final Failure? refreshFailure;
 
-  const InboxSnapshot({required this.items, this.fromCache = false, this.syncedAt, this.refreshFailure});
+  const InboxSnapshot(
+      {required this.items,
+      this.fromCache = false,
+      this.syncedAt,
+      this.refreshFailure});
 }
 
 /// Repository managing Notifications Inbox and Device Calendar Synchronization.
@@ -45,8 +49,9 @@ class NotificationRepository {
         _notificationPermission = notificationPermission,
         _clock = clock ?? DateTime.now;
 
-  static Failure _asFailure(Object e) =>
-      e is Failure ? e : ServerFailure(message: 'Dữ liệu thông báo không hợp lệ: $e');
+  static Failure _asFailure(Object e) => e is Failure
+      ? e
+      : ServerFailure(message: 'Dữ liệu thông báo không hợp lệ: $e');
 
   /// Strict Deduplication by Unique notificationId (FR-NOTI-01), newest first.
   static List<NotificationModel> _dedupe(Iterable<NotificationModel> list) {
@@ -55,7 +60,9 @@ class NotificationRepository {
       if (n.notificationId.isEmpty) continue;
       byId.putIfAbsent(n.notificationId, () => n);
     }
-    return byId.values.toList()..sort((NotificationModel a, NotificationModel b) => b.createdAt.compareTo(a.createdAt));
+    return byId.values.toList()
+      ..sort((NotificationModel a, NotificationModel b) =>
+          b.createdAt.compareTo(a.createdAt));
   }
 
   // ------------------------------------------------------------------ inbox
@@ -63,31 +70,44 @@ class NotificationRepository {
   Future<Result<InboxSnapshot, Failure>> getNotifications() async {
     await _flushPendingReads();
     try {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.notifications);
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.notifications);
       final dynamic body = response.data;
-      final dynamic payload = body is Map ? (body['items'] ?? body['data'] ?? body) : body;
+      final dynamic payload =
+          body is Map ? (body['items'] ?? body['data'] ?? body) : body;
       if (payload is! List) {
-        throw const ServerFailure(message: 'Máy chủ trả về hộp thư không đúng định dạng.');
+        throw const ServerFailure(
+            message: 'Máy chủ trả về hộp thư không đúng định dạng.');
       }
 
       // Marks the server has not received yet stay read on this device.
-      final Set<String> pending = await _roomDb.notificationDao.getPendingReads();
+      final Set<String> pending =
+          await _roomDb.notificationDao.getPendingReads();
       final bool pendingAll = await _roomDb.notificationDao.isPendingReadAll();
       final List<NotificationModel> list = _dedupe(payload
           .whereType<Map<dynamic, dynamic>>()
-          .map((Map<dynamic, dynamic> e) => NotificationModel.fromJson(Map<String, dynamic>.from(e)))
+          .map((Map<dynamic, dynamic> e) =>
+              NotificationModel.fromJson(Map<String, dynamic>.from(e)))
           .map((NotificationModel n) =>
-              (pendingAll || pending.contains(n.notificationId)) && !n.isRead ? n.copyWith(isRead: true) : n));
+              (pendingAll || pending.contains(n.notificationId)) && !n.isRead
+                  ? n.copyWith(isRead: true)
+                  : n));
 
-      await _roomDb.notificationDao.replaceAll(list.map((NotificationModel n) => n.toJson()).toList());
+      await _roomDb.notificationDao
+          .replaceAll(list.map((NotificationModel n) => n.toJson()).toList());
       return SuccessResult<InboxSnapshot, Failure>(
-        InboxSnapshot(items: list, syncedAt: await _roomDb.notificationDao.getLastSyncedAt()),
+        InboxSnapshot(
+            items: list,
+            syncedAt: await _roomDb.notificationDao.getLastSyncedAt()),
       );
     } catch (e) {
       final Failure failure = _asFailure(e);
-      final DateTime? syncedAt = await _roomDb.notificationDao.getLastSyncedAt();
-      final List<Map<String, dynamic>> cached = await _roomDb.notificationDao.getAllNotifications();
-      if (syncedAt == null && cached.isEmpty) return FailureResult<InboxSnapshot, Failure>(failure);
+      final DateTime? syncedAt =
+          await _roomDb.notificationDao.getLastSyncedAt();
+      final List<Map<String, dynamic>> cached =
+          await _roomDb.notificationDao.getAllNotifications();
+      if (syncedAt == null && cached.isEmpty)
+        return FailureResult<InboxSnapshot, Failure>(failure);
       return SuccessResult<InboxSnapshot, Failure>(InboxSnapshot(
         items: _dedupe(cached.map(NotificationModel.fromJson)),
         fromCache: true,
@@ -102,7 +122,8 @@ class NotificationRepository {
       try {
         await _apiClient.post<dynamic>(ApiEndpoints.notificationsReadAll);
         await _roomDb.notificationDao.setPendingReadAll(false);
-        await _roomDb.notificationDao.removePendingReads(await _roomDb.notificationDao.getPendingReads());
+        await _roomDb.notificationDao.removePendingReads(
+            await _roomDb.notificationDao.getPendingReads());
       } catch (_) {
         return; // still offline: keep everything queued
       }
@@ -129,7 +150,8 @@ class NotificationRepository {
   Future<bool> markAsRead(String notificationId) async {
     await _roomDb.notificationDao.markRead(notificationId);
     try {
-      await _apiClient.post<dynamic>(ApiEndpoints.notificationRead(notificationId));
+      await _apiClient
+          .post<dynamic>(ApiEndpoints.notificationRead(notificationId));
       return true;
     } catch (_) {
       await _roomDb.notificationDao.addPendingRead(notificationId);
@@ -157,20 +179,29 @@ class NotificationRepository {
   // ------------------------------------------------------------------ preferences (NOTI-03)
 
   /// Server settings; the last saved copy when offline ([fromCache] true).
-  Future<Result<({NotificationPreferences prefs, bool fromCache}), Failure>> getPreferences() async {
+  Future<Result<({NotificationPreferences prefs, bool fromCache}), Failure>>
+      getPreferences() async {
     try {
-      final Response<dynamic> response = await _apiClient.get<dynamic>(ApiEndpoints.notificationPreferences);
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.notificationPreferences);
       final dynamic body = response.data;
-      if (body is! Map) throw const ServerFailure(message: 'Cài đặt thông báo không đúng định dạng.');
-      final NotificationPreferences prefs = NotificationPreferences.fromJson(Map<String, dynamic>.from(body));
+      if (body is! Map)
+        throw const ServerFailure(
+            message: 'Cài đặt thông báo không đúng định dạng.');
+      final NotificationPreferences prefs =
+          NotificationPreferences.fromJson(Map<String, dynamic>.from(body));
       await _roomDb.notificationDao.savePreferences(prefs.toJson());
-      return SuccessResult<({NotificationPreferences prefs, bool fromCache}), Failure>((prefs: prefs, fromCache: false));
+      return SuccessResult<({NotificationPreferences prefs, bool fromCache}),
+          Failure>((prefs: prefs, fromCache: false));
     } catch (e) {
-      final Map<String, dynamic>? cached = await _roomDb.notificationDao.getPreferences();
+      final Map<String, dynamic>? cached =
+          await _roomDb.notificationDao.getPreferences();
       if (cached == null) {
-        return FailureResult<({NotificationPreferences prefs, bool fromCache}), Failure>(_asFailure(e));
+        return FailureResult<({NotificationPreferences prefs, bool fromCache}),
+            Failure>(_asFailure(e));
       }
-      return SuccessResult<({NotificationPreferences prefs, bool fromCache}), Failure>(
+      return SuccessResult<({NotificationPreferences prefs, bool fromCache}),
+          Failure>(
         (prefs: NotificationPreferences.fromJson(cached), fromCache: true),
       );
     }
@@ -188,10 +219,11 @@ class NotificationRepository {
       if (emailEnabled != null) 'emailEnabled': emailEnabled,
     };
     try {
-      final Response<dynamic> response =
-          await _apiClient.put<dynamic>(ApiEndpoints.notificationPreferences, data: body);
+      final Response<dynamic> response = await _apiClient
+          .put<dynamic>(ApiEndpoints.notificationPreferences, data: body);
       final dynamic data = response.data;
-      final NotificationPreferences saved = data is Map && data['timezone'] != null
+      final NotificationPreferences saved = data is Map &&
+              data['timezone'] != null
           ? NotificationPreferences.fromJson(Map<String, dynamic>.from(data))
           : NotificationPreferences.fromJson(<String, dynamic>{
               ...?await _roomDb.notificationDao.getPreferences(),
@@ -219,21 +251,24 @@ class NotificationRepository {
     final NotificationPermission? p = _notificationPermission;
     if (p == null) return const SuccessResult<bool, Failure>(true);
     try {
-      if (await p.isGranted() || await p.request()) return const SuccessResult<bool, Failure>(true);
+      if (await p.isGranted() || await p.request())
+        return const SuccessResult<bool, Failure>(true);
       return const FailureResult<bool, Failure>(PermissionDeniedFailure(
-        message: 'Bạn đã từ chối quyền thông báo nên chưa bật được thông báo đẩy. '
+        message:
+            'Bạn đã từ chối quyền thông báo nên chưa bật được thông báo đẩy. '
             'Nhắc hạn vẫn có trong Hộp thư; có thể cấp quyền lại trong Cài đặt của máy.',
       ));
     } on DeviceServiceException catch (e) {
-      return FailureResult<bool, Failure>(PermissionDeniedFailure(message: e.message));
+      return FailureResult<bool, Failure>(
+          PermissionDeniedFailure(message: e.message));
     }
   }
 
   // ------------------------------------------------------------------ device calendar (NOTI-04)
 
   Future<CalendarEventRecord?> getCalendarRecord(String opportunityId) async {
-    final Map<String, dynamic>? raw =
-        await _roomDb.calendarDao.findByEventId(CalendarEventRecord.keyFor(opportunityId));
+    final Map<String, dynamic>? raw = await _roomDb.calendarDao
+        .findByEventId(CalendarEventRecord.keyFor(opportunityId));
     return raw == null ? null : CalendarEventRecord.fromJson(raw);
   }
 
@@ -251,28 +286,34 @@ class NotificationRepository {
     final DateTime? deadline = opportunity.registerDeadlineAt;
     if (deadline == null) {
       return const FailureResult<CalendarEventRecord, Failure>(
-        ValidationFailure(message: 'Thời hạn đăng ký không hợp lệ, không thể lưu vào lịch.'),
+        ValidationFailure(
+            message: 'Thời hạn đăng ký không hợp lệ, không thể lưu vào lịch.'),
       );
     }
     if (!now.isBefore(deadline)) {
       return const FailureResult<CalendarEventRecord, Failure>(
-        ValidationFailure(message: 'Cơ hội đã đóng đăng ký, không cần lưu vào lịch nữa.'),
+        ValidationFailure(
+            message: 'Cơ hội đã đóng đăng ký, không cần lưu vào lịch nữa.'),
       );
     }
 
     final DeviceCalendar? calendar = _calendar;
     if (calendar == null) {
       return const FailureResult<CalendarEventRecord, Failure>(
-        PermissionDeniedFailure(message: 'Thiết bị này chưa hỗ trợ ghi lịch từ Scholink.'),
+        PermissionDeniedFailure(
+            message: 'Thiết bị này chưa hỗ trợ ghi lịch từ Scholink.'),
       );
     }
 
-    final CalendarEventRecord? previous = await getCalendarRecord(opportunity.id);
+    final CalendarEventRecord? previous =
+        await getCalendarRecord(opportunity.id);
 
     // 1. Permission: ask once; a refusal is recorded and NEVER reported as success.
     try {
-      final bool granted = await calendar.hasCalendarPermission() || await calendar.requestCalendarPermission();
-      if (!granted) return await _calendarDenied(opportunity, deadline, previous);
+      final bool granted = await calendar.hasCalendarPermission() ||
+          await calendar.requestCalendarPermission();
+      if (!granted)
+        return await _calendarDenied(opportunity, deadline, previous);
     } on DeviceServiceException catch (e) {
       return _calendarFailed(opportunity, deadline, previous, e);
     }
@@ -293,7 +334,8 @@ class NotificationRepository {
     final String title = '[Scholink] Hạn đăng ký: ${opportunity.title}';
     final String description = <String>[
       opportunity.organizerName,
-      if ((opportunity.sourceUrl ?? '').isNotEmpty) 'Nguồn: ${opportunity.sourceUrl}',
+      if ((opportunity.sourceUrl ?? '').isNotEmpty)
+        'Nguồn: ${opportunity.sourceUrl}',
       'Múi giờ nguồn công bố: ${opportunity.timezone}',
     ].join('\n');
     try {
@@ -304,7 +346,8 @@ class NotificationRepository {
           start: deadline.subtract(const Duration(minutes: 30)),
           end: deadline,
           timezone: opportunity.timezone,
-          reminderMinutes: minutes.map((int m) => m - 30).where((int m) => m >= 0).toList(),
+          reminderMinutes:
+              minutes.map((int m) => m - 30).where((int m) => m >= 0).toList(),
         ),
         existingEventId: previous?.nativeEventId,
       );
@@ -320,7 +363,8 @@ class NotificationRepository {
         milestones: kept.map((ReminderMilestone m) => m.code).toList(),
         reminderMinutes: minutes,
       );
-      return SuccessResult<CalendarEventRecord, Failure>((await getCalendarRecord(opportunity.id))!);
+      return SuccessResult<CalendarEventRecord, Failure>(
+          (await getCalendarRecord(opportunity.id))!);
     } on DeviceServiceException catch (e) {
       return _calendarFailed(opportunity, deadline, previous, e);
     }
@@ -354,7 +398,8 @@ class NotificationRepository {
     CalendarEventRecord? previous,
     DeviceServiceException e,
   ) async {
-    if (e.kind == DeviceErrorKind.permissionDenied) return _calendarDenied(opportunity, deadline, previous);
+    if (e.kind == DeviceErrorKind.permissionDenied)
+      return _calendarDenied(opportunity, deadline, previous);
     await _roomDb.calendarDao.upsertEvent(
       eventId: CalendarEventRecord.keyFor(opportunity.id),
       opportunityId: opportunity.id,
@@ -364,7 +409,8 @@ class NotificationRepository {
       syncStatus: CalendarSyncStatus.failed.name,
       milestones: previous?.milestones ?? const <String>[],
     );
-    return FailureResult<CalendarEventRecord, Failure>(ServerFailure(message: e.message, code: 'CALENDAR_ERROR'));
+    return FailureResult<CalendarEventRecord, Failure>(
+        ServerFailure(message: e.message, code: 'CALENDAR_ERROR'));
   }
 
   /// Removes the device event (if it still exists) and the local record.
@@ -375,17 +421,21 @@ class NotificationRepository {
       try {
         await _calendar.deleteEvent(nativeId);
       } on DeviceServiceException catch (e) {
-        return FailureResult<void, Failure>(e.kind == DeviceErrorKind.permissionDenied
-            ? PermissionDeniedFailure(message: e.message)
-            : ServerFailure(message: e.message, code: 'CALENDAR_ERROR'));
+        return FailureResult<void, Failure>(
+            e.kind == DeviceErrorKind.permissionDenied
+                ? PermissionDeniedFailure(message: e.message)
+                : ServerFailure(message: e.message, code: 'CALENDAR_ERROR'));
       }
     }
-    await _roomDb.calendarDao.deleteEvent(CalendarEventRecord.keyFor(opportunityId));
+    await _roomDb.calendarDao
+        .deleteEvent(CalendarEventRecord.keyFor(opportunityId));
     return const SuccessResult<void, Failure>(null);
   }
 
   /// Check Calendar Sync status for a given opportunity
-  Future<CalendarSyncStatus> getOpportunityCalendarSyncStatus(String opportunityId) async {
-    return (await getCalendarRecord(opportunityId))?.syncStatus ?? CalendarSyncStatus.notSynced;
+  Future<CalendarSyncStatus> getOpportunityCalendarSyncStatus(
+      String opportunityId) async {
+    return (await getCalendarRecord(opportunityId))?.syncStatus ??
+        CalendarSyncStatus.notSynced;
   }
 }

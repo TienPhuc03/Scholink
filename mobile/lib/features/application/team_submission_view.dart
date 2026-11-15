@@ -11,7 +11,8 @@ class TeamSubmissionView extends StatefulWidget {
   final TeamSubmissionViewModel viewModel;
 
   /// Opens the team Application detail (F28) once the team has submitted.
-  final void Function(String applicationId, {required bool justSubmitted}) onOpenApplication;
+  final void Function(String applicationId, {required bool justSubmitted})
+      onOpenApplication;
 
   /// FR-PROF-05: opens a teammate's profile (PUBLIC + TEAMMATES fields).
   final void Function(String studentId)? onOpenMemberProfile;
@@ -40,7 +41,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   /// The leader's commit succeeded: go straight to the team Application.
   void _onChange() {
     final String? committed = vm.takeCommittedApplicationId();
-    if (committed != null) widget.onOpenApplication(committed, justSubmitted: true);
+    if (committed != null)
+      widget.onOpenApplication(committed, justSubmitted: true);
   }
 
   @override
@@ -55,14 +57,17 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: Text(restart ? 'Bắt đầu lại phiên nộp?' : 'Bắt đầu nộp hồ sơ đội?'),
+        title:
+            Text(restart ? 'Bắt đầu lại phiên nộp?' : 'Bắt đầu nộp hồ sơ đội?'),
         content: const Text(
           'Đội sẽ bị khoá 10 phút: không ai được vào hoặc rời đội. Trong thời gian này mọi thành viên, '
           'kể cả bạn, cần mở Scholink để xem lại và đồng ý với hồ sơ của mình.',
           style: TextStyle(height: 1.4),
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Để sau')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Để sau')),
           TextButton(
             key: const Key('team_start_confirm'),
             onPressed: () => Navigator.pop(ctx, true),
@@ -79,9 +84,12 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
         title: const Text('Huỷ phiên nộp?'),
-        content: const Text('Đội được mở khoá và các đồng ý đã thu thập sẽ không còn dùng được.'),
+        content: const Text(
+            'Đội được mở khoá và các đồng ý đã thu thập sẽ không còn dùng được.'),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Tiếp tục nộp')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Tiếp tục nộp')),
           TextButton(
             key: const Key('team_cancel_confirm'),
             onPressed: () => Navigator.pop(ctx, true),
@@ -109,7 +117,10 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                 vm.competitionTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -122,7 +133,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   }
 
   Widget _buildBody() {
-    if (vm.isLoading && vm.status == null) return const Center(child: CircularProgressIndicator());
+    if (vm.isLoading && vm.status == null)
+      return const Center(child: CircularProgressIndicator());
     final TeamSubmissionStatus? s = vm.status;
     if (s == null) {
       return Center(
@@ -131,7 +143,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(vm.errorMessage ?? 'Không tải được thông tin nộp hồ sơ đội.', textAlign: TextAlign.center),
+              Text(vm.errorMessage ?? 'Không tải được thông tin nộp hồ sơ đội.',
+                  textAlign: TextAlign.center),
               const SizedBox(height: 12),
               OutlinedButton(onPressed: vm.load, child: const Text('Thử lại')),
             ],
@@ -147,10 +160,13 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
           _buildTeamCard(s),
           const SizedBox(height: 12),
           if (vm.actionError != null) ...<Widget>[
-            AuthMessageBanner(key: const Key('team_action_error'), message: vm.actionError!),
+            AuthMessageBanner(
+                key: const Key('team_action_error'), message: vm.actionError!),
             const SizedBox(height: 12),
           ],
-          if (vm.isLeader && vm.hasUnconfirmedAttempt && !vm.canRetrySubmit) ...<Widget>[
+          if (vm.isLeader &&
+              vm.hasUnconfirmedAttempt &&
+              !vm.canRetrySubmit) ...<Widget>[
             _buildUnconfirmed(),
             const SizedBox(height: 12),
           ],
@@ -161,7 +177,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   }
 
   Widget _buildTeamCard(TeamSubmissionStatus s) {
-    final int memberCount = s.members.isNotEmpty ? s.members.length : (vm.team?.memberCount ?? 0);
+    final int memberCount =
+        s.members.isNotEmpty ? s.members.length : (vm.team?.memberCount ?? 0);
     final int minSize = vm.team?.minSize ?? 1;
     final int maxSize = vm.team?.maxSize ?? 5;
     final bool sizeValid = memberCount >= minSize && memberCount <= maxSize;
@@ -170,13 +187,16 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
     return SectionCard(
       icon: Icons.groups_outlined,
       title: vm.team?.name ?? 'Đội của bạn',
-      trailing: Pill(text: vm.isLeader ? 'Trưởng đội' : 'Thành viên', color: AppColors.primary),
+      trailing: Pill(
+          text: vm.isLeader ? 'Trưởng đội' : 'Thành viên',
+          color: AppColors.primary),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             '$memberCount thành viên (Min: $minSize, Max: $maxSize) · Roster v$rosterVer · ${_teamStatusLabel(s)}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style:
+                const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           if (!sizeValid) ...<Widget>[
             const SizedBox(height: 6),
@@ -194,7 +214,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
 
   String _teamStatusLabel(TeamSubmissionStatus s) {
     if (s.isSubmitted) return 'Đã nộp hồ sơ (COMMITTED)';
-    if (vm.canRetrySubmit || vm.hasUnconfirmedAttempt) return 'Đang chờ máy chủ (PENDING ACK)';
+    if (vm.canRetrySubmit || vm.hasUnconfirmedAttempt)
+      return 'Đang chờ máy chủ (PENDING ACK)';
     if (vm.busy) return 'Đang xử lý (SUBMITTING)';
     if (vm.isLeaseOver) return 'Phiên nộp đã hết hạn';
     if (vm.isSessionOpen) return 'Đang thu thập đồng ý';
@@ -204,14 +225,17 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   List<Widget> _buildState(TeamSubmissionStatus s) {
     if (s.isSubmitted) {
       return <Widget>[
-        const AuthMessageBanner(message: 'Đội đã nộp hồ sơ cho cuộc thi này.', tone: AuthBannerTone.success),
+        const AuthMessageBanner(
+            message: 'Đội đã nộp hồ sơ cho cuộc thi này.',
+            tone: AuthBannerTone.success),
         const SizedBox(height: 12),
         if (vm.applicationId != null)
           AuthPrimaryButton(
             key: const Key('team_open_application'),
             label: 'Xem hồ sơ đội',
             icon: Icons.visibility_outlined,
-            onPressed: () => widget.onOpenApplication(vm.applicationId!, justSubmitted: false),
+            onPressed: () => widget.onOpenApplication(vm.applicationId!,
+                justSubmitted: false),
           ),
       ];
     }
@@ -221,14 +245,16 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
           _buildReadiness(),
           const SizedBox(height: 12),
           const AuthMessageBanner(
-            message: 'Khi bắt đầu, đội bị khoá 10 phút để mọi thành viên xem lại và đồng ý với hồ sơ của mình. '
+            message:
+                'Khi bắt đầu, đội bị khoá 10 phút để mọi thành viên xem lại và đồng ý với hồ sơ của mình. '
                 'Hãy báo cả đội trước khi bấm "Bắt đầu nộp".',
             tone: AuthBannerTone.info,
           ),
         ] else
           const AuthMessageBanner(
             key: Key('team_waiting_leader'),
-            message: 'Trưởng đội chưa bắt đầu phiên nộp. Khi trưởng đội bắt đầu, bạn sẽ thấy phần đồng ý ở đây '
+            message:
+                'Trưởng đội chưa bắt đầu phiên nộp. Khi trưởng đội bắt đầu, bạn sẽ thấy phần đồng ý ở đây '
                 '(kéo xuống để cập nhật).',
             tone: AuthBannerTone.info,
           ),
@@ -258,7 +284,10 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
               Expanded(
                 child: Text(
                   'Cơ chế bảo vệ: Đội KHÔNG tự động mở khoá khi timeout trên máy khách cho đến khi máy chủ xác minh để ngăn ngừa xung đột dữ liệu (split-brain).',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.3),
                 ),
               ),
             ],
@@ -289,7 +318,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       title: 'Passport của bạn',
       trailing: ScreeningPill(r.screening),
       child: r.canProceed
-          ? const Text('Passport của bạn đáp ứng điều kiện của cuộc thi.', style: TextStyle(fontSize: 13))
+          ? const Text('Passport của bạn đáp ứng điều kiện của cuộc thi.',
+              style: TextStyle(fontSize: 13))
           : Text(
               r.missingFields.isEmpty
                   ? 'Passport của bạn chưa đáp ứng điều kiện của cuộc thi.'
@@ -302,24 +332,34 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   Widget _buildCountdown() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: AppColors.cardInfoBackground, borderRadius: BorderRadius.circular(6)),
+      decoration: BoxDecoration(
+          color: AppColors.cardInfoBackground,
+          borderRadius: BorderRadius.circular(6)),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.lock_clock_outlined, size: 18, color: AppColors.primary),
+          const Icon(Icons.lock_clock_outlined,
+              size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('Đội đang được khoá để nộp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text('Không thể thay đổi đội hình trong phiên', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                Text('Đội đang được khoá để nộp',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('Không thể thay đổi đội hình trong phiên',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.textSecondary)),
               ],
             ),
           ),
           Text(
             formatCountdown(vm.leaseSecondsLeft),
             key: const Key('team_countdown'),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary),
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary),
           ),
         ],
       ),
@@ -328,17 +368,21 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
 
   Widget _buildMembers(TeamSubmissionStatus s) {
     final DateTime now = vm.now;
-    final int ready = s.members.where((String m) => s.stateOf(m, now) == MemberConsentState.given).length;
+    final int ready = s.members
+        .where((String m) => s.stateOf(m, now) == MemberConsentState.given)
+        .length;
     return SectionCard(
       icon: Icons.how_to_reg_outlined,
       title: 'Đồng thuận nhóm',
-      trailing: Pill(text: '$ready/${s.members.length}', color: AppColors.primary),
+      trailing:
+          Pill(text: '$ready/${s.members.length}', color: AppColors.primary),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
             'Cần ${s.members.length}/${s.members.length} thành viên xác nhận để nộp',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           for (final String m in s.members) ...<Widget>[
@@ -349,19 +393,25 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                 final bool isLeader = m == s.leaderId;
                 final String actionNeeded = switch (state) {
                   MemberConsentState.given => 'Đã hoàn tất xác nhận',
-                  MemberConsentState.missing =>
-                    isMe ? '👉 Bạn cần xem trước và bấm đồng ý bên dưới' : '👉 Cần thành viên mở app xem snapshot và đồng ý',
-                  MemberConsentState.needsRenewal =>
-                    isMe ? '👉 Hồ sơ đổi phiên bản hoặc hết hạn 10 phút. Bấm xem lại bên dưới' : '👉 Cần thành viên ký lại do đổi phiên bản hồ sơ hoặc hết hạn',
+                  MemberConsentState.missing => isMe
+                      ? '👉 Bạn cần xem trước và bấm đồng ý bên dưới'
+                      : '👉 Cần thành viên mở app xem snapshot và đồng ý',
+                  MemberConsentState.needsRenewal => isMe
+                      ? '👉 Hồ sơ đổi phiên bản hoặc hết hạn 10 phút. Bấm xem lại bên dưới'
+                      : '👉 Cần thành viên ký lại do đổi phiên bản hồ sơ hoặc hết hạn',
                 };
 
                 return InkWell(
                   key: Key('team_member_$m'),
-                  onTap: isMe || widget.onOpenMemberProfile == null ? null : () => widget.onOpenMemberProfile!(m),
+                  onTap: isMe || widget.onOpenMemberProfile == null
+                      ? null
+                      : () => widget.onOpenMemberProfile!(m),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: AppColors.borderLight, width: 0.5)),
+                      border: Border(
+                          bottom: BorderSide(
+                              color: AppColors.borderLight, width: 0.5)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,7 +424,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                                   isMe ? 'Bạn' : m,
                                   if (isLeader) '(trưởng đội)',
                                 ].join(' '),
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w500),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -389,14 +440,19 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                                 actionNeeded,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: state == MemberConsentState.given ? AppColors.textSecondary : AppColors.warning,
+                                  color: state == MemberConsentState.given
+                                      ? AppColors.textSecondary
+                                      : AppColors.warning,
                                 ),
                               ),
                             ),
                             if (!isMe && widget.onOpenMemberProfile != null)
                               const Text(
                                 'Xem hồ sơ chia sẻ ›',
-                                style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500),
                               ),
                           ],
                         ),
@@ -417,12 +473,16 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Icon(Icons.privacy_tip_outlined, size: 15, color: AppColors.textSecondary),
+                Icon(Icons.privacy_tip_outlined,
+                    size: 15, color: AppColors.textSecondary),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Quyền riêng tư (FR-PROF-05): Trưởng đội chỉ xem hồ sơ chia sẻ công khai/nội bộ đội. Bản snapshot đầy đủ chỉ thành viên sở hữu mới có quyền xem trước và ký xác nhận.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.3),
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        height: 1.3),
                   ),
                 ),
               ],
@@ -446,17 +506,23 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _summaryRow('Mã giữ chỗ (Reservation):', s.reservationId.isNotEmpty ? s.reservationId : 'Chưa cấp'),
+          _summaryRow('Mã giữ chỗ (Reservation):',
+              s.reservationId.isNotEmpty ? s.reservationId : 'Chưa cấp'),
           const SizedBox(height: 4),
-          _summaryRow('Fencing Token:', '#${s.fencingToken} (Bảo vệ tính toàn vẹn)'),
+          _summaryRow(
+              'Fencing Token:', '#${s.fencingToken} (Bảo vệ tính toàn vẹn)'),
           const SizedBox(height: 4),
           _summaryRow('Phiên bản đội hình:', 'v${s.rosterVersion}'),
           const SizedBox(height: 4),
-          _summaryRow('Quy mô đội:', '${s.members.length} người (Min: ${vm.team?.minSize ?? 1}, Max: ${vm.team?.maxSize ?? 5})'),
+          _summaryRow('Quy mô đội:',
+              '${s.members.length} người (Min: ${vm.team?.minSize ?? 1}, Max: ${vm.team?.maxSize ?? 5})'),
           const Divider(height: 16),
           const Text(
             'Danh sách ID đồng ý đã chốt (Member Consents):',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary),
           ),
           const SizedBox(height: 6),
           for (final String m in s.members) ...<Widget>[
@@ -468,38 +534,63 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                   margin: const EdgeInsets.only(bottom: 6),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isReady ? AppColors.surface : AppColors.cardInfoBackground,
+                    color: isReady
+                        ? AppColors.surface
+                        : AppColors.cardInfoBackground,
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: isReady ? AppColors.borderLight : AppColors.warning.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: isReady
+                            ? AppColors.borderLight
+                            : AppColors.warning.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Row(
                         children: <Widget>[
-                          Icon(isReady ? Icons.check_circle_outline : Icons.pending_outlined,
-                              size: 15, color: isReady ? AppColors.success : AppColors.warning),
+                          Icon(
+                              isReady
+                                  ? Icons.check_circle_outline
+                                  : Icons.pending_outlined,
+                              size: 15,
+                              color: isReady
+                                  ? AppColors.success
+                                  : AppColors.warning),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               m == vm.userId ? 'Bạn ($m)' : m,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500),
                             ),
                           ),
                           Text(
-                            isReady ? 'Profile v${c.profileVersion}' : 'Chưa có consent',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            isReady
+                                ? 'Profile v${c.profileVersion}'
+                                : 'Chưa có consent',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary),
                           ),
                         ],
                       ),
                       if (isReady) ...<Widget>[
                         const SizedBox(height: 4),
                         Text('• Consent ID: ${c.identityConsentId}',
-                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: AppColors.textSecondary)),
                         Text('• Preview ID: ${c.previewId}',
-                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
-                        Text('• Hash: ${c.payloadHash.length > 16 ? c.payloadHash.substring(0, 16) + '...' : c.payloadHash}',
-                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary)),
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: AppColors.textSecondary)),
+                        Text(
+                            '• Hash: ${c.payloadHash.length > 16 ? c.payloadHash.substring(0, 16) + '...' : c.payloadHash}',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: AppColors.textSecondary)),
                       ],
                     ],
                   ),
@@ -511,7 +602,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
             const SizedBox(height: 4),
             const Text(
               '⚠️ Chưa thể nộp hồ sơ do còn thành viên chưa ký hoặc consent hết hạn. Nút nộp sẽ tự động mở khi tất cả thành viên hoàn tất.',
-              style: TextStyle(fontSize: 12, color: AppColors.warning, height: 1.3),
+              style: TextStyle(
+                  fontSize: 12, color: AppColors.warning, height: 1.3),
             ),
           ],
         ],
@@ -522,7 +614,9 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   Widget _summaryRow(String label, String value) {
     return Row(
       children: <Widget>[
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        Text(label,
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -537,9 +631,12 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   }
 
   Widget _consentPill(MemberConsentState state) => switch (state) {
-        MemberConsentState.given => const Pill(text: 'Đã đồng ý', color: AppColors.success),
-        MemberConsentState.missing => const Pill(text: 'Chưa đồng ý', color: AppColors.textMuted),
-        MemberConsentState.needsRenewal => const Pill(text: 'Cần đồng ý lại', color: AppColors.warning),
+        MemberConsentState.given =>
+          const Pill(text: 'Đã đồng ý', color: AppColors.success),
+        MemberConsentState.missing =>
+          const Pill(text: 'Chưa đồng ý', color: AppColors.textMuted),
+        MemberConsentState.needsRenewal =>
+          const Pill(text: 'Cần đồng ý lại', color: AppColors.warning),
       };
 
   Widget _buildMyPart() {
@@ -564,7 +661,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
               vm.myConsentState == MemberConsentState.needsRenewal
                   ? 'Đồng ý trước của bạn đã hết hiệu lực. Hãy xem lại và đồng ý lần nữa.'
                   : 'Xem lại bản Passport sẽ được gửi cùng hồ sơ đội rồi xác nhận đồng ý.',
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -594,7 +692,8 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                 Checkbox(
                   key: const Key('team_my_consent_check'),
                   value: vm.consentChecked,
-                  onChanged: vm.busy ? null : (bool? v) => vm.setConsent(v ?? false),
+                  onChanged:
+                      vm.busy ? null : (bool? v) => vm.setConsent(v ?? false),
                 ),
                 Expanded(
                   child: Padding(
@@ -673,7 +772,10 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
             label: vm.isLeaseOver ? 'Bắt đầu lại' : 'Bắt đầu nộp',
             icon: Icons.lock_outline_rounded,
             isLoading: vm.busy,
-            onPressed: vm.busy || (!vm.isLeaseOver && vm.readiness?.canProceed == false) ? null : _confirmStart,
+            onPressed: vm.busy ||
+                    (!vm.isLeaseOver && vm.readiness?.canProceed == false)
+                ? null
+                : _confirmStart,
           ),
         ),
       ];

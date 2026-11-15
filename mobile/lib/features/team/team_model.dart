@@ -13,6 +13,65 @@ enum JoinRequestStatus {
   withdrawn,
 }
 
+/// Tóm tắt thông tin hồ sơ ứng viên (T4)
+class ApplicantSummary {
+  final String fullName;
+  final String avatarUrl;
+  final String institution;
+  final String major;
+  final int? startYear;
+  final int? endYear;
+  final double? gpa;
+  final double? gpaScale;
+
+  const ApplicantSummary({
+    this.fullName = '',
+    this.avatarUrl = '',
+    this.institution = '',
+    this.major = '',
+    this.startYear,
+    this.endYear,
+    this.gpa,
+    this.gpaScale,
+  });
+
+  factory ApplicantSummary.fromJson(Map<String, dynamic> json) {
+    return ApplicantSummary(
+      fullName: (json['fullName'] ?? '') as String,
+      avatarUrl: (json['avatarUrl'] ?? '') as String,
+      institution: (json['institution'] ?? '') as String,
+      major: (json['major'] ?? '') as String,
+      startYear: json['startYear'] as int?,
+      endYear: json['endYear'] as int?,
+      gpa: (json['gpa'] is num) ? (json['gpa'] as num).toDouble() : null,
+      gpaScale: (json['gpaScale'] is num)
+          ? (json['gpaScale'] as num).toDouble()
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'fullName': fullName,
+        'avatarUrl': avatarUrl,
+        'institution': institution,
+        'major': major,
+        'startYear': startYear,
+        'endYear': endYear,
+        'gpa': gpa,
+        'gpaScale': gpaScale,
+      };
+
+  String get educationDisplay {
+    final List<String> parts = <String>[];
+    if (institution.isNotEmpty) parts.add(institution);
+    if (major.isNotEmpty) parts.add(major);
+    if (startYear != null) parts.add('Khóa $startYear');
+    if (gpa != null)
+      parts.add('GPA: $gpa${gpaScale != null ? '/$gpaScale' : ''}');
+    return parts.join(' · ');
+  }
+}
+
 /// Unified JoinRequest Model matching Collaboration Microservice JoinRequest entity.
 class JoinRequestModel {
   final String id;
@@ -24,6 +83,7 @@ class JoinRequestModel {
   final DateTime appliedAt;
   final DateTime? reviewedAt;
   final String? reviewedBy;
+  final ApplicantSummary? applicant;
 
   const JoinRequestModel({
     required this.id,
@@ -35,6 +95,7 @@ class JoinRequestModel {
     required this.appliedAt,
     this.reviewedAt,
     this.reviewedBy,
+    this.applicant,
   });
 
   bool get isPending => status == JoinRequestStatus.pending;
@@ -50,7 +111,8 @@ class JoinRequestModel {
       };
 
   factory JoinRequestModel.fromJson(Map<String, dynamic> json) {
-    final String rawStatus = (json['status'] ?? 'PENDING').toString().toUpperCase();
+    final String rawStatus =
+        (json['status'] ?? 'PENDING').toString().toUpperCase();
     final JoinRequestStatus status = switch (rawStatus) {
       'ACCEPTED' => JoinRequestStatus.accepted,
       'REJECTED' => JoinRequestStatus.rejected,
@@ -72,6 +134,9 @@ class JoinRequestModel {
           ? DateTime.tryParse(json['reviewedAt'].toString())
           : null,
       reviewedBy: json['reviewedBy'] as String?,
+      applicant: json['applicant'] != null && json['applicant'] is Map
+          ? ApplicantSummary.fromJson(json['applicant'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -85,6 +150,7 @@ class JoinRequestModel {
         'appliedAt': appliedAt.toIso8601String(),
         'reviewedAt': reviewedAt?.toIso8601String(),
         'reviewedBy': reviewedBy,
+        if (applicant != null) 'applicant': applicant!.toJson(),
       };
 }
 
@@ -93,11 +159,15 @@ class TeamMemberModel {
   final String studentId;
   final String role; // LEADER, MEMBER
   final DateTime joinedAt;
+  final String? fullName;
+  final String? avatarUrl;
 
   const TeamMemberModel({
     required this.studentId,
     required this.role,
     required this.joinedAt,
+    this.fullName,
+    this.avatarUrl,
   });
 
   bool get isLeader => role.toUpperCase() == 'LEADER';
@@ -106,6 +176,8 @@ class TeamMemberModel {
     return TeamMemberModel(
       studentId: (json['studentId'] ?? json['userId'] ?? '') as String,
       role: (json['role'] ?? 'MEMBER') as String,
+      fullName: json['fullName'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
       joinedAt: json['joinedAt'] != null
           ? DateTime.tryParse(json['joinedAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -116,6 +188,8 @@ class TeamMemberModel {
         'studentId': studentId,
         'role': role,
         'joinedAt': joinedAt.toIso8601String(),
+        if (fullName != null) 'fullName': fullName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
       };
 }
 
@@ -156,11 +230,11 @@ class TeamModel {
   String get slotDisplay => '$memberCount/$maxSize';
 
   String get statusDisplay => switch (status) {
-        TeamStatus.forming => 'Đang tuyển (FORMING)',
-        TeamStatus.active => 'Đủ điều kiện (ACTIVE)',
-        TeamStatus.submitting => 'Đang nộp bài (SUBMITTING)',
-        TeamStatus.submitted => 'Đã nộp bài (SUBMITTED)',
-        TeamStatus.locked => 'Đã khóa (LOCKED)',
+        TeamStatus.forming => 'Đang tuyển',
+        TeamStatus.active => 'Đang hoạt động',
+        TeamStatus.submitting => 'Đang nộp bài',
+        TeamStatus.submitted => 'Đã nộp bài',
+        TeamStatus.locked => 'Đã khóa',
       };
 
   bool isMember(String studentId) =>
@@ -169,7 +243,8 @@ class TeamModel {
   bool isLeader(String studentId) => leaderId == studentId;
 
   factory TeamModel.fromJson(Map<String, dynamic> json) {
-    final String rawStatus = (json['status'] ?? 'FORMING').toString().toUpperCase();
+    final String rawStatus =
+        (json['status'] ?? 'FORMING').toString().toUpperCase();
     final TeamStatus status = switch (rawStatus) {
       'ACTIVE' => TeamStatus.active,
       'SUBMITTING' => TeamStatus.submitting,

@@ -62,7 +62,9 @@ class _RegisterViewState extends State<RegisterView> {
           'Scholink chỉ dùng hồ sơ của bạn cho các cơ hội bạn chủ động nộp và không chia sẻ khi chưa có sự đồng ý.',
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đã hiểu')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Đã hiểu')),
         ],
       ),
     );
@@ -82,7 +84,8 @@ class _RegisterViewState extends State<RegisterView> {
             // Figma 202:5475 - Welcome
             const AuthTitle(
               title: 'Bắt đầu cùng Scholink',
-              subtitle: 'Tạo tài khoản để tìm học bổng phù hợp và không bỏ lỡ hạn chót.',
+              subtitle:
+                  'Tạo tài khoản để tìm học bổng phù hợp và không bỏ lỡ hạn chót.',
             ),
 
             // Figma 202:5478 - Registration form
@@ -140,7 +143,8 @@ class _RegisterViewState extends State<RegisterView> {
             // Figma 202:5502 - Account consent
             _buildConsent(errors.consent, busy),
 
-            if (vm.hasError && vm.errorMessage != null) AuthMessageBanner(message: vm.errorMessage!),
+            if (vm.hasError && vm.errorMessage != null)
+              AuthMessageBanner(message: vm.errorMessage!),
 
             // Figma 202:5506 - Primary action
             AuthPrimaryButton(
@@ -194,8 +198,11 @@ class _RegisterViewState extends State<RegisterView> {
                 activeColor: AppColors.primary,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
-                side: BorderSide(color: error != null ? AppColors.error : AppColors.border, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                side: BorderSide(
+                    color: error != null ? AppColors.error : AppColors.border,
+                    width: 1.5),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4)),
               ),
             ),
             const SizedBox(width: 8),
@@ -215,7 +222,8 @@ class _RegisterViewState extends State<RegisterView> {
                       baseline: TextBaseline.alphabetic,
                       child: GestureDetector(
                         onTap: () => _showPolicy('Điều khoản sử dụng'),
-                        child: const Text('Điều khoản sử dụng', style: linkStyle),
+                        child:
+                            const Text('Điều khoản sử dụng', style: linkStyle),
                       ),
                     ),
                     const TextSpan(text: ' và '),
@@ -224,7 +232,8 @@ class _RegisterViewState extends State<RegisterView> {
                       baseline: TextBaseline.alphabetic,
                       child: GestureDetector(
                         onTap: () => _showPolicy('Chính sách bảo mật'),
-                        child: const Text('Chính sách bảo mật', style: linkStyle),
+                        child:
+                            const Text('Chính sách bảo mật', style: linkStyle),
                       ),
                     ),
                     const TextSpan(text: ' của Scholink.'),
@@ -236,7 +245,8 @@ class _RegisterViewState extends State<RegisterView> {
         ),
         if (error != null) ...<Widget>[
           const SizedBox(height: 6),
-          Text(error, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+          Text(error,
+              style: const TextStyle(fontSize: 12, color: AppColors.error)),
         ],
       ],
     );

@@ -19,13 +19,15 @@ class MemoryCache implements LocalCacheManager {
   @override
   Future<void> clear() async => store.clear();
   @override
-  Future<dynamic> getJson(String key) async => store[key] == null ? null : jsonDecode(store[key]!);
+  Future<dynamic> getJson(String key) async =>
+      store[key] == null ? null : jsonDecode(store[key]!);
   @override
   Future<String?> getString(String key) async => store[key];
   @override
   Future<void> remove(String key) async => store.remove(key);
   @override
-  Future<void> saveJson(String key, dynamic data) async => store[key] = jsonEncode(data);
+  Future<void> saveJson(String key, dynamic data) async =>
+      store[key] = jsonEncode(data);
   @override
   Future<void> saveString(String key, String value) async => store[key] = value;
 }
@@ -34,7 +36,8 @@ class QueuePicker implements AttachmentPicker {
   final List<PickedAttachment?> queue = <PickedAttachment?>[];
 
   @override
-  Future<PickedAttachment?> pick() async => queue.isEmpty ? null : queue.removeAt(0);
+  Future<PickedAttachment?> pick() async =>
+      queue.isEmpty ? null : queue.removeAt(0);
 }
 
 PickedAttachment pdf(String name, {int size = 1200}) {
@@ -61,9 +64,11 @@ Map<String, dynamic> readinessBody({
       'screeningReasons': <Map<String, dynamic>>[],
     };
 
-Map<String, dynamic> previewBody(RecordedCall call, {DateTime? expiresAt, String previewId = 'prv_1'}) {
+Map<String, dynamic> previewBody(RecordedCall call,
+    {DateTime? expiresAt, String previewId = 'prv_1'}) {
   final Map<String, dynamic> req = call.data as Map<String, dynamic>;
-  final List<dynamic> ids = (req['attachmentIds'] as List<dynamic>?) ?? <dynamic>[];
+  final List<dynamic> ids =
+      (req['attachmentIds'] as List<dynamic>?) ?? <dynamic>[];
   return <String, dynamic>{
     'previewId': previewId,
     'opportunityId': req['opportunityId'],
@@ -78,11 +83,14 @@ Map<String, dynamic> previewBody(RecordedCall call, {DateTime? expiresAt, String
       'completionScore': 80,
       'profileVersion': 4,
     }),
-    'manifestJson': jsonEncode(ids.map((dynamic id) => <String, dynamic>{'assetId': id}).toList()),
+    'manifestJson': jsonEncode(
+        ids.map((dynamic id) => <String, dynamic>{'assetId': id}).toList()),
     'manifestHash': 'm' * 64,
     'payloadHash': 'p' * 64,
     'screening': 'ELIGIBLE',
-    'expiresAt': (expiresAt ?? DateTime.now().add(const Duration(minutes: 10))).toUtc().toIso8601String(),
+    'expiresAt': (expiresAt ?? DateTime.now().add(const Duration(minutes: 10)))
+        .toUtc()
+        .toIso8601String(),
     'screeningReasons': <Map<String, dynamic>>[],
   };
 }
@@ -105,12 +113,15 @@ class ApplyHarness {
   ApplyHarness() {
     api.reply(ApiEndpoints.myApplications, <dynamic>[]);
     api.reply(ApiEndpoints.readiness, readinessBody());
-    api.handlers[ApiEndpoints.applicationPreviews] =
-        (RecordedCall c) => previewBody(c, expiresAt: now.add(const Duration(minutes: 10)));
-    api.reply(ApiEndpoints.consents, <String, dynamic>{'consentId': 'cns_1', 'previewId': 'prv_1'});
+    api.handlers[ApiEndpoints.applicationPreviews] = (RecordedCall c) =>
+        previewBody(c, expiresAt: now.add(const Duration(minutes: 10)));
+    api.reply(ApiEndpoints.consents,
+        <String, dynamic>{'consentId': 'cns_1', 'previewId': 'prv_1'});
     api.reply(ApiEndpoints.applications, submitOk());
-    api.reply(ApiEndpoints.mediaUploadUrl, <String, dynamic>{'assetId': 'ast_1', 'status': 'UPLOADING'});
-    api.reply(ApiEndpoints.mediaComplete('ast_1'), <String, dynamic>{'id': 'ast_1', 'status': 'READY'});
+    api.reply(ApiEndpoints.mediaUploadUrl,
+        <String, dynamic>{'assetId': 'ast_1', 'status': 'UPLOADING'});
+    api.reply(ApiEndpoints.mediaComplete('ast_1'),
+        <String, dynamic>{'id': 'ast_1', 'status': 'READY'});
   }
 
   ApplyViewModel build() => ApplyViewModel(

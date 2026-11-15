@@ -32,7 +32,9 @@ class ApplicationRepository {
 
   void _notifyChanged() => _changes.fire();
 
-  Future<Result<ReadinessResult, Failure>> checkReadiness(String opportunityId) => _guard(() async {
+  Future<Result<ReadinessResult, Failure>> checkReadiness(
+          String opportunityId) =>
+      _guard(() async {
         final Response<dynamic> r = await _api.get<dynamic>(
           ApiEndpoints.readiness,
           queryParameters: <String, dynamic>{'opportunityId': opportunityId},
@@ -60,7 +62,9 @@ class ApplicationRepository {
       });
 
   /// Q12: SNAPSHOT always, ATTACHMENTS only when files are attached.
-  Future<Result<ConsentReceipt, Failure>> createConsent(ApplicationPreview preview) => _guard(() async {
+  Future<Result<ConsentReceipt, Failure>> createConsent(
+          ApplicationPreview preview) =>
+      _guard(() async {
         final Response<dynamic> r = await _api.post<dynamic>(
           ApiEndpoints.consents,
           data: <String, dynamic>{
@@ -72,20 +76,26 @@ class ApplicationRepository {
             'ruleVersion': preview.ruleVersion,
             'payloadHash': preview.payloadHash,
             'manifestHash': preview.manifestHash,
-            'scope': <String>['SNAPSHOT', if (preview.attachmentIds.isNotEmpty) 'ATTACHMENTS'],
+            'scope': <String>[
+              'SNAPSHOT',
+              if (preview.attachmentIds.isNotEmpty) 'ATTACHMENTS'
+            ],
           },
         );
         final Map<String, dynamic> m = unwrapData(r.data);
         final String consentId = (m['consentId'] ?? m['id'] ?? '').toString();
         if (consentId.isEmpty) {
-          throw const ServerFailure(message: 'Máy chủ không trả về mã xác nhận đồng ý.');
+          throw const ServerFailure(
+              message: 'Máy chủ không trả về mã xác nhận đồng ý.');
         }
-        return ConsentReceipt(consentId: consentId, previewId: preview.previewId);
+        return ConsentReceipt(
+            consentId: consentId, previewId: preview.previewId);
       });
 
   /// Builds the exact body for `POST /api/v1/applications`. It is persisted together with the
   /// Idempotency-Key, because the backend rejects the same key with a different body.
-  static Map<String, dynamic> buildSubmitBody(ApplicationPreview preview, ConsentReceipt consent) =>
+  static Map<String, dynamic> buildSubmitBody(
+          ApplicationPreview preview, ConsentReceipt consent) =>
       <String, dynamic>{
         'opportunityId': preview.opportunityId,
         'submissionId': preview.submissionId,
@@ -106,7 +116,8 @@ class ApplicationRepository {
         final Response<dynamic> r = await _api.post<dynamic>(
           ApiEndpoints.applications,
           data: body,
-          options: Options(headers: <String, dynamic>{'Idempotency-Key': idempotencyKey}),
+          options: Options(
+              headers: <String, dynamic>{'Idempotency-Key': idempotencyKey}),
         );
         final SubmitResult result = SubmitResult.fromJson(unwrapData(r.data));
         _notifyChanged();
@@ -115,26 +126,40 @@ class ApplicationRepository {
 
   /// `POST /applications/:id/withdraw` (FR-APP-07). Not idempotent on the backend: a second
   /// call answers 409 STATE_CONFLICT, which [ApplicationDetailViewModel] treats as done.
-  Future<Result<ApplicationStatus, Failure>> withdraw(String applicationId) => _guard(() async {
-        final Response<dynamic> r = await _api.post<dynamic>(ApiEndpoints.withdrawApplication(applicationId));
-        final ApplicationStatus status = ApplicationStatus.parse(unwrapData(r.data)['status']);
+  Future<Result<ApplicationStatus, Failure>> withdraw(String applicationId) =>
+      _guard(() async {
+        final Response<dynamic> r = await _api
+            .post<dynamic>(ApiEndpoints.withdrawApplication(applicationId));
+        final ApplicationStatus status =
+            ApplicationStatus.parse(unwrapData(r.data)['status']);
         _notifyChanged();
         return status;
       });
 
-  Future<Result<List<ApplicationSummary>, Failure>> getMyApplications() => _guard(() async {
-        final Response<dynamic> r = await _api.get<dynamic>(ApiEndpoints.myApplications);
-        final dynamic data = r.data is Map<String, dynamic> ? ((r.data as Map<String, dynamic>)['data'] ?? (r.data as Map<String, dynamic>)['items']) : r.data;
+  Future<Result<List<ApplicationSummary>, Failure>> getMyApplications() =>
+      _guard(() async {
+        final Response<dynamic> r =
+            await _api.get<dynamic>(ApiEndpoints.myApplications);
+        final dynamic data = r.data is Map<String, dynamic>
+            ? ((r.data as Map<String, dynamic>)['data'] ??
+                (r.data as Map<String, dynamic>)['items'])
+            : r.data;
         final List<ApplicationSummary> items = data is List
-            ? data.whereType<Map<String, dynamic>>().map(ApplicationSummary.fromJson).toList()
+            ? data
+                .whereType<Map<String, dynamic>>()
+                .map(ApplicationSummary.fromJson)
+                .toList()
             : <ApplicationSummary>[];
         items.sort((ApplicationSummary a, ApplicationSummary b) =>
-            (b.submittedAt ?? DateTime(0)).compareTo(a.submittedAt ?? DateTime(0)));
+            (b.submittedAt ?? DateTime(0))
+                .compareTo(a.submittedAt ?? DateTime(0)));
         return items;
       });
 
-  Future<Result<ApplicationDetail, Failure>> getApplication(String id) => _guard(() async {
-        final Response<dynamic> r = await _api.get<dynamic>(ApiEndpoints.applicationDetail(id));
+  Future<Result<ApplicationDetail, Failure>> getApplication(String id) =>
+      _guard(() async {
+        final Response<dynamic> r =
+            await _api.get<dynamic>(ApiEndpoints.applicationDetail(id));
         return ApplicationDetail.fromJson(unwrapData(r.data));
       });
 

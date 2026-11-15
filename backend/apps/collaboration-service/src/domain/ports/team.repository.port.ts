@@ -39,6 +39,16 @@ export interface ITeamRepository {
   findPendingJoinRequest(teamId: string, applicantId: string): Promise<JoinRequest | null>;
   findJoinRequestsByTeam(teamId: string): Promise<JoinRequest[]>;
   updateJoinRequest(request: JoinRequest): Promise<void>;
+  cancelPendingJoinRequests(studentId: string, competitionId: string, exceptRequestId?: string): Promise<void>;
+
+  // Atomic Accept Join Request & Outbox
+  acceptJoinRequestInTransaction(params: {
+    team: Team;
+    joinRequest: JoinRequest;
+    activeMembership: ActiveMembershipRecord;
+    outboxEvent?: any;
+  }): Promise<void>;
+  saveOutboxEvent(event: any): Promise<void>;
 
   // Submission Reservations (WF07 & SCHOL-20)
   saveReservation(reservation: SubmissionReservation): Promise<void>;
@@ -46,6 +56,11 @@ export interface ITeamRepository {
   findActiveReservationByTeam(teamId: string): Promise<SubmissionReservation | null>;
   findExpiredPendingReservations(): Promise<SubmissionReservation[]>;
   updateReservation(reservation: SubmissionReservation): Promise<void>;
+
+  // Team Deletion (WF08 & Team Management)
+  delete(id: string): Promise<void>;
+  deleteActiveMembershipsByTeam(teamId: string): Promise<void>;
+  deleteJoinRequestsByTeam(teamId: string): Promise<void>;
 }
 
 export const TEAM_REPOSITORY = 'TEAM_REPOSITORY';

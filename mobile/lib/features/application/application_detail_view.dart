@@ -16,7 +16,8 @@ class ApplicationDetailView extends StatefulWidget {
   final void Function(ApplicationDetail detail)? onResubmit;
 
   /// Opens the read-only snapshot of one submitted revision (Q5).
-  final void Function(ApplicationDetail detail, ApplicationRevision revision)? onOpenRevision;
+  final void Function(ApplicationDetail detail, ApplicationRevision revision)?
+      onOpenRevision;
 
   /// F37 (Q18): leader resubmits a withdrawn team application through the team flow.
   final void Function(ApplicationDetail detail)? onResubmitTeam;
@@ -62,7 +63,9 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
           style: const TextStyle(height: 1.4),
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Giữ hồ sơ')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Giữ hồ sơ')),
           TextButton(
             key: const Key('detail_withdraw_confirm'),
             onPressed: () => Navigator.pop(ctx, true),
@@ -78,7 +81,8 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-        content: Text(error ?? 'Đã rút hồ sơ. Bạn có thể nộp lại trước khi hết hạn đăng ký.'),
+        content: Text(error ??
+            'Đã rút hồ sơ. Bạn có thể nộp lại trước khi hết hạn đăng ký.'),
         backgroundColor: error == null ? AppColors.success : AppColors.error,
       ));
   }
@@ -101,7 +105,8 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
                 color: AppColors.textPrimary,
               ),
             ),
-            shape: const Border(bottom: BorderSide(color: AppColors.borderLight)),
+            shape:
+                const Border(bottom: BorderSide(color: AppColors.borderLight)),
           ),
           bottomNavigationBar: d == null ? null : _buildActionBar(d),
           body: _buildBody(d),
@@ -111,7 +116,8 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
   }
 
   Widget _buildBody(ApplicationDetail? d) {
-    if (vm.isLoading && d == null) return const Center(child: CircularProgressIndicator());
+    if (vm.isLoading && d == null)
+      return const Center(child: CircularProgressIndicator());
     if (d == null) {
       return Center(
         child: Padding(
@@ -119,7 +125,8 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(vm.errorMessage ?? 'Không tải được hồ sơ.', textAlign: TextAlign.center),
+              Text(vm.errorMessage ?? 'Không tải được hồ sơ.',
+                  textAlign: TextAlign.center),
               const SizedBox(height: 12),
               OutlinedButton(onPressed: vm.load, child: const Text('Thử lại')),
             ],
@@ -139,7 +146,8 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
           ],
           if (widget.justSubmitted) ...<Widget>[
             const AuthMessageBanner(
-              message: 'Nộp hồ sơ thành công! Bạn có thể theo dõi trạng thái tại đây '
+              message:
+                  'Nộp hồ sơ thành công! Bạn có thể theo dõi trạng thái tại đây '
                   'hoặc trong "Hồ sơ ứng tuyển của tôi" ở tab Passport.',
               tone: AuthBannerTone.success,
             ),
@@ -152,20 +160,26 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
             trailing: d.events.isEmpty
                 ? null
                 : SmallBadge('${d.events.length} mốc',
-                    color: AppColors.primary, background: const Color(0x66E2DFFF)),
+                    color: AppColors.primary,
+                    background: const Color(0x66E2DFFF)),
             child: d.events.isEmpty
                 ? Text('Đã nộp lúc ${formatDateTime(s.submittedAt)}.',
-                    style: const TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary))
+                    style: const TextStyle(
+                        fontFamily: 'Be Vietnam Pro',
+                        fontSize: 12,
+                        color: AppColors.textSecondary))
                 : Column(
                     children: List<Widget>.generate(d.events.length, (int i) {
                       final ApplicationEvent e = d.events[i];
-                      final ApplicationRevision? rev = e.isSubmission ? d.revisionNumber(e.revision) : null;
+                      final ApplicationRevision? rev =
+                          e.isSubmission ? d.revisionNumber(e.revision) : null;
                       return _TimelineEntry(
                         event: e,
                         isLast: i == d.events.length - 1,
-                        onOpenRevision: rev == null || widget.onOpenRevision == null
-                            ? null
-                            : () => widget.onOpenRevision!(d, rev),
+                        onOpenRevision:
+                            rev == null || widget.onOpenRevision == null
+                                ? null
+                                : () => widget.onOpenRevision!(d, rev),
                       );
                     }),
                   ),
@@ -174,12 +188,15 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
             const SizedBox(height: 16),
             _SnapshotCard(
               detail: d,
-              onOpen: widget.onOpenRevision == null ? null : (ApplicationRevision r) => widget.onOpenRevision!(d, r),
+              onOpen: widget.onOpenRevision == null
+                  ? null
+                  : (ApplicationRevision r) => widget.onOpenRevision!(d, r),
             ),
           ],
           if (d.registrationDeadline != null && d.canWithdraw) ...<Widget>[
             const SizedBox(height: 16),
-            InfoNote('Có thể rút đơn trước hạn đăng ký (${formatDateTime(d.registrationDeadline)}). '
+            InfoNote(
+                'Có thể rút đơn trước hạn đăng ký (${formatDateTime(d.registrationDeadline)}). '
                 'Sau thời hạn này, hồ sơ được giữ nguyên để đơn vị tổ chức xét duyệt.'),
           ],
           const SizedBox(height: 8),
@@ -187,15 +204,22 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              title: const Text('Chi tiết kỹ thuật', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              title: const Text('Chi tiết kỹ thuật',
+                  style:
+                      TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               expandedCrossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                SelectableText('Mã hồ sơ: ${s.id}', style: const TextStyle(fontSize: 12)),
-                SelectableText('Mã snapshot: ${d.snapshotId}', style: const TextStyle(fontSize: 12)),
-                SelectableText('Mã đồng ý: ${d.consentId}', style: const TextStyle(fontSize: 12)),
-                SelectableText('Hồ sơ v${d.profileVersion} · quy tắc v${d.ruleVersion}',
+                SelectableText('Mã hồ sơ: ${s.id}',
                     style: const TextStyle(fontSize: 12)),
-                SelectableText('Mã băm: ${d.payloadHash}', style: const TextStyle(fontSize: 12)),
+                SelectableText('Mã snapshot: ${d.snapshotId}',
+                    style: const TextStyle(fontSize: 12)),
+                SelectableText('Mã đồng ý: ${d.consentId}',
+                    style: const TextStyle(fontSize: 12)),
+                SelectableText(
+                    'Hồ sơ v${d.profileVersion} · quy tắc v${d.ruleVersion}',
+                    style: const TextStyle(fontSize: 12)),
+                SelectableText('Mã băm: ${d.payloadHash}',
+                    style: const TextStyle(fontSize: 12)),
               ],
             ),
           ),
@@ -213,14 +237,18 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
         key: const Key('detail_withdraw'),
         onPressed: vm.isWithdrawing ? null : () => _confirmWithdraw(d),
         icon: vm.isWithdrawing
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.cancel_outlined, size: 15),
         label: const Text('Rút đơn ứng tuyển'),
         style: TextButton.styleFrom(
           foregroundColor: _danger,
           backgroundColor: AppColors.surface,
           minimumSize: const Size.fromHeight(44),
-          textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+              fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
@@ -236,11 +264,13 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
         key: const Key('detail_resubmit'),
         label: 'Nộp lại (lần ${s.revision + 1})',
         icon: Icons.send_rounded,
-        onPressed: widget.onResubmit == null ? null : () => widget.onResubmit!(d),
+        onPressed:
+            widget.onResubmit == null ? null : () => widget.onResubmit!(d),
       );
     } else {
       final String? note = _actionNote(d);
-      if (note != null) content = InfoNote(note, textKey: const Key('detail_action_note'));
+      if (note != null)
+        content = InfoNote(note, textKey: const Key('detail_action_note'));
     }
     if (content == null) return null;
     return Container(
@@ -255,8 +285,12 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
 
   String? _actionNote(ApplicationDetail d) {
     final ApplicationSummary s = d.summary;
-    if (s.isTeam && d.canResubmit) return 'Trưởng đội nộp lại hồ sơ từ màn đội thi.';
-    if (s.isTeam && !d.viewerIsOwner && !d.isClosedOutcome && s.status != ApplicationStatus.withdrawn) {
+    if (s.isTeam && d.canResubmit)
+      return 'Trưởng đội nộp lại hồ sơ từ màn đội thi.';
+    if (s.isTeam &&
+        !d.viewerIsOwner &&
+        !d.isClosedOutcome &&
+        s.status != ApplicationStatus.withdrawn) {
       return 'Chỉ trưởng đội có thể rút hồ sơ của đội.';
     }
     if (d.isClosedOutcome) return 'Hồ sơ đã có kết quả nên không thể rút.';
@@ -286,8 +320,12 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ApplicationSummary s = detail.summary;
-    const TextStyle meta = TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary);
-    const TextStyle tag = TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600);
+    const TextStyle meta = TextStyle(
+        fontFamily: 'Be Vietnam Pro',
+        fontSize: 12,
+        color: AppColors.textSecondary);
+    const TextStyle tag = TextStyle(
+        fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600);
     final Color screening = screeningColor(s.screening);
     final Color status = statusColor(s.status);
     return Container(
@@ -307,7 +345,8 @@ class _HeroCard extends StatelessWidget {
             runSpacing: 6,
             children: <Widget>[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: status.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(9999),
@@ -318,12 +357,17 @@ class _HeroCard extends StatelessWidget {
                     Container(
                       width: 6,
                       height: 6,
-                      decoration: BoxDecoration(color: status, shape: BoxShape.circle),
+                      decoration:
+                          BoxDecoration(color: status, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       s.status.label,
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: status),
+                      style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: status),
                     ),
                   ],
                 ),
@@ -331,9 +375,14 @@ class _HeroCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  const Icon(Icons.schedule, size: 12, color: AppColors.textSecondary),
+                  const Icon(Icons.schedule,
+                      size: 12, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
-                  Flexible(child: Text(formatDateTime(s.submittedAt).replaceFirst(' ', ' • '), style: meta)),
+                  Flexible(
+                      child: Text(
+                          formatDateTime(s.submittedAt)
+                              .replaceFirst(' ', ' • '),
+                          style: meta)),
                 ],
               ),
             ],
@@ -356,10 +405,12 @@ class _HeroCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
               if (s.typeLabel.isNotEmpty) ...<Widget>[
-                Text(s.typeLabel, style: tag.copyWith(color: AppColors.primary)),
+                Text(s.typeLabel,
+                    style: tag.copyWith(color: AppColors.primary)),
                 Text('•', style: tag.copyWith(color: AppColors.border)),
               ],
-              Icon(s.isTeam ? Icons.group_outlined : Icons.person_outline, size: 15, color: AppColors.textPrimary),
+              Icon(s.isTeam ? Icons.group_outlined : Icons.person_outline,
+                  size: 15, color: AppColors.textPrimary),
               Text(
                 '${s.isTeam ? 'Nộp theo đội' : 'Nộp cá nhân'} · lần ${s.revision}',
                 style: tag.copyWith(color: AppColors.textPrimary),
@@ -375,8 +426,11 @@ class _HeroCard extends StatelessWidget {
                 Container(
                   width: 28,
                   height: 28,
-                  decoration: BoxDecoration(color: screening.withValues(alpha: 0.1), shape: BoxShape.circle),
-                  child: Icon(Icons.verified_outlined, size: 15, color: screening),
+                  decoration: BoxDecoration(
+                      color: screening.withValues(alpha: 0.1),
+                      shape: BoxShape.circle),
+                  child:
+                      Icon(Icons.verified_outlined, size: 15, color: screening),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -386,7 +440,10 @@ class _HeroCard extends StatelessWidget {
                       const Text(
                         'Kết quả sàng lọc',
                         style: TextStyle(
-                            fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary),
                       ),
                       Text(
                         detail.registrationDeadline != null
@@ -403,13 +460,19 @@ class _HeroCard extends StatelessWidget {
                     s.screening.label,
                     textAlign: TextAlign.end,
                     style: TextStyle(
-                        fontFamily: 'Be Vietnam Pro', fontSize: 14, fontWeight: FontWeight.w600, color: screening),
+                        fontFamily: 'Be Vietnam Pro',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: screening),
                   ),
                 ),
               ],
             ),
           ),
-          if (detail.reasons.isNotEmpty) ...<Widget>[const SizedBox(height: 10), ReasonList(detail.reasons)],
+          if (detail.reasons.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 10),
+            ReasonList(detail.reasons)
+          ],
         ],
       ),
     );
@@ -441,13 +504,17 @@ class _SnapshotCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: <Widget>[
-                const Icon(Icons.inventory_2_outlined, size: 15, color: AppColors.textPrimary),
+                const Icon(Icons.inventory_2_outlined,
+                    size: 15, color: AppColors.textPrimary),
                 const SizedBox(width: 6),
                 const Expanded(
                   child: Text(
                     'Bản lưu hồ sơ (Snapshot)',
                     style: TextStyle(
-                        fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                   ),
                 ),
                 if (onOpen != null)
@@ -458,10 +525,14 @@ class _SnapshotCard extends StatelessWidget {
                         Text(
                           'Xem đầy đủ',
                           style: TextStyle(
-                              fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary),
                         ),
                         SizedBox(width: 2),
-                        Icon(Icons.north_east, size: 10, color: AppColors.primary),
+                        Icon(Icons.north_east,
+                            size: 10, color: AppColors.primary),
                       ],
                     ),
                   ),
@@ -496,14 +567,18 @@ class _SnapshotCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontFamily: 'monospace', fontSize: 12, color: AppColors.textPrimary),
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    color: AppColors.textPrimary),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
                         const SmallBadge('Đã khóa',
-                            color: Color(0xFF005338), background: AppColors.surface, icon: Icons.verified_outlined),
+                            color: Color(0xFF005338),
+                            background: AppColors.surface,
+                            icon: Icons.verified_outlined),
                       ],
                     ),
                   ),
@@ -531,7 +606,8 @@ class _RevisionTile extends StatelessWidget {
   final bool isCurrent;
   final VoidCallback? onTap;
 
-  const _RevisionTile({required this.revision, required this.isCurrent, this.onTap});
+  const _RevisionTile(
+      {required this.revision, required this.isCurrent, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -550,8 +626,11 @@ class _RevisionTile extends StatelessWidget {
               Container(
                 width: 32,
                 height: 32,
-                decoration: BoxDecoration(color: const Color(0xFFDAE2FD), borderRadius: BorderRadius.circular(4)),
-                child: const Icon(Icons.description_outlined, size: 16, color: AppColors.primary),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFDAE2FD),
+                    borderRadius: BorderRadius.circular(4)),
+                child: const Icon(Icons.description_outlined,
+                    size: 16, color: AppColors.primary),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -571,21 +650,31 @@ class _RevisionTile extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary),
                         ),
-                        if (isCurrent) const Pill(text: 'Hiện tại', color: AppColors.primary),
+                        if (isCurrent)
+                          const Pill(
+                              text: 'Hiện tại', color: AppColors.primary),
                         ScreeningPill(r.screening),
                       ],
                     ),
                     Text(
                       <String>[
                         formatDateTime(r.submittedAt),
-                        if (r.isRedacted) 'đã xoá theo chính sách lưu trữ' else '${r.attachmentCount} tệp đính kèm',
+                        if (r.isRedacted)
+                          'đã xoá theo chính sách lưu trữ'
+                        else
+                          '${r.attachmentCount} tệp đính kèm',
                       ].join(' • '),
-                      style: const TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                          fontFamily: 'Be Vietnam Pro',
+                          fontSize: 12,
+                          color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              if (onTap != null) const Icon(Icons.open_in_new, size: 14, color: AppColors.textSecondary),
+              if (onTap != null)
+                const Icon(Icons.open_in_new,
+                    size: 14, color: AppColors.textSecondary),
             ],
           ),
         ),
@@ -600,12 +689,16 @@ class _TimelineEntry extends StatelessWidget {
   final bool isLast;
   final VoidCallback? onOpenRevision;
 
-  const _TimelineEntry({required this.event, required this.isLast, this.onOpenRevision});
+  const _TimelineEntry(
+      {required this.event, required this.isLast, this.onOpenRevision});
 
   @override
   Widget build(BuildContext context) {
     final bool active = isLast;
-    const TextStyle meta = TextStyle(fontFamily: 'Be Vietnam Pro', fontSize: 12, color: AppColors.textSecondary);
+    const TextStyle meta = TextStyle(
+        fontFamily: 'Be Vietnam Pro',
+        fontSize: 12,
+        color: AppColors.textSecondary);
     final String sub = event.reasonLabel ?? '';
     final String when = <String>[
       if (event.createdAt != null) _shortTime(event.createdAt),
@@ -631,11 +724,16 @@ class _TimelineEntry extends StatelessWidget {
                       ? Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(color: AppColors.background, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(
+                              color: AppColors.background,
+                              shape: BoxShape.circle),
                         )
                       : const Icon(Icons.check, size: 14, color: Colors.white),
                 ),
-                if (!isLast) Expanded(child: Container(width: 2, color: AppColors.primaryLight)),
+                if (!isLast)
+                  Expanded(
+                      child:
+                          Container(width: 2, color: AppColors.primaryLight)),
               ],
             ),
           ),
@@ -658,8 +756,11 @@ class _TimelineEntry extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 12,
-                            fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                            color: active ? AppColors.primary : AppColors.textPrimary,
+                            fontWeight:
+                                active ? FontWeight.w700 : FontWeight.w600,
+                            color: active
+                                ? AppColors.primary
+                                : AppColors.textPrimary,
                           ),
                         ),
                         Text(when, style: meta),
@@ -668,7 +769,9 @@ class _TimelineEntry extends StatelessWidget {
                   ),
                   if (sub.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 2),
-                    Text(sub, style: meta.copyWith(color: active ? AppColors.textPrimary : null)),
+                    Text(sub,
+                        style: meta.copyWith(
+                            color: active ? AppColors.textPrimary : null)),
                   ],
                   if (onOpenRevision != null)
                     GestureDetector(
@@ -679,7 +782,10 @@ class _TimelineEntry extends StatelessWidget {
                         child: Text(
                           'Xem bản đã nộp',
                           style: TextStyle(
-                              fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary),
                         ),
                       ),
                     ),

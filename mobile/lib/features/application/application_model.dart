@@ -19,8 +19,9 @@ DateTime? _date(dynamic v) {
   return s == null ? null : DateTime.tryParse(s)?.toLocal();
 }
 
-List<String> _strings(dynamic v) =>
-    v is List ? v.map(_str).where((String s) => s.isNotEmpty).toList() : <String>[];
+List<String> _strings(dynamic v) => v is List
+    ? v.map(_str).where((String s) => s.isNotEmpty).toList()
+    : <String>[];
 
 Map<String, dynamic> unwrapData(dynamic res) {
   if (res is! Map<String, dynamic>) return <String, dynamic>{};
@@ -55,7 +56,8 @@ class ScreeningReason {
   final String code;
   final String message;
 
-  const ScreeningReason({required this.fieldKey, required this.code, required this.message});
+  const ScreeningReason(
+      {required this.fieldKey, required this.code, required this.message});
 
   static List<ScreeningReason> listFrom(dynamic raw) {
     if (raw is! List) return <ScreeningReason>[];
@@ -112,12 +114,15 @@ class ReadinessResult {
   });
 
   /// Q4: ineligible or missing fields block; NEEDS_REVIEW may continue with a warning.
-  bool get canProceed => screening != Screening.ineligible && missingFields.isEmpty;
+  bool get canProceed =>
+      screening != Screening.ineligible && missingFields.isEmpty;
 
-  factory ReadinessResult.fromJson(Map<String, dynamic> json) => ReadinessResult(
+  factory ReadinessResult.fromJson(Map<String, dynamic> json) =>
+      ReadinessResult(
         opportunityId: _str(json['opportunityId']),
         profileVersion: _int(json['profileVersion']),
-        ruleVersion: _int(json['ruleVersion']) > 0 ? _int(json['ruleVersion']) : 1,
+        ruleVersion:
+            _int(json['ruleVersion']) > 0 ? _int(json['ruleVersion']) : 1,
         completionScore: _int(json['completionScore']).clamp(0, 100),
         readinessScore: _int(json['readinessScore']).clamp(0, 100),
         isReady: json['isReady'] == true,
@@ -163,7 +168,8 @@ class ApplicationPreview {
     this.attachmentIds = const <String>[],
   });
 
-  factory ApplicationPreview.fromJson(Map<String, dynamic> json, {DateTime? now}) {
+  factory ApplicationPreview.fromJson(Map<String, dynamic> json,
+      {DateTime? now}) {
     Map<String, dynamic> snapshotMap = <String, dynamic>{};
     try {
       final dynamic decoded = jsonDecode(_str(json['snapshotJson']));
@@ -175,7 +181,8 @@ class ApplicationPreview {
       final dynamic manifest = jsonDecode(_str(json['manifestJson']));
       if (manifest is List) {
         for (final dynamic item in manifest) {
-          if (item is Map<String, dynamic> && _strOrNull(item['assetId']) != null) {
+          if (item is Map<String, dynamic> &&
+              _strOrNull(item['assetId']) != null) {
             attachmentIds.add(_str(item['assetId']));
           }
         }
@@ -188,12 +195,14 @@ class ApplicationPreview {
       submissionId: _str(json['submissionId']),
       snapshotId: _str(json['snapshotId']),
       profileVersion: _int(json['profileVersion']),
-      ruleVersion: _int(json['ruleVersion']) > 0 ? _int(json['ruleVersion']) : 1,
+      ruleVersion:
+          _int(json['ruleVersion']) > 0 ? _int(json['ruleVersion']) : 1,
       payloadHash: _str(json['payloadHash']),
       manifestHash: _str(json['manifestHash']),
       screening: Screening.parse(json['screening']),
       reasons: ScreeningReason.listFrom(json['screeningReasons']),
-      expiresAt: _date(json['expiresAt']) ?? (now ?? DateTime.now()).add(const Duration(minutes: 10)),
+      expiresAt: _date(json['expiresAt']) ??
+          (now ?? DateTime.now()).add(const Duration(minutes: 10)),
       snapshot: PassportModel.fromJson(snapshotMap),
       attachmentIds: attachmentIds,
     );
@@ -215,7 +224,8 @@ enum ApplicationStatus {
   cancelled,
   unknown;
 
-  static ApplicationStatus parse(dynamic raw) => switch (_str(raw).toUpperCase()) {
+  static ApplicationStatus parse(dynamic raw) =>
+      switch (_str(raw).toUpperCase()) {
         'DRAFT' => ApplicationStatus.draft,
         'SUBMITTED' => ApplicationStatus.submitted,
         'REVIEWING' => ApplicationStatus.reviewing,
@@ -247,7 +257,8 @@ enum ApplicationStatus {
 
   /// Only withdrawn/reopened applications allow a new submission, as `Application.canResubmit`
   /// does on the backend: anything else is refused there with ALREADY_APPLIED.
-  bool get isActive => this != ApplicationStatus.withdrawn && this != ApplicationStatus.reopened;
+  bool get isActive =>
+      this != ApplicationStatus.withdrawn && this != ApplicationStatus.reopened;
 }
 
 /// One row of `GET /api/v1/applications/me` (ApplicationSummaryMessage).
@@ -279,14 +290,16 @@ class ApplicationSummary {
   });
 
   bool get isTeam => submissionType.toUpperCase() == 'TEAM';
-  String get displayTitle => opportunityTitle.isNotEmpty ? opportunityTitle : 'Cơ hội $opportunityId';
+  String get displayTitle =>
+      opportunityTitle.isNotEmpty ? opportunityTitle : 'Cơ hội $opportunityId';
   String get typeLabel => switch (opportunityType.toUpperCase()) {
         'SCHOLARSHIP' => 'Học bổng',
         'COMPETITION' => 'Cuộc thi',
         _ => '',
       };
 
-  factory ApplicationSummary.fromJson(Map<String, dynamic> json) => ApplicationSummary(
+  factory ApplicationSummary.fromJson(Map<String, dynamic> json) =>
+      ApplicationSummary(
         id: _str(json['id'] ?? json['applicationId']),
         opportunityId: _str(json['opportunityId']),
         opportunityTitle: _str(json['opportunityTitle']),
@@ -318,9 +331,12 @@ class ApplicationEvent {
     this.createdAt,
   });
 
-  factory ApplicationEvent.fromJson(Map<String, dynamic> json) => ApplicationEvent(
+  factory ApplicationEvent.fromJson(Map<String, dynamic> json) =>
+      ApplicationEvent(
         id: _str(json['id']),
-        fromStatus: _strOrNull(json['fromStatus']) == null ? null : ApplicationStatus.parse(json['fromStatus']),
+        fromStatus: _strOrNull(json['fromStatus']) == null
+            ? null
+            : ApplicationStatus.parse(json['fromStatus']),
         toStatus: ApplicationStatus.parse(json['toStatus']),
         revision: _int(json['revision']),
         reason: _strOrNull(json['reason']),
@@ -329,7 +345,11 @@ class ApplicationEvent {
 
   /// Submissions create a new revision whose snapshot can be opened from the timeline.
   bool get isSubmission => switch (reason) {
-        'INITIAL_SUBMISSION' || 'STUDENT_RESUBMITTED' || 'TEAM_INITIAL_SUBMISSION' || 'TEAM_RESUBMITTED' => true,
+        'INITIAL_SUBMISSION' ||
+        'STUDENT_RESUBMITTED' ||
+        'TEAM_INITIAL_SUBMISSION' ||
+        'TEAM_RESUBMITTED' =>
+          true,
         _ => false,
       };
 
@@ -415,8 +435,10 @@ class ApplicationRevision {
 
   bool get isTeam => members.isNotEmpty;
 
-  int get attachmentCount =>
-      isTeam ? members.fold<int>(0, (int n, TeamMemberSnapshot m) => n + m.attachmentIds.length) : attachmentIds.length;
+  int get attachmentCount => isTeam
+      ? members.fold<int>(
+          0, (int n, TeamMemberSnapshot m) => n + m.attachmentIds.length)
+      : attachmentIds.length;
 
   factory ApplicationRevision.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> snapshot = _decodeMap(json['snapshotJson']);
@@ -431,13 +453,18 @@ class ApplicationRevision {
       if (manifest is List) {
         for (final dynamic entry in manifest) {
           if (entry is Map<String, dynamic>) {
-            memberFiles[_str(entry['studentId'])] = _assetIds(entry['manifest']);
+            memberFiles[_str(entry['studentId'])] =
+                _assetIds(entry['manifest']);
           }
         }
       }
-      members = rawMembers.whereType<Map<String, dynamic>>().map((Map<String, dynamic> m) {
+      members = rawMembers
+          .whereType<Map<String, dynamic>>()
+          .map((Map<String, dynamic> m) {
         final Map<String, dynamic> passport =
-            m['snapshot'] is Map<String, dynamic> ? m['snapshot'] as Map<String, dynamic> : <String, dynamic>{};
+            m['snapshot'] is Map<String, dynamic>
+                ? m['snapshot'] as Map<String, dynamic>
+                : <String, dynamic>{};
         final String studentId = _str(m['studentId']);
         return TeamMemberSnapshot(
           studentId: studentId,
@@ -463,7 +490,8 @@ class ApplicationRevision {
       isRedacted: redacted,
       passport: redacted || team ? null : PassportModel.fromJson(snapshot),
       attachmentIds: redacted || team ? const <String>[] : _assetIds(manifest),
-      rosterVersion: team ? _int(snapshot['rosterVersion']) : _int(json['rosterVersion']),
+      rosterVersion:
+          team ? _int(snapshot['rosterVersion']) : _int(json['rosterVersion']),
       leaderId: team ? _strOrNull(snapshot['leaderId']) : null,
       members: members,
     );
@@ -552,17 +580,20 @@ class ApplicationDetail {
             .toList()
         : <ApplicationEvent>[];
     // Backend returns newest first; the timeline reads top-down from the oldest.
-    final bool allTimed = events.every((ApplicationEvent e) => e.createdAt != null);
+    final bool allTimed =
+        events.every((ApplicationEvent e) => e.createdAt != null);
     final List<ApplicationEvent> ordered = allTimed
         ? (List<ApplicationEvent>.of(events)
-          ..sort((ApplicationEvent a, ApplicationEvent b) => a.createdAt!.compareTo(b.createdAt!)))
+          ..sort((ApplicationEvent a, ApplicationEvent b) =>
+              a.createdAt!.compareTo(b.createdAt!)))
         : events.reversed.toList();
     final List<ApplicationRevision> revisions = json['revisions'] is List
         ? ((json['revisions'] as List<dynamic>)
             .whereType<Map<String, dynamic>>()
             .map(ApplicationRevision.fromJson)
             .toList()
-          ..sort((ApplicationRevision a, ApplicationRevision b) => b.revision.compareTo(a.revision)))
+          ..sort((ApplicationRevision a, ApplicationRevision b) =>
+              b.revision.compareTo(a.revision)))
         : <ApplicationRevision>[];
     return ApplicationDetail(
       summary: ApplicationSummary.fromJson(json),
