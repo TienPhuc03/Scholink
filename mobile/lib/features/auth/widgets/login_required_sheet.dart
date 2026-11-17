@@ -37,7 +37,6 @@ class LoginRequiredSheet extends StatelessWidget {
               'Bạn cần đăng nhập',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
                   fontSize: 18,
                   fontWeight: FontWeight.w700),
             ),

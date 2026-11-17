@@ -88,27 +88,30 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
         builder: (BuildContext context, Widget? _) {
           return Column(
             children: <Widget>[
-              // Filter Tabs: Tất cả vs Chưa đọc
-              Padding(
+              // LinkedIn-style Filter Chips Row (Horizontally scrollable)
+              Container(
+                color: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: <Widget>[
-                    ChoiceChip(
-                      selected: _vm.selectedFilter == 'ALL',
-                      label: const Text('Tất cả'),
-                      onSelected: (_) => _vm.setFilter('ALL'),
-                    ),
-                    ChoiceChip(
-                      selected: _vm.selectedFilter == 'UNREAD',
-                      label: Text(_vm.unreadCount > 0
-                          ? 'Chưa đọc (${_vm.unreadCount})'
-                          : 'Chưa đọc'),
-                      onSelected: (_) => _vm.setFilter('UNREAD'),
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: <Widget>[
+                      _buildPillChip(
+                        label: 'Tất cả',
+                        selected: _vm.selectedFilter == 'ALL',
+                        onTap: () => _vm.setFilter('ALL'),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildPillChip(
+                        label: _vm.unreadCount > 0
+                            ? 'Chưa đọc (${_vm.unreadCount})'
+                            : 'Chưa đọc',
+                        selected: _vm.selectedFilter == 'UNREAD',
+                        onTap: () => _vm.setFilter('UNREAD'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (_vm.isRefreshing) const LinearProgressIndicator(minHeight: 2),
@@ -144,11 +147,40 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
                     style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                 ),
-              const Divider(height: 1),
+              const Divider(height: 1, thickness: 0.6, color: Color(0xFFE2E8F0)),
               Expanded(child: _buildBody()),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildPillChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+            width: 0.8,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? Colors.white : const Color(0xFF334155),
+          ),
+        ),
       ),
     );
   }
@@ -224,7 +256,8 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, thickness: 0.6, color: Color(0xFFF1F5F9)),
         itemBuilder: (BuildContext context, int index) {
           final NotificationModel noti = items[index];
           return _NotificationTile(
@@ -263,99 +296,129 @@ class _NotificationTile extends StatelessWidget {
         child: Container(
           color: notification.isRead
               ? Colors.transparent
-              : AppColors.primary.withValues(alpha: 0.04),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              : AppColors.primary.withValues(alpha: 0.035),
+          padding: const EdgeInsets.fromLTRB(10, 12, 14, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // Icon according to type
+              // Unread blue indicator dot (LinkedIn pattern: far left)
               Container(
-                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(top: 14, right: 6),
+                width: 7,
+                height: 7,
                 decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle),
-                child: Icon(_getIconData(notification.type),
-                    size: 20, color: color),
+                  color: notification.isRead
+                      ? Colors.transparent
+                      : const Color(0xFF0A66C2),
+                  shape: BoxShape.circle,
+                ),
               ),
-              const SizedBox(width: 12),
 
-              // Content
+              // Organization / Category Icon
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(_getIconData(notification.type),
+                    size: 19, color: color),
+              ),
+              const SizedBox(width: 10),
+
+              // Content & Typography
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
+                      spacing: 6,
+                      runSpacing: 3,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: <Widget>[
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.12),
+                            color: color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             notification.typeDisplay,
                             style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: color),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
                           ),
                         ),
                         Text(
                           notification.formattedCreatedAt,
                           style: const TextStyle(
-                              fontSize: 11, color: AppColors.textMuted),
+                            fontSize: 10.5,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Text(
                       notification.title,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 13.5,
                         fontWeight: notification.isRead
                             ? FontWeight.w600
-                            : FontWeight.bold,
+                            : FontWeight.w700,
                         color: AppColors.textPrimary,
+                        height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       notification.body,
                       style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                          height: 1.35),
+                        fontSize: 12,
+                        color: Color(0xFF475569),
+                        height: 1.35,
+                      ),
                     ),
                     if (notification.hasTarget)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Nhấn để xem chi tiết',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: const Color(0xFFBFDBFE), width: 0.6),
+                          ),
+                          child: const Text(
+                            'Xem chi tiết →',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF1D4ED8),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
 
-              // Unread blue dot indicator
-              if (!notification.isRead) ...<Widget>[
-                const SizedBox(width: 8),
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                      color: AppColors.primary, shape: BoxShape.circle),
+              // Trailing overflow dots
+              const Padding(
+                padding: EdgeInsets.only(top: 4, left: 4),
+                child: Icon(
+                  Icons.more_horiz_rounded,
+                  size: 16,
+                  color: Color(0xFF94A3B8),
                 ),
-              ],
+              ),
             ],
           ),
         ),

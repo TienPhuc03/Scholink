@@ -70,7 +70,6 @@ class _ApplyViewState extends State<ApplyView> {
               const Text(
                 'Nộp hồ sơ',
                 style: TextStyle(
-                    fontFamily: 'Be Vietnam Pro',
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary),
@@ -143,12 +142,10 @@ class _ApplyViewState extends State<ApplyView> {
 
   Widget _buildSuccess(SubmitResult r) {
     const TextStyle stepTitle = TextStyle(
-        fontFamily: 'Inter',
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary);
     const TextStyle meta = TextStyle(
-        fontFamily: 'Be Vietnam Pro',
         fontSize: 12,
         color: AppColors.textSecondary);
     final String shortId = r.applicationId.length <= 12
@@ -200,7 +197,6 @@ class _ApplyViewState extends State<ApplyView> {
                           child: Text(
                             'ĐÃ HOÀN TẤT NỘP HỒ SƠ',
                             style: TextStyle(
-                                fontFamily: 'Inter',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.55,
@@ -215,7 +211,6 @@ class _ApplyViewState extends State<ApplyView> {
                     'Nộp thành công!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontFamily: 'Be Vietnam Pro',
                       fontSize: 24,
                       height: 32 / 24,
                       fontWeight: FontWeight.w700,
@@ -258,7 +253,6 @@ class _ApplyViewState extends State<ApplyView> {
                     Text(
                       'LẦN NỘP ${r.revision > 0 ? r.revision : 1}',
                       style: const TextStyle(
-                          fontFamily: 'Inter',
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.55,
@@ -267,7 +261,6 @@ class _ApplyViewState extends State<ApplyView> {
                     Text(
                       vm.opportunityTitle,
                       style: const TextStyle(
-                        fontFamily: 'Be Vietnam Pro',
                         fontSize: 18,
                         height: 24 / 18,
                         fontWeight: FontWeight.w600,
@@ -359,7 +352,6 @@ class _ApplyViewState extends State<ApplyView> {
                     ],
                   ),
                   style: TextStyle(
-                      fontFamily: 'Be Vietnam Pro',
                       fontSize: 12,
                       height: 16 / 12),
                 ),
@@ -387,7 +379,7 @@ class _ApplyViewState extends State<ApplyView> {
             backgroundColor: AppColors.primaryLight,
             minimumSize: const Size.fromHeight(48),
             textStyle: const TextStyle(
-                fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
+                fontSize: 14, fontWeight: FontWeight.w600),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
@@ -409,7 +401,6 @@ class _ApplyViewState extends State<ApplyView> {
           'Bạn đã nộp hồ sơ cho cơ hội này',
           textAlign: TextAlign.center,
           style: TextStyle(
-              fontFamily: 'Be Vietnam Pro',
               fontSize: 18,
               fontWeight: FontWeight.w700),
         ),
@@ -494,7 +485,6 @@ class _ApplyViewState extends State<ApplyView> {
                     child: Text(
                       'Tiến độ',
                       style: TextStyle(
-                          fontFamily: 'Inter',
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.44,
@@ -504,7 +494,6 @@ class _ApplyViewState extends State<ApplyView> {
                   Text(
                     '${r.readinessScore}%',
                     style: const TextStyle(
-                        fontFamily: 'Inter',
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.44,
@@ -1069,7 +1058,6 @@ class _ChecklistRow extends StatelessWidget {
                   ? 'Passport đã đủ các mục bắt buộc'
                   : missingFieldLabel(field!),
               style: const TextStyle(
-                  fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary),
@@ -1092,7 +1080,6 @@ class _ChecklistRow extends StatelessWidget {
                   child: Text(
                     action,
                     style: const TextStyle(
-                        fontFamily: 'Inter',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primary),

@@ -717,7 +717,6 @@ class _Section extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontFamily: 'Be Vietnam Pro',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -960,7 +959,6 @@ class _CertificateSheetState extends State<_CertificateSheet> {
             Text(
               widget.initial == null ? 'Thêm chứng chỉ' : 'Sửa chứng chỉ',
               style: const TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
                   fontSize: 18,
                   fontWeight: FontWeight.w700),
             ),

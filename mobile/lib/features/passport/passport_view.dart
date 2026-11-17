@@ -276,12 +276,20 @@ class _PassportViewState extends State<PassportView> {
                   _buildMyApplicationsEntry(),
                 ],
                 if (widget.onPreviewProfile != null) ...<Widget>[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   OutlinedButton.icon(
                     key: const Key('passport_preview_profile'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 0.8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
                     onPressed: widget.onPreviewProfile,
-                    icon: const Icon(Icons.visibility_outlined, size: 18),
-                    label: const Text('Xem hồ sơ như người khác thấy'),
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('Xem hồ sơ như người khác thấy',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -397,34 +405,41 @@ class _PassportViewState extends State<PassportView> {
       required Widget child,
       Widget? trailing}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderLight),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x040F172A),
+            blurRadius: 6,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, color: AppColors.primary, size: 20),
+              Icon(icon, color: AppColors.primary, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontFamily: 'Be Vietnam Pro',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ),
               if (trailing != null) trailing,
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           child,
         ],
       ),
@@ -433,11 +448,18 @@ class _PassportViewState extends State<PassportView> {
 
   Widget _buildCompletionCard(PassportModel passport) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardInfoBackground,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x040F172A),
+            blurRadius: 6,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,26 +470,26 @@ class _PassportViewState extends State<PassportView> {
               const Text(
                 'Độ hoàn thiện Passport',
                 style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary),
               ),
               Text(
                 '${passport.completionScore}%',
                 style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: passport.completionScore / 100.0,
-              minHeight: 8,
-              backgroundColor: AppColors.border,
+              minHeight: 7,
+              backgroundColor: const Color(0xFFF1F5F9),
               valueColor: AlwaysStoppedAnimation<Color>(
                 passport.isHighQualityProfile
                     ? AppColors.success
@@ -475,25 +497,28 @@ class _PassportViewState extends State<PassportView> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             passport.isHighQualityProfile
                 ? 'Tuyệt vời! Hồ sơ đạt chuẩn cao (≥80%) tối ưu xét duyệt học bổng & ghép đội.'
                 : 'Hồ sơ cần hoàn thiện trên 80% để tăng cơ hội nhận học bổng & ghép đội thi.',
             style:
-                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             key: const Key('passport_edit'),
             onPressed: _openEditor,
-            icon: const Icon(Icons.edit_outlined, size: 16),
+            icon: const Icon(Icons.edit_outlined, size: 15),
             label: const Text('Chỉnh sửa hồ sơ',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
+              minimumSize: const Size.fromHeight(38),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6)),
+                  borderRadius: BorderRadius.circular(19)),
             ),
           ),
         ],
@@ -505,39 +530,40 @@ class _PassportViewState extends State<PassportView> {
   Widget _buildMyApplicationsEntry() {
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         key: const Key('passport_my_applications'),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         onTap: widget.onOpenMyApplications,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.borderLight),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
           ),
           child: const Row(
             children: <Widget>[
               Icon(Icons.assignment_turned_in_outlined,
-                  color: AppColors.primary),
-              SizedBox(width: 12),
+                  color: AppColors.primary, size: 20),
+              SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text('Hồ sơ ứng tuyển của tôi',
                         style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary)),
-                    SizedBox(height: 2),
+                    SizedBox(height: 1),
                     Text('Theo dõi trạng thái các hồ sơ đã nộp',
                         style: TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                            fontSize: 11.5, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded,
+                  size: 18, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -585,9 +611,25 @@ class _PassportViewState extends State<PassportView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(passport.fullName,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w700)),
+                      Row(
+                        children: <Widget>[
+                          Flexible(
+                            child: Text(
+                              passport.fullName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified_rounded,
+                              size: 14, color: Color(0xFF0284C7)),
+                        ],
+                      ),
                     if (passport.regionCode != null)
                       Text(
                         'Khu vực: ${passport.regionCode}',

@@ -809,15 +809,16 @@ class _ScholinkAppState extends State<ScholinkApp> {
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          height: 56,
+          height: 52,
           backgroundColor: Colors.white,
           indicatorColor: Colors.transparent,
           labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
             (Set<WidgetState> states) => TextStyle(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w700
+                  ? FontWeight.w600
                   : FontWeight.w500,
+              letterSpacing: -0.1,
               color: states.contains(WidgetState.selected)
                   ? AppColors.primary
                   : const Color(0xFF64748B),
@@ -825,7 +826,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
           ),
           iconTheme: WidgetStateProperty.resolveWith<IconThemeData>(
             (Set<WidgetState> states) => IconThemeData(
-              size: 21,
+              size: 20,
               color: states.contains(WidgetState.selected)
                   ? AppColors.primary
                   : const Color(0xFF64748B),
@@ -834,8 +835,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
         ),
         child: Container(
           decoration: const BoxDecoration(
+            color: Colors.white,
             border:
-                Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 0.8)),
+                Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 0.6)),
           ),
           child: NavigationBar(
             selectedIndex: _currentTabIndex,

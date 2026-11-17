@@ -40,7 +40,6 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
         title: const Text(
           'Đơn Ứng Tuyển',
           style: TextStyle(
-            fontFamily: 'Be Vietnam Pro',
             fontSize: 20,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
@@ -173,15 +172,17 @@ class _SummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-          color: AppColors.cardInfoBackground,
-          borderRadius: BorderRadius.circular(8)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+      ),
       child: Row(
         children: <Widget>[
           const Icon(Icons.fact_check_outlined,
               size: 16, color: AppColors.primary),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Expanded(
             child: Text.rich(
               TextSpan(
@@ -189,21 +190,24 @@ class _SummaryBar extends StatelessWidget {
                 children: <InlineSpan>[
                   TextSpan(
                     text: total.toString().padLeft(2, '0'),
-                    style: const TextStyle(color: AppColors.textPrimary),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
               style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           if (inProgress > 0) ...<Widget>[
             Container(
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               decoration: const BoxDecoration(
                   color: Color(0xFF006E4B), shape: BoxShape.circle),
             ),
@@ -211,10 +215,10 @@ class _SummaryBar extends StatelessWidget {
             Text(
               '$inProgress đang xử lý',
               style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF005338)),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF005338),
+              ),
             ),
           ],
         ],
@@ -233,26 +237,25 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color:
-            selected ? const Color(0xFF4F46E5) : AppColors.cardInfoBackground,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? AppColors.textOnPrimary
-                    : AppColors.textSecondary,
-              ),
+      padding: const EdgeInsets.only(right: 6),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? Colors.white : const Color(0xFF475569),
             ),
           ),
         ),
@@ -324,7 +327,6 @@ class _ApplicationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _cardStyle(a.status);
     const TextStyle meta = TextStyle(
-        fontFamily: 'Be Vietnam Pro',
         fontSize: 12,
         color: AppColors.textSecondary);
     final List<String> details = <String>[
@@ -334,104 +336,119 @@ class _ApplicationCard extends StatelessWidget {
     ];
     return Opacity(
       opacity: style.dim ? 0.85 : 1,
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        elevation: 0.5,
-        shadowColor: Colors.black26,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: style.bg,
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              if (style.icon != null)
-                                Icon(style.icon, size: 12, color: style.fg)
-                              else
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x040F172A),
+              blurRadius: 6,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                                color: style.bg,
+                                borderRadius: BorderRadius.circular(6)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                if (style.icon != null)
+                                  Icon(style.icon, size: 12, color: style.fg)
+                                else
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: const BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle),
+                                  ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  a.status.label,
+                                  style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: style.fg),
                                 ),
-                              const SizedBox(width: 4),
-                              Text(
-                                a.status.label,
-                                style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: style.fg),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        Text(_date(a.submittedAt), style: meta),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      a.displayTitle,
-                      style: const TextStyle(
-                        fontFamily: 'Be Vietnam Pro',
-                        fontSize: 18,
-                        height: 24 / 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                          const Spacer(),
+                          Text(_date(a.submittedAt), style: meta),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(details.join(' • '), style: meta),
-                  ],
-                ),
-              ),
-              Container(
-                color: AppColors.cardInfoBackground.withValues(alpha: 0.6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        style.footer,
-                        style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: style.fg),
-                      ),
-                    ),
-                    Text(
-                      style.link,
-                      style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
+                      const SizedBox(height: 8),
+                      Text(
+                        a.displayTitle,
+                        style: const TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: style.linkColor),
-                    ),
-                    Icon(Icons.arrow_forward, size: 12, color: style.linkColor),
-                  ],
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(details.join(' • '), style: meta),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius:
+                        BorderRadius.vertical(bottom: Radius.circular(12)),
+                    border: Border(
+                        top: BorderSide(color: Color(0xFFF1F5F9), width: 0.8)),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          style.footer,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: style.fg),
+                        ),
+                      ),
+                      Text(
+                        style.link,
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: style.linkColor),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_rounded,
+                          size: 12, color: style.linkColor),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

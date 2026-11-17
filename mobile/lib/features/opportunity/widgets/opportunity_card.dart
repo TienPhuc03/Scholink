@@ -75,17 +75,17 @@ class OpportunityCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: item.isBookmarked
-              ? AppColors.primary.withOpacity(0.4)
-              : const Color(0xFFE5E7EB),
-          width: item.isBookmarked ? 1.5 : 0.8,
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : const Color(0xFFE2E8F0),
+          width: item.isBookmarked ? 1.1 : 0.7,
         ),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x05000000),
-            blurRadius: 6,
+            color: Color(0x040F172A),
+            blurRadius: 8,
             offset: Offset(0, 2),
           ),
         ],
@@ -93,27 +93,27 @@ class OpportunityCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Semantics(
             label: semanticsText,
             container: true,
             child: Padding(
-              padding: const EdgeInsets.all(14.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  // 1. Header: Monogram Avatar + Organizer Name + Verified + Bookmark Button
+                  // 1. Header: Monogram Avatar + Organizer Info + Overflow & Bookmark
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
                       Container(
-                        width: 38,
-                        height: 38,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           color: const Color(0xFFEEF0FD),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6),
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -121,59 +121,75 @@ class OpportunityCard extends StatelessWidget {
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w700,
-                            fontSize: 13.5,
+                            fontSize: 12,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 9),
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Flexible(
-                              child: Text(
-                                item.organizerName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
+                            Row(
+                              children: <Widget>[
+                                Flexible(
+                                  child: Text(
+                                    item.organizerName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                      letterSpacing: -0.1,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  size: 13,
+                                  color: Color(0xFF0284C7),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.verified_rounded,
-                              size: 14,
-                              color: Color(0xFF0284C7),
+                            const SizedBox(height: 1),
+                            Text(
+                              item.isExternal ? 'Nguồn bên ngoài' : 'Tuyển sinh trực tuyến',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       // Bookmark Action with Accessible Tooltip (Touch target >= 44x44)
                       SizedBox(
-                        width: 44,
-                        height: 44,
+                        width: 38,
+                        height: 38,
                         child: IconButton(
                           tooltip: 'Lưu ${item.title}',
+                          padding: EdgeInsets.zero,
                           icon: Icon(
                             item.isBookmarked
                                 ? Icons.bookmark_rounded
                                 : Icons.bookmark_outline_rounded,
                             color: item.isBookmarked
                                 ? AppColors.primary
-                                : const Color(0xFF9CA3AF),
-                            size: 22,
+                                : const Color(0xFF94A3B8),
+                            size: 20,
                           ),
                           onPressed: onBookmarkTap,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
 
                   // 2. Metadata Badges (Type, Apply Mode, Deadline)
                   Wrap(
-                    spacing: 6,
+                    spacing: 5,
                     runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: <Widget>[
@@ -187,7 +203,7 @@ class OpportunityCard extends StatelessWidget {
                         child: Text(
                           item.typeDisplay,
                           style: const TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
@@ -197,15 +213,15 @@ class OpportunityCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
+                          color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           item.isExternal ? 'Website nguồn' : 'Nộp Online',
                           style: const TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF4B5563),
+                            color: Color(0xFF475569),
                           ),
                         ),
                       ),
@@ -213,13 +229,13 @@ class OpportunityCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: deadlineColor.withOpacity(0.1),
+                          color: deadlineColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           deadlineText,
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: deadlineColor,
                           ),
@@ -227,58 +243,58 @@ class OpportunityCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
 
-                  // 3. Post Title (SemiBold 16sp, maxLines 2)
+                  // 3. Post Title (SemiBold 14.5sp, maxLines 2)
                   Text(
                     item.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
-                      height: 1.3,
+                      height: 1.35,
+                      letterSpacing: -0.2,
                     ),
                   ),
 
-                  // 4. Brief Intro (Regular 13.5sp, maxLines 2)
+                  // 4. Brief Intro (Regular 12.5sp, maxLines 2)
                   if (item.description.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3.5),
                     Text(
                       item.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w400,
                         color: AppColors.textSecondary,
-                        height: 1.35,
+                        height: 1.4,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 9),
 
-                  // 5. Visual Banner (Compact 16:6 ratio; if image fails, compact badge container without huge purple block)
+                  // 5. Visual Banner (Compact 16:6.5 ratio)
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     child: Stack(
                       children: <Widget>[
                         AspectRatio(
-                          aspectRatio: 16 / 6.2,
+                          aspectRatio: 16 / 6.5,
                           child: Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (BuildContext ctx, Object err,
                                 StackTrace? stack) {
-                              // Compact neutral fallback container, NOT a massive purple block
                               return Container(
-                                color: const Color(0xFFF3F4F6),
+                                color: const Color(0xFFF1F5F9),
                                 alignment: Alignment.center,
                                 child: const Icon(
                                   Icons.school_rounded,
-                                  size: 28,
-                                  color: Color(0xFF9CA3AF),
+                                  size: 24,
+                                  color: Color(0xFF94A3B8),
                                 ),
                               );
                             },
@@ -286,11 +302,11 @@ class OpportunityCard extends StatelessWidget {
                                 ImageChunkEvent? loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(
-                                color: const Color(0xFFF9FAFB),
+                                color: const Color(0xFFF8FAFC),
                                 alignment: Alignment.center,
                                 child: const SizedBox(
-                                  width: 20,
-                                  height: 20,
+                                  width: 18,
+                                  height: 18,
                                   child:
                                       CircularProgressIndicator(strokeWidth: 2),
                                 ),
@@ -302,14 +318,14 @@ class OpportunityCard extends StatelessWidget {
                         // Bottom-Left Overlay: Reward Badge
                         if (item.reward.isNotEmpty)
                           Positioned(
-                            left: 8,
-                            bottom: 8,
+                            left: 7,
+                            bottom: 7,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3.5),
+                                  horizontal: 7, vertical: 3),
                               decoration: BoxDecoration(
                                 color: AppColors.success,
-                                borderRadius: BorderRadius.circular(5),
+                                borderRadius: BorderRadius.circular(4),
                                 boxShadow: const <BoxShadow>[
                                   BoxShadow(
                                       color: Colors.black26,
@@ -322,7 +338,7 @@ class OpportunityCard extends StatelessWidget {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                 ),
                               ),
                             ),
@@ -331,14 +347,14 @@ class OpportunityCard extends StatelessWidget {
                         // Bottom-Right Overlay: First Tag
                         if (item.tags.isNotEmpty)
                           Positioned(
-                            right: 8,
-                            bottom: 8,
+                            right: 7,
+                            bottom: 7,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 3.5),
+                                  horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
-                                borderRadius: BorderRadius.circular(5),
+                                color: Colors.black.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 item.tags.first.startsWith('#')
@@ -347,7 +363,7 @@ class OpportunityCard extends StatelessWidget {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 10.5,
+                                  fontSize: 9.5,
                                 ),
                               ),
                             ),
@@ -356,9 +372,82 @@ class OpportunityCard extends StatelessWidget {
                     ),
                   ),
 
-                  // 6. Footer: Tags + CTA Pill Button
+                  // 6. LinkedIn-style Engagement & Meta Row
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+                    child: Row(
+                      children: <Widget>[
+                        SizedBox(
+                          width: 27,
+                          height: 15,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: <Widget>[
+                              Positioned(
+                                left: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF0A66C2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.thumb_up_alt_rounded,
+                                      size: 8, color: Colors.white),
+                                ),
+                              ),
+                              Positioned(
+                                left: 11,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE11D48),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 1),
+                                  ),
+                                  child: const Icon(Icons.favorite_rounded,
+                                      size: 8, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Expanded(
+                          child: Text(
+                            '24 sinh viên quan tâm • 8 đã nộp',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (item.tags.length > 1)
+                          Text(
+                            item.tags[1].startsWith('#')
+                                ? item.tags[1]
+                                : '#${item.tags[1]}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 1, thickness: 0.6, color: Color(0xFFF1F5F9)),
+
+                  // 7. Footer: Up to 2 tags + Primary "Chi tiết" Pill Button
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -366,15 +455,15 @@ class OpportunityCard extends StatelessWidget {
                         // Up to 2 tags
                         Expanded(
                           child: Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
+                            spacing: 5,
+                            runSpacing: 3,
                             children: <Widget>[
                               for (final String tag
                                   in item.tags.skip(1).take(2))
                                 Text(
                                   tag.startsWith('#') ? tag : '#$tag',
                                   style: const TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w500,
                                     color: AppColors.textSecondary,
                                   ),
@@ -386,27 +475,27 @@ class OpportunityCard extends StatelessWidget {
                         // Primary Action Pill Button
                         Material(
                           color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           child: InkWell(
                             onTap: onTap,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(14),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 7),
+                                  horizontal: 12, vertical: 5.5),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: <Widget>[
                                   Text(
                                     'Chi tiết',
                                     style: TextStyle(
-                                      fontSize: 12.5,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
                                     ),
                                   ),
-                                  SizedBox(width: 4),
+                                  SizedBox(width: 3.5),
                                   Icon(Icons.arrow_forward_rounded,
-                                      size: 14, color: Colors.white),
+                                      size: 13, color: Colors.white),
                                 ],
                               ),
                             ),

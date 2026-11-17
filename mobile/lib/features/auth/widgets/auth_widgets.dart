@@ -8,8 +8,8 @@ import '../../../core/constants/app_colors.dart';
 /// label 12/16 Inter, input 48px high with 4px radius and #C7C4D8 border,
 /// 16px leading icon, primary action 48px high with 6px radius.
 
-const String _brandFont = 'Be Vietnam Pro';
-const String _bodyFont = 'Inter';
+const String? _brandFont = null;
+const String? _bodyFont = null;
 
 /// Figma 202:5465 - Header with Scholink brand. Shows a back button when [onBack] is set.
 class AuthHeader extends StatelessWidget {
@@ -62,7 +62,6 @@ class AuthHeader extends StatelessWidget {
               Text(
                 'Scholink',
                 style: TextStyle(
-                  fontFamily: _brandFont,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   height: 24 / 18,
@@ -72,7 +71,6 @@ class AuthHeader extends StatelessWidget {
               Text(
                 'Cơ hội cho sinh viên',
                 style: TextStyle(
-                  fontFamily: _bodyFont,
                   fontSize: 11,
                   height: 14 / 11,
                   color: AppColors.textSecondary,
@@ -144,20 +142,19 @@ class AuthTitle extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontFamily: _brandFont,
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: FontWeight.w700,
-            height: 28 / 20,
+            letterSpacing: -0.3,
+            height: 1.25,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           subtitle,
           style: const TextStyle(
-            fontFamily: _bodyFont,
-            fontSize: 14,
-            height: 20 / 14,
+            fontSize: 12.5,
+            height: 1.4,
             color: AppColors.textSecondary,
           ),
         ),
@@ -166,7 +163,7 @@ class AuthTitle extends StatelessWidget {
   }
 }
 
-/// Column of form fields separated by 16px (Figma 202:5478).
+/// Column of form fields separated by 14px (Figma 202:5478).
 class AuthFormSection extends StatelessWidget {
   final List<Widget> children;
 
@@ -176,7 +173,7 @@ class AuthFormSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: _withGaps(children, 16),
+      children: _withGaps(children, 14),
     );
   }
 }
@@ -226,9 +223,9 @@ class AuthTextField extends StatefulWidget {
 class _AuthTextFieldState extends State<AuthTextField> {
   bool _obscured = true;
 
-  OutlineInputBorder _border(Color color, [double width = 1]) =>
+  OutlineInputBorder _border(Color color, [double width = 0.8]) =>
       OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(9),
         borderSide: BorderSide(color: color, width: width),
       );
 
@@ -240,13 +237,12 @@ class _AuthTextFieldState extends State<AuthTextField> {
         Text(
           widget.label,
           style: const TextStyle(
-            fontFamily: _bodyFont,
             fontSize: 12,
             height: 16 / 12,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         TextField(
           controller: widget.controller,
           enabled: widget.enabled,
@@ -260,9 +256,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
           maxLength: widget.maxLength,
           inputFormatters: widget.inputFormatters,
           style: const TextStyle(
-            fontFamily: _bodyFont,
-            fontSize: 14,
-            height: 20 / 14,
+            fontSize: 13,
             color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
@@ -273,12 +267,12 @@ class _AuthTextFieldState extends State<AuthTextField> {
             fillColor: AppColors.surface,
             isDense: true,
             contentPadding: EdgeInsets.symmetric(
-                vertical: 14, horizontal: widget.icon == null ? 12 : 0),
+                vertical: 11, horizontal: widget.icon == null ? 12 : 0),
             prefixIcon: widget.icon == null
                 ? null
                 : Icon(widget.icon, size: 16, color: AppColors.textMuted),
             prefixIconConstraints:
-                const BoxConstraints(minWidth: 38, minHeight: 46),
+                const BoxConstraints(minWidth: 36, minHeight: 42),
             suffixIcon: widget.obscurable
                 ? IconButton(
                     tooltip: _obscured ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
@@ -293,15 +287,14 @@ class _AuthTextFieldState extends State<AuthTextField> {
                   )
                 : null,
             hintStyle: const TextStyle(
-                fontFamily: _bodyFont,
-                fontSize: 14,
+                fontSize: 13,
                 color: AppColors.textMuted),
-            border: _border(AppColors.border),
-            enabledBorder: _border(AppColors.border),
+            border: _border(const Color(0xFFE2E8F0)),
+            enabledBorder: _border(const Color(0xFFE2E8F0)),
             disabledBorder: _border(AppColors.borderLight),
-            focusedBorder: _border(AppColors.primary, 1.5),
+            focusedBorder: _border(AppColors.primary, 1.3),
             errorBorder: _border(AppColors.error),
-            focusedErrorBorder: _border(AppColors.error, 1.5),
+            focusedErrorBorder: _border(AppColors.error, 1.3),
           ),
         ),
       ],
@@ -309,7 +302,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
   }
 }
 
-/// Figma 202:5495 - Small muted helper text (11/14 semibold).
+/// Figma 202:5495 - Small muted helper text (10.5/14 semibold).
 class AuthHelperText extends StatelessWidget {
   final String text;
 
@@ -320,8 +313,7 @@ class AuthHelperText extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        fontFamily: _bodyFont,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: FontWeight.w600,
         height: 14 / 11,
         color: AppColors.textMuted,
@@ -355,14 +347,14 @@ class AuthPrimaryButton extends StatelessWidget {
         disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
         disabledForegroundColor: AppColors.textOnPrimary,
         elevation: 0,
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        minimumSize: const Size.fromHeight(42),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       child: isLoading
           ? const SizedBox(
-              width: 20,
-              height: 20,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
                   strokeWidth: 2, color: AppColors.textOnPrimary),
             )
@@ -370,7 +362,7 @@ class AuthPrimaryButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Icon(icon, size: 16),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 // Flexible so long labels ellipsize when the button shares a row (e.g. with "Quay lại").
                 Flexible(
                   child: Text(
@@ -378,10 +370,10 @@ class AuthPrimaryButton extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontFamily: _bodyFont,
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
-                      height: 20 / 14,
+                      letterSpacing: -0.1,
+                      height: 1.35,
                     ),
                   ),
                 ),
@@ -407,18 +399,17 @@ class AuthGoogleSection extends StatelessWidget {
           caption,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            fontFamily: _bodyFont,
-            fontSize: 12,
+            fontSize: 11,
             height: 16 / 12,
             color: AppColors.textMuted,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Material(
           color: AppColors.googleButtonBackground,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(10),
           child: InkWell(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(10),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -427,15 +418,14 @@ class AuthGoogleSection extends StatelessWidget {
               );
             },
             child: const SizedBox(
-              height: 48,
+              height: 42,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   Text(
                     'G',
                     style: TextStyle(
-                      fontFamily: _bodyFont,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
@@ -444,10 +434,9 @@ class AuthGoogleSection extends StatelessWidget {
                   Text(
                     'Tiếp tục với Google',
                     style: TextStyle(
-                      fontFamily: _bodyFont,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      height: 20 / 14,
+                      letterSpacing: -0.1,
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -480,13 +469,11 @@ class AuthLinkText extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
           child: Text.rich(
             TextSpan(
               style: const TextStyle(
-                fontFamily: _bodyFont,
-                fontSize: 14,
-                height: 20 / 14,
+                fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),
               children: <InlineSpan>[
@@ -542,7 +529,6 @@ class AuthMessageBanner extends StatelessWidget {
             child: Text(
               message,
               style: TextStyle(
-                  fontFamily: _bodyFont,
                   fontSize: 12,
                   height: 18 / 12,
                   color: color),
@@ -669,7 +655,6 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                   child: Text(
                     filled ? code[i] : '',
                     style: const TextStyle(
-                      fontFamily: _bodyFont,
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -707,7 +692,6 @@ class OtpResendRow extends StatelessWidget {
         const Text(
           'Chưa nhận được mã? ',
           style: TextStyle(
-              fontFamily: _bodyFont,
               fontSize: 14,
               color: AppColors.textSecondary),
         ),
@@ -725,7 +709,6 @@ class OtpResendRow extends StatelessWidget {
                     ? 'Gửi lại sau ${secondsLeft}s'
                     : 'Gửi lại mã',
             style: TextStyle(
-              fontFamily: _bodyFont,
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: canResend ? AppColors.primary : AppColors.textMuted,

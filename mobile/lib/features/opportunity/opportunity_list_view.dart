@@ -126,44 +126,59 @@ class _OpportunityListViewState extends State<OpportunityListView> {
       backgroundColor:
           const Color(0xFFF3F2EF), // LinkedIn signature background tint
       appBar: AppBar(
-        title: Row(
-          children: <Widget>[
-            Container(
+        titleSpacing: 0,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leadingWidth: 44,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12.0),
+          child: Center(
+            child: Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFFEEF0FD),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
               ),
               alignment: Alignment.center,
-              child: const Icon(Icons.school_rounded,
-                  color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Scholink',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
+              child: const Icon(
+                Icons.person_rounded,
+                size: 18,
                 color: AppColors.primary,
-                letterSpacing: -0.4,
               ),
             ),
-          ],
+          ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 1.0,
+        title: Padding(
+          padding: const EdgeInsets.only(right: 6.0),
+          child: _buildSearchBar(),
+        ),
         actions: <Widget>[
+          if (widget.onOpenAiChat != null)
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: const Icon(Icons.chat_bubble_outline_rounded,
+                  color: Color(0xFF475569), size: 20),
+              tooltip: 'Trò chuyện AI',
+              onPressed: widget.onOpenAiChat,
+            ),
           if (widget.onOpenNotificationInbox != null)
             IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: const Icon(Icons.notifications_none_rounded,
-                  color: Color(0xFF334155)),
+                  color: Color(0xFF475569), size: 20),
               tooltip: 'Hộp thư thông báo',
               onPressed: widget.onOpenNotificationInbox,
             ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF334155)),
+            padding: const EdgeInsets.only(right: 8),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: const Icon(Icons.refresh_rounded,
+                color: Color(0xFF475569), size: 19),
             tooltip: 'Làm mới danh sách',
             onPressed: () => _vm.loadOpportunities(forceRefresh: true),
           ),
@@ -174,29 +189,21 @@ class _OpportunityListViewState extends State<OpportunityListView> {
         builder: (BuildContext context, Widget? _) {
           return Column(
             children: <Widget>[
-              // Search & Filter header container
+              // Filter chips row (clean single horizontal scrollable row)
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                child: Column(
-                  children: <Widget>[
-                    _buildSearchBar(),
-                    const SizedBox(height: 8),
-                    _buildTypeChips(),
-                    const SizedBox(height: 6),
-                    _buildApplyModeChips(),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                child: _buildFilterChipsRow(),
               ),
 
               // Status / Offline Banners
               ..._buildStatusBanners(),
 
-              if (_vm.isRefreshing) const LinearProgressIndicator(minHeight: 2),
+              if (_vm.isRefreshing) const LinearProgressIndicator(minHeight: 1.5),
 
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-              // Main Feed: LinkedIn-style Post stream
+              // Main Feed: Post stream
               Expanded(child: _buildBody()),
             ],
           );
@@ -205,51 +212,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: const Color(0xFFEDF3F8), // LinkedIn search input background
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: TextField(
-        key: const Key('opportunity_search'),
-        controller: _searchController,
-        textInputAction: TextInputAction.search,
-        style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
-        decoration: InputDecoration(
-          hintText: 'Tìm kiếm học bổng, trường, ngành...',
-          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-          prefixIcon: const Icon(Icons.search_rounded,
-              size: 18, color: Color(0xFF64748B)),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.clear_rounded,
-                      size: 16, color: Color(0xFF64748B)),
-                  tooltip: 'Xóa từ khóa',
-                  onPressed: () {
-                    _searchController.clear();
-                    _vm.setSearchQuery('');
-                    setState(() {});
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          filled: false,
-          contentPadding: const EdgeInsets.symmetric(vertical: 9),
-        ),
-        onChanged: (String val) {
-          _vm.setSearchQuery(val);
-          setState(() {});
-        },
-        onSubmitted: (_) => _vm.loadOpportunities(),
-      ),
-    );
-  }
-
-  Widget _buildTypeChips() {
+  Widget _buildFilterChipsRow() {
     final String current = _vm.selectedTypeFilter;
+    final String mode = _vm.selectedApplyMode;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -263,21 +228,13 @@ class _OpportunityListViewState extends State<OpportunityListView> {
             const SizedBox(width: 6),
             _buildChip('BOOKMARKED', '⭐ Đã lưu', current == 'BOOKMARKED'),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildApplyModeChips() {
-    final String mode = _vm.selectedApplyMode;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: <Widget>[
-          const Text('Chế độ: ',
-              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-          const SizedBox(width: 4),
-          _buildSmallModeChip('ALL', 'Tất cả', mode),
+          Container(
+            height: 18,
+            width: 1,
+            color: const Color(0xFFE2E8F0),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          _buildSmallModeChip('ALL', 'Tất cả chế độ', mode),
           const SizedBox(width: 6),
           _buildSmallModeChip('IN_APP', 'Nộp online', mode),
           const SizedBox(width: 6),
@@ -287,24 +244,71 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     );
   }
 
+  Widget _buildSearchBar() {
+    return Container(
+      height: 35,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+      ),
+      child: TextField(
+        key: const Key('opportunity_search'),
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          hintText: 'Tìm kiếm học bổng, trường, ngành...',
+          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 16, color: Color(0xFF64748B)),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.clear_rounded,
+                      size: 15, color: Color(0xFF64748B)),
+                  tooltip: 'Xóa từ khóa',
+                  onPressed: () {
+                    _searchController.clear();
+                    _vm.setSearchQuery('');
+                    setState(() {});
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(vertical: 7),
+        ),
+        onChanged: (String val) {
+          _vm.setSearchQuery(val);
+          setState(() {});
+        },
+        onSubmitted: (_) => _vm.loadOpportunities(),
+      ),
+    );
+  }
+
   Widget _buildChip(String value, String label, bool isSelected) {
     return GestureDetector(
       onTap: () => _vm.setTypeFilter(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5.5),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
+          color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+            width: isSelected ? 1.0 : 0.8,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             color: isSelected ? Colors.white : const Color(0xFF334155),
+            letterSpacing: -0.1,
           ),
         ),
       ),
@@ -315,23 +319,26 @@ class _OpportunityListViewState extends State<OpportunityListView> {
     final bool isSelected = currentMode == value;
     return GestureDetector(
       onTap: () => _vm.setApplyModeFilter(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+            color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.0 : 0.8,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+            letterSpacing: -0.1,
           ),
         ),
       ),

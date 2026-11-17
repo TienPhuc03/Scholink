@@ -34,7 +34,6 @@ class ApplicationSnapshotView extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary),
@@ -255,7 +254,6 @@ class _AttachmentsCard extends StatelessWidget {
                           child: SelectableText(
                             _shortId(id),
                             style: const TextStyle(
-                                fontFamily: 'Inter',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary),
@@ -269,7 +267,6 @@ class _AttachmentsCard extends StatelessWidget {
                 const Text(
                   'Tệp được lưu cùng bản nộp; chưa hỗ trợ tải xuống trên ứng dụng.',
                   style: TextStyle(
-                      fontFamily: 'Be Vietnam Pro',
                       fontSize: 12,
                       color: AppColors.textMuted),
                 ),
@@ -318,7 +315,6 @@ class _IntegrityBanner extends StatelessWidget {
                   child: Text(
                     'Toàn vẹn dữ liệu (SHA-256)',
                     style: TextStyle(
-                        fontFamily: 'Inter',
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: green),
@@ -401,7 +397,6 @@ class _IntegrityBanner extends StatelessWidget {
                     ],
                   ),
                   style: const TextStyle(
-                      fontFamily: 'Inter',
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textSecondary),
@@ -414,7 +409,6 @@ class _IntegrityBanner extends StatelessWidget {
             '${isCurrent ? 'Đây là lần nộp hiện tại. ' : ''}'
             'Bản chụp này không thay đổi khi bạn cập nhật Passport hay nộp lại.',
             style: const TextStyle(
-                fontFamily: 'Be Vietnam Pro',
                 fontSize: 12,
                 color: AppColors.textMuted),
           ),
@@ -450,7 +444,6 @@ class _Metric extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-                fontFamily: 'Inter',
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary),
@@ -464,14 +457,12 @@ class _Metric extends StatelessWidget {
                   TextSpan(
                     text: ' $unit',
                     style: const TextStyle(
-                        fontFamily: 'Inter',
                         fontSize: 11,
                         color: AppColors.textMuted),
                   ),
               ],
             ),
             style: TextStyle(
-                fontFamily: 'Be Vietnam Pro',
                 fontSize: 20,
                 height: 28 / 20,
                 fontWeight: FontWeight.w700,
@@ -518,7 +509,6 @@ class _ContextRow extends StatelessWidget {
         children: <Widget>[
           Text(label,
               style: const TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
                   fontSize: 12,
                   color: AppColors.textSecondary)),
           const SizedBox(width: 12),
@@ -527,7 +517,6 @@ class _ContextRow extends StatelessWidget {
               value,
               textAlign: TextAlign.end,
               style: const TextStyle(
-                  fontFamily: 'Inter',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary),

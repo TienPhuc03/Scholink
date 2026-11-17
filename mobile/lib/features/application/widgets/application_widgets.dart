@@ -51,21 +51,24 @@ class Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           if (icon != null) ...<Widget>[
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 4)
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 3.5)
           ],
           Text(text,
               style: TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                  letterSpacing: -0.1)),
         ],
       ),
     );
@@ -92,15 +95,16 @@ class ScreeningPill extends StatelessWidget {
       Pill(text: screening.label, color: screeningColor(screening));
 }
 
-/// Card shadow of the application frames (357:*): `drop-shadow 0 1 1 rgba(0,0,0,.05)`.
+/// Subtle ambient card shadow
 const List<BoxShadow> cardShadow = <BoxShadow>[
-  BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 1),
+  BoxShadow(color: Color(0x040F172A), offset: Offset(0, 2), blurRadius: 10),
 ];
 
 /// Info/ID strip background used inside cards (#F2F3FF).
 BoxDecoration get tintBox => BoxDecoration(
     color: AppColors.cardInfoBackground,
-    borderRadius: BorderRadius.circular(8));
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6));
 
 /// White card with an optional icon title, as in the Figma application frames.
 class SectionCard extends StatelessWidget {
@@ -119,10 +123,11 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
         boxShadow: cardShadow,
       ),
       child: Column(
@@ -131,17 +136,16 @@ class SectionCard extends StatelessWidget {
           Row(
             children: <Widget>[
               if (icon != null) ...<Widget>[
-                Icon(icon, size: 18, color: AppColors.primary),
-                const SizedBox(width: 8)
+                Icon(icon, size: 17, color: AppColors.primary),
+                const SizedBox(width: 7)
               ],
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontFamily: 'Be Vietnam Pro',
-                    fontSize: 18,
-                    height: 24 / 18,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -149,7 +153,7 @@ class SectionCard extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           child,
         ],
       ),
@@ -182,7 +186,6 @@ class SmallBadge extends StatelessWidget {
           ],
           Text(text,
               style: TextStyle(
-                  fontFamily: 'Inter',
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: color)),
@@ -218,7 +221,6 @@ class InfoNote extends StatelessWidget {
               text,
               key: textKey,
               style: const TextStyle(
-                  fontFamily: 'Be Vietnam Pro',
                   fontSize: 12,
                   height: 19.5 / 12,
                   color: AppColors.textSecondary),

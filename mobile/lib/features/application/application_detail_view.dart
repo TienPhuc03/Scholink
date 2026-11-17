@@ -99,7 +99,6 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
             title: const Text(
               'Chi Tiết Đơn',
               style: TextStyle(
-                fontFamily: 'Be Vietnam Pro',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -165,7 +164,6 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
             child: d.events.isEmpty
                 ? Text('Đã nộp lúc ${formatDateTime(s.submittedAt)}.',
                     style: const TextStyle(
-                        fontFamily: 'Be Vietnam Pro',
                         fontSize: 12,
                         color: AppColors.textSecondary))
                 : Column(
@@ -248,7 +246,7 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
           backgroundColor: AppColors.surface,
           minimumSize: const Size.fromHeight(44),
           textStyle: const TextStyle(
-              fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
+              fontSize: 12, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
@@ -321,11 +319,10 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ApplicationSummary s = detail.summary;
     const TextStyle meta = TextStyle(
-        fontFamily: 'Be Vietnam Pro',
         fontSize: 12,
         color: AppColors.textSecondary);
     const TextStyle tag = TextStyle(
-        fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600);
+        fontSize: 12, fontWeight: FontWeight.w600);
     final Color screening = screeningColor(s.screening);
     final Color status = statusColor(s.status);
     return Container(
@@ -364,7 +361,6 @@ class _HeroCard extends StatelessWidget {
                     Text(
                       s.status.label,
                       style: TextStyle(
-                          fontFamily: 'Inter',
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: status),
@@ -391,7 +387,6 @@ class _HeroCard extends StatelessWidget {
           Text(
             s.displayTitle,
             style: const TextStyle(
-              fontFamily: 'Be Vietnam Pro',
               fontSize: 20,
               height: 28 / 20,
               fontWeight: FontWeight.w700,
@@ -440,7 +435,6 @@ class _HeroCard extends StatelessWidget {
                       const Text(
                         'Kết quả sàng lọc',
                         style: TextStyle(
-                            fontFamily: 'Inter',
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary),
@@ -460,7 +454,6 @@ class _HeroCard extends StatelessWidget {
                     s.screening.label,
                     textAlign: TextAlign.end,
                     style: TextStyle(
-                        fontFamily: 'Be Vietnam Pro',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: screening),
@@ -511,7 +504,6 @@ class _SnapshotCard extends StatelessWidget {
                   child: Text(
                     'Bản lưu hồ sơ (Snapshot)',
                     style: TextStyle(
-                        fontFamily: 'Inter',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary),
@@ -525,7 +517,6 @@ class _SnapshotCard extends StatelessWidget {
                         Text(
                           'Xem đầy đủ',
                           style: TextStyle(
-                              fontFamily: 'Inter',
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: AppColors.primary),
@@ -557,7 +548,6 @@ class _SnapshotCard extends StatelessWidget {
                               const Text(
                                 'Khóa xác thực SHA256',
                                 style: TextStyle(
-                                    fontFamily: 'Inter',
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.textSecondary),
@@ -645,7 +635,6 @@ class _RevisionTile extends StatelessWidget {
                         Text(
                           'Lần ${r.revision}',
                           style: const TextStyle(
-                              fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary),
@@ -665,7 +654,6 @@ class _RevisionTile extends StatelessWidget {
                           '${r.attachmentCount} tệp đính kèm',
                       ].join(' • '),
                       style: const TextStyle(
-                          fontFamily: 'Be Vietnam Pro',
                           fontSize: 12,
                           color: AppColors.textSecondary),
                     ),
@@ -696,7 +684,6 @@ class _TimelineEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool active = isLast;
     const TextStyle meta = TextStyle(
-        fontFamily: 'Be Vietnam Pro',
         fontSize: 12,
         color: AppColors.textSecondary);
     final String sub = event.reasonLabel ?? '';
@@ -754,7 +741,6 @@ class _TimelineEntry extends StatelessWidget {
                         Text(
                           event.toStatus.label,
                           style: TextStyle(
-                            fontFamily: 'Inter',
                             fontSize: 12,
                             fontWeight:
                                 active ? FontWeight.w700 : FontWeight.w600,
@@ -782,7 +768,6 @@ class _TimelineEntry extends StatelessWidget {
                         child: Text(
                           'Xem bản đã nộp',
                           style: TextStyle(
-                              fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppColors.primary),

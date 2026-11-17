@@ -10,6 +10,7 @@
     "build:all": "nest build gateway && nest build identity-service && nest build opportunity-service && nest build collaboration-service && nest build billing-service && nest build notification-service",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start gateway",
+    "start:all": "node scripts/start-all.js",
     "start:gateway": "nest start gateway --watch",
     "start:identity": "nest start identity-service --watch",
     "start:opportunity": "nest start opportunity-service --watch",

@@ -171,7 +171,6 @@ class _RegisterViewState extends State<RegisterView> {
 
   Widget _buildConsent(String? error, bool busy) {
     const TextStyle linkStyle = TextStyle(
-      fontFamily: 'Inter',
       fontSize: 12,
       height: 18 / 12,
       fontWeight: FontWeight.w600,
@@ -210,7 +209,6 @@ class _RegisterViewState extends State<RegisterView> {
               child: Text.rich(
                 TextSpan(
                   style: const TextStyle(
-                    fontFamily: 'Inter',
                     fontSize: 12,
                     height: 18 / 12,
                     color: AppColors.textSecondary,

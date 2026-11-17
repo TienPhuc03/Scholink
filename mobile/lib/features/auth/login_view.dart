@@ -194,7 +194,6 @@ class _LoginViewState extends State<LoginView> {
                   Text(
                     'Scholink',
                     style: TextStyle(
-                      fontFamily: 'Be Vietnam Pro',
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
@@ -204,7 +203,6 @@ class _LoginViewState extends State<LoginView> {
                   Text(
                     'Cơ hội cho sinh viên',
                     style: TextStyle(
-                      fontFamily: 'Inter',
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
                       color: AppColors.textSecondary,
@@ -239,19 +237,18 @@ class _LoginViewState extends State<LoginView> {
         Text(
           'Chào mừng bạn trở lại!',
           style: TextStyle(
-            fontFamily: 'Be Vietnam Pro',
-            fontSize: 22,
+            fontSize: 18.5,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
+            letterSpacing: -0.3,
             height: 1.25,
           ),
         ),
-        SizedBox(height: 8),
+        SizedBox(height: 6),
         Text(
           'Tiếp tục hành trình chinh phục học bổng cùng Scholink.',
           style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
+            fontSize: 12.5,
             fontWeight: FontWeight.w400,
             color: AppColors.textSecondary,
             height: 1.4,
@@ -264,25 +261,25 @@ class _LoginViewState extends State<LoginView> {
   /// Figma Node 202:5531 - Product Benefit Info Card
   Widget _buildBenefitCard() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 11.0),
       decoration: BoxDecoration(
         color: AppColors.cardInfoBackground,
-        borderRadius: BorderRadius.circular(8.0),
+        borderRadius: BorderRadius.circular(10.0),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6),
       ),
       child: const Row(
         children: <Widget>[
           Icon(
             Icons.school_outlined,
-            size: 26,
+            size: 22,
             color: AppColors.primary,
           ),
-          SizedBox(width: 12),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'Một hồ sơ sinh viên. Nhiều cơ hội hơn. Hạn chót luôn trong tầm tay.',
               style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w400,
                 color: AppColors.textSecondary,
                 height: 1.35,
@@ -303,20 +300,18 @@ class _LoginViewState extends State<LoginView> {
         const Text(
           'Email',
           style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
+            fontSize: 13,
             color: AppColors.textPrimary,
           ),
           decoration: const InputDecoration(
@@ -324,31 +319,29 @@ class _LoginViewState extends State<LoginView> {
             prefixIcon: Icon(
               Icons.mail_outline_rounded,
               color: AppColors.textMuted,
-              size: 20,
+              size: 18,
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // Password Field
         const Text(
           'Mật khẩu',
           style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         TextField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _handleLogin(),
           style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
+            fontSize: 13,
             color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
@@ -356,7 +349,7 @@ class _LoginViewState extends State<LoginView> {
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
               color: AppColors.textMuted,
-              size: 20,
+              size: 18,
             ),
             suffixIcon: IconButton(
               icon: Icon(
@@ -364,7 +357,7 @@ class _LoginViewState extends State<LoginView> {
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
                 color: AppColors.textMuted,
-                size: 20,
+                size: 18,
               ),
               onPressed: () {
                 setState(() {
@@ -374,13 +367,13 @@ class _LoginViewState extends State<LoginView> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         // Figma Node 202:5547 - Remember me & Forgot Password
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            // Remember me checkbox (Flexible: large system text must not push the row off screen, F37)
+            // Remember me checkbox
             Flexible(
               child: InkWell(
                 borderRadius: BorderRadius.circular(4),
@@ -394,8 +387,8 @@ class _LoginViewState extends State<LoginView> {
                   child: Row(
                     children: <Widget>[
                       SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 16,
+                        height: 16,
                         child: Checkbox(
                           value: _rememberMe,
                           activeColor: AppColors.primary,
@@ -403,7 +396,7 @@ class _LoginViewState extends State<LoginView> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           side: const BorderSide(
-                              color: AppColors.border, width: 1.5),
+                              color: AppColors.border, width: 1.2),
                           onChanged: (bool? val) {
                             setState(() {
                               _rememberMe = val ?? false;
@@ -411,13 +404,12 @@ class _LoginViewState extends State<LoginView> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 7),
                       const Flexible(
                         child: Text(
                           'Ghi nhớ đăng nhập',
                           style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -443,8 +435,7 @@ class _LoginViewState extends State<LoginView> {
               child: const Text(
                 'Quên mật khẩu?',
                 style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w500,
                   color: AppColors.primary,
                 ),
@@ -455,27 +446,26 @@ class _LoginViewState extends State<LoginView> {
 
         // Error message banner if any
         if (widget.viewModel.hasError) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.25), width: 0.8),
             ),
             child: Row(
               children: <Widget>[
                 const Icon(Icons.error_outline_rounded,
-                    color: AppColors.error, size: 18),
-                const SizedBox(width: 8),
+                    color: AppColors.error, size: 16),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     widget.viewModel.errorMessage ??
                         'Đăng nhập không thành công',
                     style: const TextStyle(
-                      fontFamily: 'Inter',
                       color: AppColors.error,
-                      fontSize: 12,
+                      fontSize: 11.5,
                     ),
                   ),
                 ),
@@ -484,7 +474,7 @@ class _LoginViewState extends State<LoginView> {
           ),
         ],
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
 
         // Figma Node 202:5553 - Primary Login Button
         ElevatedButton(
@@ -493,15 +483,15 @@ class _LoginViewState extends State<LoginView> {
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(42),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
           child: isLoading
               ? const SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -511,15 +501,15 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     Icon(Icons.arrow_forward_rounded,
-                        size: 18, color: Colors.white),
-                    SizedBox(width: 8),
+                        size: 16, color: Colors.white),
+                    SizedBox(width: 6),
                     Text(
                       'Đăng nhập',
                       style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
+                        letterSpacing: -0.1,
                       ),
                     ),
                   ],
@@ -537,14 +527,13 @@ class _LoginViewState extends State<LoginView> {
           'hoặc đăng nhập bằng',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
+            fontSize: 11,
             color: AppColors.textMuted,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         InkWell(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(10),
           onTap: isLoading
               ? null
               : () {
@@ -556,10 +545,11 @@ class _LoginViewState extends State<LoginView> {
                   );
                 },
           child: Container(
-            height: 48,
+            height: 42,
             decoration: BoxDecoration(
               color: AppColors.googleButtonBackground,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6),
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -567,20 +557,19 @@ class _LoginViewState extends State<LoginView> {
                 Text(
                   'G',
                   style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary,
                   ),
                 ),
-                SizedBox(width: 10),
+                SizedBox(width: 8),
                 Text(
                   'Tiếp tục với Google',
                   style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ],
@@ -610,8 +599,7 @@ class _LoginViewState extends State<LoginView> {
           child: RichText(
             text: const TextSpan(
               style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
+                fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),
               children: <InlineSpan>[
@@ -640,17 +628,16 @@ class _LoginViewState extends State<LoginView> {
           },
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.primary, width: 1.2),
-        minimumSize: const Size.fromHeight(44),
+        side: const BorderSide(color: AppColors.primary, width: 1.0),
+        minimumSize: const Size.fromHeight(42),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(10),
         ),
       ),
-      icon: const Icon(Icons.explore_outlined, size: 18),
+      icon: const Icon(Icons.explore_outlined, size: 16),
       label: const Text(
         'Khám phá trước, đăng nhập sau',
         style: TextStyle(
-          fontFamily: 'Inter',
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
