@@ -229,7 +229,7 @@ class ChatViewModel extends BaseViewModel {
     }
 
     if (_lastSeq > 0) {
-      _repository.markAsRead(room.id, _lastSeq);
+      unawaited(_repository.markAsRead(room.id, _lastSeq));
     }
 
     _isReady = true;

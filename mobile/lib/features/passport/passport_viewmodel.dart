@@ -111,8 +111,9 @@ class PassportViewModel extends BaseViewModel {
   Future<bool> uploadDocument(PassportDocument doc) async {
     final MediaRepository? media = _media;
     final PassportModel? current = _passport;
-    if (media == null || current == null || _uploading != null || _isSaving)
+    if (media == null || current == null || _uploading != null || _isSaving) {
       return false;
+    }
 
     _documentError = null;
     final PickedAttachment? file;

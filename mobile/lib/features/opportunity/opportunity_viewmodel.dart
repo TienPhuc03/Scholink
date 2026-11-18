@@ -99,8 +99,9 @@ class OpportunityViewModel extends BaseViewModel {
 
     final Result<OpportunityPage, Failure> result =
         await _repository.fetchPage(_query);
-    if (_disposed || generation != _generation)
+    if (_disposed || generation != _generation) {
       return; // a newer filter/search took over
+    }
 
     _isRefreshing = false;
     _loadMoreError = null;

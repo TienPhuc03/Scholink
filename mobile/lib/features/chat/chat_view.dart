@@ -121,6 +121,7 @@ class _ChatViewState extends State<ChatView> {
       if (file == null) return;
 
       final Uint8List bytes = await file.readAsBytes();
+      if (!mounted) return;
       if (bytes.isEmpty) return;
 
       if (bytes.length > 5 * 1024 * 1024) {

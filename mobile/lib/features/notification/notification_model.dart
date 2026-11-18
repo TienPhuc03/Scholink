@@ -168,8 +168,9 @@ class NotificationModel {
   static NotificationType _typeOf(String raw) {
     final String t = raw.toUpperCase();
     // Server: DEADLINE_REMINDER (entity) / REMINDER (older worker); app cache: deadlineReminder.
-    if (t.contains('DEADLINE') || t.contains('REMINDER'))
+    if (t.contains('DEADLINE') || t.contains('REMINDER')) {
       return NotificationType.deadlineReminder;
+    }
     if (t.contains('APPLICATION')) return NotificationType.applicationUpdate;
     if (t.contains('TEAM')) return NotificationType.teamInvite;
     if (t.contains('MATCH')) return NotificationType.matchSuggestion;

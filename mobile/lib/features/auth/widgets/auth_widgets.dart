@@ -8,8 +8,6 @@ import '../../../core/constants/app_colors.dart';
 /// label 12/16 Inter, input 48px high with 4px radius and #C7C4D8 border,
 /// 16px leading icon, primary action 48px high with 6px radius.
 
-const String? _brandFont = null;
-const String? _bodyFont = null;
 
 /// Figma 202:5465 - Header with Scholink brand. Shows a back button when [onBack] is set.
 class AuthHeader extends StatelessWidget {
@@ -622,8 +620,9 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                 decoration: const InputDecoration(
                     counterText: '', border: InputBorder.none),
                 onChanged: (String value) {
-                  if (value.length == OtpCodeField.length)
+                  if (value.length == OtpCodeField.length) {
                     widget.onCompleted?.call(value);
+                  }
                 },
               ),
             ),

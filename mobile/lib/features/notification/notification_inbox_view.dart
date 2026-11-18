@@ -47,8 +47,9 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
 
   void _open(NotificationModel noti) {
     if (!noti.isRead) _vm.markAsRead(noti.notificationId);
-    if (noti.hasTarget && widget.onOpenTarget != null)
+    if (noti.hasTarget && widget.onOpenTarget != null) {
       widget.onOpenTarget!(noti);
+    }
   }
 
   @override

@@ -43,7 +43,7 @@ abstract final class PassportValidators {
   }) {
     final bool any = <String>[institution, major, startYear, endYear, gpa]
         .any((String s) => s.trim().isNotEmpty);
-    if (!any)
+    if (!any) {
       return (
         institution: null,
         major: null,
@@ -51,6 +51,7 @@ abstract final class PassportValidators {
         endYear: null,
         gpa: null
       );
+    }
 
     final int? start = int.tryParse(startYear.trim());
     final int? end =
@@ -109,21 +110,25 @@ abstract final class PassportValidators {
   static String? newSkill(String v, List<String> existing) {
     final String s = v.trim();
     if (s.isEmpty) return 'Nhập tên kỹ năng.';
-    if (s.length > maxSkillLength)
+    if (s.length > maxSkillLength) {
       return 'Kỹ năng tối đa $maxSkillLength ký tự.';
+    }
     if (existing.length >= maxSkills) return 'Tối đa $maxSkills kỹ năng.';
-    if (existing.any((String e) => e.toLowerCase() == s.toLowerCase()))
+    if (existing.any((String e) => e.toLowerCase() == s.toLowerCase())) {
       return 'Kỹ năng này đã có.';
+    }
     return null;
   }
 
   static String? newAchievement(String v, List<String> existing) {
     final String s = v.trim();
     if (s.isEmpty) return 'Nhập nội dung thành tích.';
-    if (s.length > maxAchievementLength)
+    if (s.length > maxAchievementLength) {
       return 'Thành tích tối đa $maxAchievementLength ký tự.';
-    if (existing.length >= maxAchievements)
+    }
+    if (existing.length >= maxAchievements) {
       return 'Tối đa $maxAchievements thành tích.';
+    }
     return null;
   }
 
@@ -137,10 +142,12 @@ abstract final class PassportValidators {
   static String? certificateDates(DateTime? issued, DateTime? expiry,
       {DateTime? now}) {
     if (issued == null) return 'Chọn ngày cấp.';
-    if (issued.isAfter(now ?? DateTime.now()))
+    if (issued.isAfter(now ?? DateTime.now())) {
       return 'Ngày cấp không được ở tương lai.';
-    if (expiry != null && expiry.isBefore(issued))
+    }
+    if (expiry != null && expiry.isBefore(issued)) {
       return 'Ngày hết hạn phải sau ngày cấp.';
+    }
     return null;
   }
 }

@@ -106,8 +106,9 @@ class NotificationRepository {
           await _roomDb.notificationDao.getLastSyncedAt();
       final List<Map<String, dynamic>> cached =
           await _roomDb.notificationDao.getAllNotifications();
-      if (syncedAt == null && cached.isEmpty)
+      if (syncedAt == null && cached.isEmpty) {
         return FailureResult<InboxSnapshot, Failure>(failure);
+      }
       return SuccessResult<InboxSnapshot, Failure>(InboxSnapshot(
         items: _dedupe(cached.map(NotificationModel.fromJson)),
         fromCache: true,
@@ -185,9 +186,10 @@ class NotificationRepository {
       final Response<dynamic> response =
           await _apiClient.get<dynamic>(ApiEndpoints.notificationPreferences);
       final dynamic body = response.data;
-      if (body is! Map)
+      if (body is! Map) {
         throw const ServerFailure(
             message: 'Cài đặt thông báo không đúng định dạng.');
+      }
       final NotificationPreferences prefs =
           NotificationPreferences.fromJson(Map<String, dynamic>.from(body));
       await _roomDb.notificationDao.savePreferences(prefs.toJson());
@@ -251,8 +253,9 @@ class NotificationRepository {
     final NotificationPermission? p = _notificationPermission;
     if (p == null) return const SuccessResult<bool, Failure>(true);
     try {
-      if (await p.isGranted() || await p.request())
+      if (await p.isGranted() || await p.request()) {
         return const SuccessResult<bool, Failure>(true);
+      }
       return const FailureResult<bool, Failure>(PermissionDeniedFailure(
         message:
             'Bạn đã từ chối quyền thông báo nên chưa bật được thông báo đẩy. '
@@ -312,8 +315,9 @@ class NotificationRepository {
     try {
       final bool granted = await calendar.hasCalendarPermission() ||
           await calendar.requestCalendarPermission();
-      if (!granted)
+      if (!granted) {
         return await _calendarDenied(opportunity, deadline, previous);
+      }
     } on DeviceServiceException catch (e) {
       return _calendarFailed(opportunity, deadline, previous, e);
     }
@@ -398,8 +402,9 @@ class NotificationRepository {
     CalendarEventRecord? previous,
     DeviceServiceException e,
   ) async {
-    if (e.kind == DeviceErrorKind.permissionDenied)
+    if (e.kind == DeviceErrorKind.permissionDenied) {
       return _calendarDenied(opportunity, deadline, previous);
+    }
     await _roomDb.calendarDao.upsertEvent(
       eventId: CalendarEventRecord.keyFor(opportunity.id),
       opportunityId: opportunity.id,

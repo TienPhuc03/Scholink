@@ -66,8 +66,9 @@ class ApplicantSummary {
     if (institution.isNotEmpty) parts.add(institution);
     if (major.isNotEmpty) parts.add(major);
     if (startYear != null) parts.add('Khóa $startYear');
-    if (gpa != null)
+    if (gpa != null) {
       parts.add('GPA: $gpa${gpaScale != null ? '/$gpaScale' : ''}');
+    }
     return parts.join(' · ');
   }
 }

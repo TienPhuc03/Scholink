@@ -61,8 +61,9 @@ void main() {
     // Other tabs (TV3) are not part of these checks; ignore their overflow under the test font.
     final void Function(FlutterErrorDetails)? original = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails d) {
-      if (!d.exceptionAsString().contains('RenderFlex overflowed'))
+      if (!d.exceptionAsString().contains('RenderFlex overflowed')) {
         original?.call(d);
+      }
     };
     addTearDown(() => FlutterError.onError = original);
   }

@@ -41,8 +41,9 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   /// The leader's commit succeeded: go straight to the team Application.
   void _onChange() {
     final String? committed = vm.takeCommittedApplicationId();
-    if (committed != null)
+    if (committed != null) {
       widget.onOpenApplication(committed, justSubmitted: true);
+    }
   }
 
   @override
@@ -133,8 +134,9 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
   }
 
   Widget _buildBody() {
-    if (vm.isLoading && vm.status == null)
+    if (vm.isLoading && vm.status == null) {
       return const Center(child: CircularProgressIndicator());
+    }
     final TeamSubmissionStatus? s = vm.status;
     if (s == null) {
       return Center(
@@ -214,8 +216,9 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
 
   String _teamStatusLabel(TeamSubmissionStatus s) {
     if (s.isSubmitted) return 'Đã nộp hồ sơ (COMMITTED)';
-    if (vm.canRetrySubmit || vm.hasUnconfirmedAttempt)
+    if (vm.canRetrySubmit || vm.hasUnconfirmedAttempt) {
       return 'Đang chờ máy chủ (PENDING ACK)';
+    }
     if (vm.busy) return 'Đang xử lý (SUBMITTING)';
     if (vm.isLeaseOver) return 'Phiên nộp đã hết hạn';
     if (vm.isSessionOpen) return 'Đang thu thập đồng ý';
@@ -586,7 +589,7 @@ class _TeamSubmissionViewState extends State<TeamSubmissionView> {
                                 fontFamily: 'monospace',
                                 color: AppColors.textSecondary)),
                         Text(
-                            '• Hash: ${c.payloadHash.length > 16 ? c.payloadHash.substring(0, 16) + '...' : c.payloadHash}',
+                            '• Hash: ${c.payloadHash.length > 16 ? '${c.payloadHash.substring(0, 16)}...' : c.payloadHash}',
                             style: const TextStyle(
                                 fontSize: 11,
                                 fontFamily: 'monospace',

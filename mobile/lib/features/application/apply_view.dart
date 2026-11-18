@@ -90,11 +90,13 @@ class _ApplyViewState extends State<ApplyView> {
         body: ListenableBuilder(
           listenable: vm,
           builder: (BuildContext context, Widget? child) {
-            if (vm.isLoading)
+            if (vm.isLoading) {
               return const Center(child: CircularProgressIndicator());
+            }
             if (vm.result != null) return _buildSuccess(vm.result!);
-            if (vm.existingApplication != null)
+            if (vm.existingApplication != null) {
               return _buildAlreadyApplied(vm.existingApplication!);
+            }
             return Column(
               children: <Widget>[
                 _StepHeader(step: vm.step),

@@ -43,9 +43,10 @@ class PushListener {
     if (!_mqtt.isConnected) {
       // MqttManager subscribes users/<userId>/notifications when it connects.
       final bool ok = await _mqtt.connect(userId);
-      if (!ok)
+      if (!ok) {
         debugPrint(
             '[Push] MQTT chưa kết nối được; nhắc hạn vẫn có trong Hộp thư.');
+      }
     } else {
       _mqtt.subscribe('users/$userId/notifications');
     }
