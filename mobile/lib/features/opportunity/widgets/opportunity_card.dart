@@ -32,23 +32,7 @@ class OpportunityCard extends StatelessWidget {
     return '${words[0][0]}${words[1][0]}'.toUpperCase();
   }
 
-  String _getBannerImageUrl() {
-    final String titleLower = item.title.toLowerCase();
-    if (titleLower.contains('ai') ||
-        titleLower.contains('hackathon') ||
-        titleLower.contains('công nghệ') ||
-        item.isCompetition) {
-      return 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80';
-    } else if (titleLower.contains('nữ sinh') || titleLower.contains('stem')) {
-      return 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80';
-    } else if (titleLower.contains('tiếp bước') ||
-        titleLower.contains('tài năng')) {
-      return 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80';
-    } else if (item.isScholarship) {
-      return 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=800&q=80';
-  }
+  String _getBannerImageUrl() => item.bannerImageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -289,12 +273,43 @@ class OpportunityCard extends StatelessWidget {
                             errorBuilder: (BuildContext ctx, Object err,
                                 StackTrace? stack) {
                               return Container(
-                                color: const Color(0xFFF1F5F9),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: item.isCompetition
+                                        ? <Color>[
+                                            const Color(0xFF0F172A),
+                                            const Color(0xFF1E293B),
+                                          ]
+                                        : <Color>[
+                                            const Color(0xFF1E3A8A),
+                                            const Color(0xFF2563EB),
+                                          ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
                                 alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.school_rounded,
-                                  size: 24,
-                                  color: Color(0xFF94A3B8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: <Widget>[
+                                    Icon(
+                                      item.isCompetition
+                                          ? Icons.emoji_events_rounded
+                                          : Icons.school_rounded,
+                                      size: 20,
+                                      color: Colors.white70,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      item.typeDisplay,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },

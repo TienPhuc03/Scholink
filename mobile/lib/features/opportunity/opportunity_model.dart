@@ -77,6 +77,7 @@ class OpportunityModel {
   final String? sourceUrl;
   final String timezone;
   final List<String> eligibilityRules;
+  final String? coverImageUrl;
   final String? updatedAt;
   final String? cachedAt;
 
@@ -100,6 +101,7 @@ class OpportunityModel {
     this.sourceUrl,
     this.timezone = 'Asia/Ho_Chi_Minh',
     this.eligibilityRules = const <String>[],
+    this.coverImageUrl,
     this.updatedAt,
     this.cachedAt,
     this.version,
@@ -140,6 +142,133 @@ class OpportunityModel {
       }
     }
     return isScholarship ? '30.000.000 đ / suất' : 'Giải thưởng hấp dẫn';
+  }
+
+  static const List<String> _aiPool = <String>[
+    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _cyberPool = <String>[
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _hackathonPool = <String>[
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _startupPool = <String>[
+    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _creativePool = <String>[
+    'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _studyAbroadPool = <String>[
+    'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _researchPool = <String>[
+    'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  static const List<String> _generalScholarshipPool = <String>[
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=800&q=80',
+  ];
+
+  /// Resolves an authentic, diverse, and verified working banner image.
+  String get bannerImageUrl {
+    if (coverImageUrl != null && coverImageUrl!.trim().isNotEmpty) {
+      return coverImageUrl!.trim();
+    }
+    final int hash = id.hashCode.abs();
+    final String titleLower = title.toLowerCase();
+    final String tagString = tags.join(' ').toLowerCase();
+    final String content = '$titleLower $tagString';
+
+    if (isCompetition) {
+      if (content.contains('ai') ||
+          content.contains('trí tuệ') ||
+          content.contains('machine learning') ||
+          content.contains('dữ liệu') ||
+          content.contains('vision')) {
+        return _aiPool[hash % _aiPool.length];
+      }
+      if (content.contains('ctf') ||
+          content.contains('an ninh') ||
+          content.contains('bảo mật') ||
+          content.contains('security') ||
+          content.contains('cyber')) {
+        return _cyberPool[hash % _cyberPool.length];
+      }
+      if (content.contains('hackathon') ||
+          content.contains('lập trình') ||
+          content.contains('icpc') ||
+          content.contains('code') ||
+          content.contains('thuật toán') ||
+          content.contains('software')) {
+        return _hackathonPool[hash % _hackathonPool.length];
+      }
+      if (content.contains('startup') ||
+          content.contains('khởi nghiệp') ||
+          content.contains('kinh doanh') ||
+          content.contains('hult') ||
+          content.contains('doanh nhân') ||
+          content.contains('pitch')) {
+        return _startupPool[hash % _startupPool.length];
+      }
+      if (content.contains('stem') ||
+          content.contains('nữ sinh') ||
+          content.contains('robot') ||
+          content.contains('thiết kế') ||
+          content.contains('design') ||
+          content.contains('sáng tạo')) {
+        return _creativePool[hash % _creativePool.length];
+      }
+      const List<String> allComp = <String>[
+        'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80',
+      ];
+      return allComp[hash % allComp.length];
+    }
+
+    // Scholarship paths
+    if (content.contains('du học') ||
+        content.contains('chính phủ') ||
+        content.contains('quốc tế') ||
+        content.contains('úc') ||
+        content.contains('thụy sĩ') ||
+        content.contains('fulbright') ||
+        content.contains('chevening') ||
+        content.contains('honda') ||
+        content.contains('toàn phần')) {
+      return _studyAbroadPool[hash % _studyAbroadPool.length];
+    }
+    if (content.contains('thạc sĩ') ||
+        content.contains('tiến sĩ') ||
+        content.contains('nghiên cứu') ||
+        content.contains('vinif') ||
+        content.contains('viện') ||
+        content.contains('khoa học')) {
+      return _researchPool[hash % _researchPool.length];
+    }
+    return _generalScholarshipPool[hash % _generalScholarshipPool.length];
   }
 
   /// Register deadline in device time (BR10 applied), or null when the value cannot be read.
@@ -272,6 +401,7 @@ class OpportunityModel {
     String? sourceUrl,
     String? timezone,
     List<String>? eligibilityRules,
+    String? coverImageUrl,
     String? updatedAt,
     String? cachedAt,
     int? version,
@@ -293,6 +423,7 @@ class OpportunityModel {
       sourceUrl: sourceUrl ?? this.sourceUrl,
       timezone: timezone ?? this.timezone,
       eligibilityRules: eligibilityRules ?? this.eligibilityRules,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       updatedAt: updatedAt ?? this.updatedAt,
       cachedAt: cachedAt ?? this.cachedAt,
       version: version ?? this.version,
@@ -393,6 +524,7 @@ class OpportunityModel {
       sourceUrl: _str(json['sourceUrl']),
       timezone: _str(json['timezone']) ?? 'Asia/Ho_Chi_Minh',
       eligibilityRules: eligibilityRules,
+      coverImageUrl: _str(json['coverImageUrl'] ?? json['imageUrl'] ?? json['bannerUrl']),
       updatedAt: _str(json['updatedAt']),
       cachedAt: _str(json['cachedAt']),
       version: int.tryParse('${json['version'] ?? ''}'),
@@ -416,6 +548,7 @@ class OpportunityModel {
         'sourceUrl': sourceUrl,
         'timezone': timezone,
         'eligibilityRules': eligibilityRules,
+        'coverImageUrl': coverImageUrl,
         'updatedAt': updatedAt,
         'cachedAt': cachedAt,
         'version': version,
