@@ -109,7 +109,7 @@ class OpportunityCard extends StatelessWidget {
             container: true,
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 14.0, vertical: 12.0),
+                  horizontal: 12.0, vertical: 10.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,13 +118,13 @@ class OpportunityCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
-                      // 42x42 Squircle Monogram
+                      // 36x36 Squircle Monogram
                       Container(
-                        width: 42,
-                        height: 42,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                               color: const Color(0xFFE0E7FF), width: 0.8),
                         ),
@@ -134,11 +134,11 @@ class OpportunityCard extends StatelessWidget {
                           style: const TextStyle(
                             color: Color(0xFF4F46E5),
                             fontWeight: FontWeight.w700,
-                            fontSize: 14.5,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
 
                       // Organizer details
                       Expanded(
@@ -153,28 +153,28 @@ class OpportunityCard extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      fontSize: 13.5,
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF0F172A),
                                       letterSpacing: -0.1,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3.5),
                                 const Icon(
                                   Icons.verified_rounded,
-                                  size: 15,
+                                  size: 13.5,
                                   color: Color(0xFF4F46E5),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 1.5),
                             Text(
                               item.isExternal
                                   ? 'Nguồn bên ngoài'
                                   : 'Nộp trực tuyến',
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 10.5,
                                 color: Color(0xFF64748B),
                                 fontWeight: FontWeight.w400,
                               ),
@@ -188,7 +188,7 @@ class OpportunityCard extends StatelessWidget {
                         tooltip: 'Lưu ${item.title}',
                         padding: EdgeInsets.zero,
                         constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
                         icon: Icon(
                           item.isBookmarked
                               ? Icons.bookmark_rounded
@@ -196,7 +196,7 @@ class OpportunityCard extends StatelessWidget {
                           color: item.isBookmarked
                               ? const Color(0xFF4F46E5)
                               : const Color(0xFF64748B),
-                          size: 20,
+                          size: 18,
                         ),
                         onPressed: onBookmarkTap,
                       ),
@@ -205,11 +205,11 @@ class OpportunityCard extends StatelessWidget {
                       IconButton(
                         padding: EdgeInsets.zero,
                         constraints:
-                            const BoxConstraints(minWidth: 30, minHeight: 30),
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
                         icon: const Icon(
                           Icons.more_horiz_rounded,
                           color: Color(0xFF64748B),
-                          size: 20,
+                          size: 18,
                         ),
                         onPressed: () {},
                       ),
@@ -218,7 +218,7 @@ class OpportunityCard extends StatelessWidget {
 
                   // 2. Metadata Badges (ABOVE TITLE as in mockup!)
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0, bottom: 8.0),
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 6.0),
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -235,7 +235,7 @@ class OpportunityCard extends StatelessWidget {
                               bgColor: const Color(0xFFEEF2FF),
                               textColor: const Color(0xFF4F46E5),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                           ],
 
                           // Mode Badge
@@ -247,7 +247,7 @@ class OpportunityCard extends StatelessWidget {
                             bgColor: const Color(0xFFF3F4F6),
                             textColor: const Color(0xFF475569),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
 
                           // Deadline Badge
                           _buildPillBadge(
@@ -263,7 +263,7 @@ class OpportunityCard extends StatelessWidget {
 
                           // Type Badge (Shows when scholarship or no specific tag)
                           if (item.tags.isEmpty || item.isScholarship) ...<Widget>[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             _buildPillBadge(
                               icon: item.isScholarship
                                   ? Icons.school_outlined
@@ -278,43 +278,43 @@ class OpportunityCard extends StatelessWidget {
                     ),
                   ),
 
-                  // 3. Post Title (Bold 16sp)
+                  // 3. Post Title (Bold 14.5sp)
                   Text(
                     item.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
                       color: Color(0xFF0F172A),
-                      height: 1.3,
-                      letterSpacing: -0.3,
+                      height: 1.25,
+                      letterSpacing: -0.2,
                     ),
                   ),
 
-                  // 4. Brief Description (Regular 13sp)
+                  // 4. Brief Description (Regular 11.5sp)
                   if (item.description.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Text(
                       item.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w400,
                         color: Color(0xFF475569),
-                        height: 1.4,
+                        height: 1.35,
                       ),
                     ),
                   ],
 
-                  // 5. Visual Banner (16:9 ratio with corner radius 12dp)
+                  // 5. Visual Banner (16:9 ratio with corner radius 10dp)
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
+                    padding: const EdgeInsets.only(top: 8.0),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 180),
+                        constraints: const BoxConstraints(maxHeight: 155),
                         child: Stack(
                           children: <Widget>[
                             AspectRatio(
@@ -329,7 +329,7 @@ class OpportunityCard extends StatelessWidget {
                                     alignment: Alignment.center,
                                     child: const Icon(
                                       Icons.school_rounded,
-                                      size: 32,
+                                      size: 30,
                                       color: Color(0xFF94A3B8),
                                     ),
                                   );
@@ -367,21 +367,21 @@ class OpportunityCard extends StatelessWidget {
                                   return const SizedBox.shrink();
                                 }
                                 return Positioned(
-                                  right: 10,
-                                  bottom: 10,
+                                  right: 8,
+                                  bottom: 8,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3.5),
+                                        horizontal: 6, vertical: 2.5),
                                     decoration: BoxDecoration(
                                       color: Colors.black.withOpacity(0.65),
-                                      borderRadius: BorderRadius.circular(5),
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       overlayTag,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 11,
+                                        fontSize: 9.5,
                                         letterSpacing: -0.1,
                                       ),
                                     ),
@@ -397,7 +397,7 @@ class OpportunityCard extends StatelessWidget {
 
                   // 6. Footer: Social Engagement Info & "Xem chi tiết →" Pill CTA
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
+                    padding: const EdgeInsets.only(top: 8.0),
                     child: Builder(
                       builder: (BuildContext context) {
                         final bool isLargeText =
@@ -407,17 +407,17 @@ class OpportunityCard extends StatelessWidget {
                           children: <Widget>[
                             const Icon(
                               Icons.people_outline_rounded,
-                              size: 16,
+                              size: 14,
                               color: Color(0xFF4F46E5),
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 '$interestedCount sinh viên quan tâm • $submittedCount đã nộp',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   color: Color(0xFF475569),
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -428,17 +428,17 @@ class OpportunityCard extends StatelessWidget {
 
                         final Widget ctaButton = Material(
                           color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           child: InkWell(
                             onTap: onTap,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(14),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
+                                  horizontal: 9, vertical: 4.5),
                               child: Text(
                                 'Xem chi tiết →',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF4F46E5),
                                   letterSpacing: -0.1,
@@ -453,7 +453,7 @@ class OpportunityCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               socialInfo,
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: ctaButton,
@@ -467,7 +467,7 @@ class OpportunityCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: <Widget>[
                             Expanded(child: socialInfo),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             ctaButton,
                           ],
                         );
@@ -490,20 +490,20 @@ class OpportunityCard extends StatelessWidget {
     required Color textColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.5),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 4),
+          Icon(icon, size: 10.5, color: textColor),
+          const SizedBox(width: 3.5),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: textColor,
               letterSpacing: -0.1,

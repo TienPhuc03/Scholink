@@ -217,7 +217,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
               // 1. Title Row ("Cơ hội" & "Bộ lọc & Sắp xếp")
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
                 child: Builder(
                   builder: (BuildContext context) {
                     final bool isLargeText =
@@ -225,9 +225,9 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                     final Widget titleText = const Text(
                       'Cơ hội',
                       style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
                         color: Color(0xFF0F172A),
                       ),
                     );
@@ -238,27 +238,27 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                               content: Text('Bộ lọc nâng cao & Sắp xếp')),
                         );
                       },
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                            horizontal: 9, vertical: 4.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
                             Icon(Icons.tune_rounded,
-                                size: 15, color: Color(0xFF4F46E5)),
-                            SizedBox(width: 5),
+                                size: 13.5, color: Color(0xFF4F46E5)),
+                            SizedBox(width: 4),
                             Flexible(
                               child: Text(
                                 'Bộ lọc & Sắp xếp',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFF4F46E5),
                                 ),
@@ -274,7 +274,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           titleText,
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           filterSortBtn,
                         ],
                       );
@@ -294,7 +294,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
               // 2. Filter chips row (Stadium Pills)
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                 child: _buildFilterChipsRow(),
               ),
 
@@ -400,10 +400,10 @@ class _OpportunityListViewState extends State<OpportunityListView> {
       onTap: () => _vm.setTypeFilter(value),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF4F46E5)
@@ -420,15 +420,15 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                 if (icon != null) ...<Widget>[
                   Icon(
                     icon,
-                    size: 15,
+                    size: 13.5,
                     color: isSelected ? Colors.white : const Color(0xFF1F2937),
                   ),
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 4),
                 ],
                 Text(
                   displayLabel,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                     color: isSelected ? Colors.white : const Color(0xFF1F2937),
                     letterSpacing: -0.1,
@@ -456,10 +456,10 @@ class _OpportunityListViewState extends State<OpportunityListView> {
       onTap: () => _vm.setApplyModeFilter(value),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF4F46E5)
@@ -470,7 +470,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected
                 ? const Color(0xFF4F46E5)
@@ -484,26 +484,26 @@ class _OpportunityListViewState extends State<OpportunityListView> {
 
   Widget _buildSearchBar() {
     return Container(
-      height: 38,
+      height: 36,
       decoration: BoxDecoration(
         color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: TextField(
         key: const Key('opportunity_search'),
         controller: _searchController,
         textInputAction: TextInputAction.search,
-        style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)),
+        style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: 'Tìm kiếm học bổng, cuộc thi, chương trình...',
-          hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
           prefixIcon: const Icon(Icons.search_rounded,
-              size: 18, color: Color(0xFF6B7280)),
+              size: 16, color: Color(0xFF6B7280)),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   padding: EdgeInsets.zero,
                   icon: const Icon(Icons.clear_rounded,
-                      size: 16, color: Color(0xFF6B7280)),
+                      size: 15, color: Color(0xFF6B7280)),
                   tooltip: 'Xóa từ khóa',
                   onPressed: () {
                     _searchController.clear();
@@ -514,7 +514,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
               : null,
           border: InputBorder.none,
           filled: false,
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(vertical: 7),
         ),
         onChanged: (String val) {
           _vm.setSearchQuery(val);

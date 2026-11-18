@@ -816,12 +816,12 @@ class _ScholinkAppState extends State<ScholinkApp> {
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          height: 56,
+          height: 52,
           backgroundColor: Colors.white,
           indicatorColor: Colors.transparent,
           labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
             (Set<WidgetState> states) => TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: states.contains(WidgetState.selected)
                   ? FontWeight.w700
                   : FontWeight.w500,
@@ -833,7 +833,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
           ),
           iconTheme: WidgetStateProperty.resolveWith<IconThemeData>(
             (Set<WidgetState> states) => IconThemeData(
-              size: 22,
+              size: 20,
               color: states.contains(WidgetState.selected)
                   ? const Color(0xFF4F46E5)
                   : const Color(0xFF64748B),
@@ -854,13 +854,13 @@ class _ScholinkAppState extends State<ScholinkApp> {
               NavigationDestination(
                 icon: const Icon(Icons.explore_outlined),
                 selectedIcon: Container(
-                  width: 24,
-                  height: 24,
+                  width: 22,
+                  height: 22,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Color(0xFF4F46E5),
                   ),
-                  child: const Icon(Icons.explore, size: 16, color: Colors.white),
+                  child: const Icon(Icons.explore, size: 14, color: Colors.white),
                 ),
                 label: 'Cơ hội',
               ),
