@@ -1,13 +1,13 @@
 /// Centralized API Endpoints matching Scholink Gateway and Microservices routes.
 abstract final class ApiEndpoints {
-  // IP LAN of Mac for real iPhone testing over Wi-Fi (192.168.1.220)
+  // IP LAN of Mac for real iPhone testing over Wi-Fi (192.168.100.206)
   static const String defaultBaseUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://192.168.1.220:3000',
+    defaultValue: 'http://192.168.100.206:3000',
   );
   static const String mqttBrokerUri = String.fromEnvironment(
     'MQTT_BROKER_URI',
-    defaultValue: '192.168.1.220',
+    defaultValue: '192.168.100.206',
   );
   static const int mqttPort = 1883;
 
