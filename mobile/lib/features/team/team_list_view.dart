@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_widgets.dart';
-import '../passport/passport_model.dart';
 import '../passport/passport_repository.dart';
 import '../passport/profile_view_screen.dart';
 import 'team_model.dart';

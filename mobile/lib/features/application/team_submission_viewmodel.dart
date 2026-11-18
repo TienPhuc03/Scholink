@@ -265,10 +265,12 @@ class TeamSubmissionViewModel extends BaseViewModel {
     await _run(() async {
       await _checkReadiness();
       final ReadinessResult? r = _readiness;
-      if (r == null)
+      if (r == null) {
         return 'Không kiểm tra được Passport của bạn. Vui lòng thử lại.';
-      if (!r.canProceed)
+      }
+      if (!r.canProceed) {
         return 'Passport của bạn chưa đáp ứng điều kiện của cuộc thi.';
+      }
       final Result<ApplicationPreview, Failure> p =
           await _applications.createPreview(
         opportunityId: opportunityId,

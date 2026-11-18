@@ -54,8 +54,9 @@ DateTime? parseDeadline(String? raw) {
   final DateTime? parsed = DateTime.tryParse(value);
   if (parsed == null) return null;
   final bool dateOnly = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value);
-  if (dateOnly)
+  if (dateOnly) {
     return DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59);
+  }
   return parsed.toLocal();
 }
 
@@ -367,10 +368,12 @@ class OpportunityModel {
     if (eligibilityRules.isEmpty) {
       final num? minGpa = num.tryParse('${json['minGpa'] ?? ''}');
       final num? ielts = num.tryParse('${json['requiredIelts'] ?? ''}');
-      if (minGpa != null && minGpa > 0)
+      if (minGpa != null && minGpa > 0) {
         eligibilityRules.add('GPA từ $minGpa trở lên');
-      if (ielts != null && ielts > 0)
+      }
+      if (ielts != null && ielts > 0) {
         eligibilityRules.add('IELTS từ $ielts trở lên');
+      }
     }
 
     return OpportunityModel(

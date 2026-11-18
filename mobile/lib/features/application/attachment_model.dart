@@ -35,8 +35,9 @@ abstract final class AttachmentRules {
     if (mime == null) return 'Chỉ nhận tệp PDF.';
     if (bytes.isEmpty) return 'Tệp rỗng.';
     if (bytes.length > maxBytes) return 'Tệp vượt quá 5 MB.';
-    if (!headerMatches(mime, bytes))
+    if (!headerMatches(mime, bytes)) {
       return 'Nội dung tệp không khớp định dạng ${fileName.split('.').last.toUpperCase()}.';
+    }
     return null;
   }
 }
@@ -81,8 +82,9 @@ class AttachmentItem {
       );
 
   String get sizeLabel {
-    if (sizeBytes >= 1024 * 1024)
+    if (sizeBytes >= 1024 * 1024) {
       return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(sizeBytes / 1024).ceil()} KB';
   }
 }

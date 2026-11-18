@@ -113,8 +113,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _resetTabViewModels();
     // F29: the next account on this device must not receive this account's pushes.
     if (sl.isRegistered<PushListener>()) unawaited(sl<PushListener>().stop());
-    if (sl.isRegistered<RoomDatabase>())
+    if (sl.isRegistered<RoomDatabase>()) {
       unawaited(sl<RoomDatabase>().clearUserData());
+    }
   }
 
   @override
@@ -151,13 +152,15 @@ class _ScholinkAppState extends State<ScholinkApp> {
   Future<void> _startPush() async {
     if (!sl.isRegistered<PushListener>()) return;
     final String? userId = await sl<SecureStorageHelper>().getUserId();
-    if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated)
+    if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated) {
       return;
+    }
     await sl<PushListener>().start(
       userId,
       onReceived: () {
-        if (mounted && _isAuthenticated && !_isGuest)
+        if (mounted && _isAuthenticated && !_isGuest) {
           unawaited(_tabs.notification.loadNotifications());
+        }
       },
     );
   }
@@ -170,7 +173,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
         refUrl.isEmpty ||
         !mounted ||
         !_isAuthenticated ||
-        _isGuest) return;
+        _isGuest) {
+      return;
+    }
     if (refUrl == '/notifications') {
       // The user tapped a stack of notifications: show the inbox.
       _nav.popUntil((Route<dynamic> r) => r.isFirst);
@@ -219,8 +224,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
       _pendingBookmark = null;
     });
     unawaited(_startPush());
-    if (resumeBookmark != null)
+    if (resumeBookmark != null) {
       unawaited(_completePendingBookmark(resumeBookmark));
+    }
     if (resumeApply != null) {
       // Wait for the main shell to replace the login screen before pushing on top of it.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -545,9 +551,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
               return;
             }
             _nav.pop();
-            if (justSubmitted)
+            if (justSubmitted) {
               _showMessage('Đã nộp lại hồ sơ thành công.',
                   color: AppColors.success);
+            }
           },
         ),
       ),

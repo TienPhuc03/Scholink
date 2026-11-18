@@ -21,8 +21,9 @@ class OpportunityQuery {
   bool matches(OpportunityModel o) {
     if (type == 'SCHOLARSHIP' && !o.isScholarship) return false;
     if (type == 'COMPETITION' && !o.isCompetition) return false;
-    if (applyMode != null && o.applyMode.toUpperCase() != applyMode)
+    if (applyMode != null && o.applyMode.toUpperCase() != applyMode) {
       return false;
+    }
     final String q = (keyword ?? '').trim().toLowerCase();
     if (q.isEmpty) return true;
     return o.title.toLowerCase().contains(q) ||
@@ -100,8 +101,9 @@ class OpportunityRepository {
     try {
       final Map<String, dynamic> params = <String, dynamic>{'limit': limit};
       if (query.type != null) params['type'] = query.type;
-      if ((query.keyword ?? '').trim().isNotEmpty)
+      if ((query.keyword ?? '').trim().isNotEmpty) {
         params['keyword'] = query.keyword!.trim();
+      }
       if (query.applyMode != null) params['applyMode'] = query.applyMode;
       if (cursor != null) params['cursor'] = cursor;
 
@@ -140,8 +142,9 @@ class OpportunityRepository {
     } catch (e) {
       final Failure failure = _asFailure(e);
       // Next pages need the server; the first page can fall back to the cache.
-      if (cursor != null || _roomDb == null)
+      if (cursor != null || _roomDb == null) {
         return FailureResult<OpportunityPage, Failure>(failure);
+      }
 
       final List<OpportunityModel> cached = (await _roomDb.opportunityDao
               .getAll(type: query.type))
@@ -149,8 +152,9 @@ class OpportunityRepository {
           .where(query.matches)
           .toList()
         ..sort(_byDeadline);
-      if (cached.isEmpty)
+      if (cached.isEmpty) {
         return FailureResult<OpportunityPage, Failure>(failure);
+      }
 
       return SuccessResult<OpportunityPage, Failure>(OpportunityPage(
         items: await _withUserFlags(cached),
@@ -176,9 +180,10 @@ class OpportunityRepository {
   Future<Result<OpportunityPage, Failure>> _bookmarkedPage(
       OpportunityQuery query) async {
     final RoomDatabase? db = _roomDb;
-    if (db == null)
+    if (db == null) {
       return const SuccessResult<OpportunityPage, Failure>(
           OpportunityPage(items: <OpportunityModel>[]));
+    }
 
     Failure? syncFailure;
     if (await _isSignedIn()) {
@@ -241,8 +246,9 @@ class OpportunityRepository {
       final OpportunityModel model =
           OpportunityModel.fromJson(Map<String, dynamic>.from(payload));
       await _roomDb?.opportunityDao.insertOrUpdate(model.toJson());
-      if (model.isExternal && await _isSignedIn())
+      if (model.isExternal && await _isSignedIn()) {
         await _refreshExternalMark(id);
+      }
       return SuccessResult<OpportunityDetail, Failure>(
         OpportunityDetail(
             (await _withUserFlags(<OpportunityModel>[model])).first),
@@ -251,8 +257,9 @@ class OpportunityRepository {
       final Failure failure = _asFailure(e);
       final Map<String, dynamic>? cached =
           await _roomDb?.opportunityDao.findById(id);
-      if (cached == null)
+      if (cached == null) {
         return FailureResult<OpportunityDetail, Failure>(failure);
+      }
       final OpportunityModel model = (await _withUserFlags(
               <OpportunityModel>[OpportunityModel.fromJson(cached)]))
           .first;

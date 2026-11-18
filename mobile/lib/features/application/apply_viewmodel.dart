@@ -154,8 +154,9 @@ class ApplyViewModel extends BaseViewModel {
   ApplicationSummary? _findActive(List<ApplicationSummary>? items) {
     if (items == null) return null;
     for (final ApplicationSummary a in items) {
-      if (a.opportunityId == opportunityId && !a.isTeam && a.status.isActive)
+      if (a.opportunityId == opportunityId && !a.isTeam && a.status.isActive) {
         return a;
+      }
     }
     return null;
   }
@@ -165,8 +166,9 @@ class ApplyViewModel extends BaseViewModel {
   int? _findResubmitRevision(List<ApplicationSummary>? items) {
     if (items == null) return null;
     for (final ApplicationSummary a in items) {
-      if (a.opportunityId == opportunityId && !a.isTeam && !a.status.isActive)
+      if (a.opportunityId == opportunityId && !a.isTeam && !a.status.isActive) {
         return a.revision + 1;
+      }
     }
     return null;
   }

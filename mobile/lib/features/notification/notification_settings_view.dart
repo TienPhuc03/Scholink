@@ -74,8 +74,9 @@ class _NotificationSettingsViewState extends State<NotificationSettingsView> {
         builder: (BuildContext context, Widget? _) {
           final NotificationPreferences? prefs = _vm.preferences;
           if (prefs == null) {
-            if (_vm.preferencesLoading)
+            if (_vm.preferencesLoading) {
               return const Center(child: CircularProgressIndicator());
+            }
             return Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),

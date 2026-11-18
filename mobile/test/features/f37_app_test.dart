@@ -102,8 +102,9 @@ void main() {
       // layout under large text is covered by the Q7 tests below.
       final void Function(FlutterErrorDetails)? original = FlutterError.onError;
       FlutterError.onError = (FlutterErrorDetails d) {
-        if (!d.exceptionAsString().contains('RenderFlex overflowed'))
+        if (!d.exceptionAsString().contains('RenderFlex overflowed')) {
           original?.call(d);
+        }
       };
       addTearDown(() => FlutterError.onError = original);
       tester.view.physicalSize = const Size(1080, 2400);

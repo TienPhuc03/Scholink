@@ -115,8 +115,9 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
   }
 
   Widget _buildBody(ApplicationDetail? d) {
-    if (vm.isLoading && d == null)
+    if (vm.isLoading && d == null) {
       return const Center(child: CircularProgressIndicator());
+    }
     if (d == null) {
       return Center(
         child: Padding(
@@ -267,8 +268,9 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
       );
     } else {
       final String? note = _actionNote(d);
-      if (note != null)
+      if (note != null) {
         content = InfoNote(note, textKey: const Key('detail_action_note'));
+      }
     }
     if (content == null) return null;
     return Container(
@@ -283,8 +285,9 @@ class _ApplicationDetailViewState extends State<ApplicationDetailView> {
 
   String? _actionNote(ApplicationDetail d) {
     final ApplicationSummary s = d.summary;
-    if (s.isTeam && d.canResubmit)
+    if (s.isTeam && d.canResubmit) {
       return 'Trưởng đội nộp lại hồ sơ từ màn đội thi.';
+    }
     if (s.isTeam &&
         !d.viewerIsOwner &&
         !d.isClosedOutcome &&

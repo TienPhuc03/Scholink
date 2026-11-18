@@ -309,10 +309,10 @@ class _VideoCallViewState extends State<VideoCallView> {
               clipBehavior: Clip.antiAlias,
               child: Stack(
                 children: <Widget>[
-                  Center(
+                  const Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: const <Widget>[
+                      children: <Widget>[
                         CircleAvatar(
                           radius: 22,
                           backgroundColor: AppColors.primary,

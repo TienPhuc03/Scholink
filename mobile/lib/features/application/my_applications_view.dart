@@ -52,8 +52,9 @@ class _MyApplicationsViewState extends State<MyApplicationsView> {
         listenable: widget.viewModel,
         builder: (BuildContext context, Widget? child) {
           final MyApplicationsViewModel vm = widget.viewModel;
-          if (vm.isLoading && vm.items.isEmpty)
+          if (vm.isLoading && vm.items.isEmpty) {
             return const Center(child: CircularProgressIndicator());
+          }
           if (vm.hasError && vm.items.isEmpty) {
             return _Message(
               icon: Icons.cloud_off_rounded,
