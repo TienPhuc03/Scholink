@@ -821,13 +821,13 @@ class _ScholinkAppState extends State<ScholinkApp> {
           indicatorColor: Colors.transparent,
           labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
             (Set<WidgetState> states) => TextStyle(
-              fontSize: 10.5,
+              fontSize: 10,
               fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w600
+                  ? FontWeight.w700
                   : FontWeight.w500,
               letterSpacing: -0.1,
               color: states.contains(WidgetState.selected)
-                  ? AppColors.primary
+                  ? const Color(0xFF4F46E5)
                   : const Color(0xFF64748B),
             ),
           ),
@@ -835,7 +835,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
             (Set<WidgetState> states) => IconThemeData(
               size: 20,
               color: states.contains(WidgetState.selected)
-                  ? AppColors.primary
+                  ? const Color(0xFF4F46E5)
                   : const Color(0xFF64748B),
             ),
           ),
@@ -844,21 +844,29 @@ class _ScholinkAppState extends State<ScholinkApp> {
           decoration: const BoxDecoration(
             color: Colors.white,
             border:
-                Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 0.6)),
+                Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.8)),
           ),
           child: NavigationBar(
             selectedIndex: _currentTabIndex,
             onDestinationSelected: _selectTab,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: <NavigationDestination>[
-              const NavigationDestination(
-                icon: Icon(Icons.explore_outlined),
-                selectedIcon: Icon(Icons.explore_rounded),
+              NavigationDestination(
+                icon: const Icon(Icons.explore_outlined),
+                selectedIcon: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF4F46E5),
+                  ),
+                  child: const Icon(Icons.explore, size: 14, color: Colors.white),
+                ),
                 label: 'Cơ hội',
               ),
               const NavigationDestination(
-                icon: Icon(Icons.group_outlined),
-                selectedIcon: Icon(Icons.group_rounded),
+                icon: Icon(Icons.people_outline_rounded),
+                selectedIcon: Icon(Icons.people_rounded),
                 label: 'Đội thi',
               ),
               const NavigationDestination(

@@ -17,7 +17,6 @@ abstract final class ApiEndpoints {
     if (!kIsWeb && Platform.isAndroid) return '10.0.2.2';
     return 'localhost';
   }
-
   static const int mqttPort = 1883;
 
   // Identity Service routes
