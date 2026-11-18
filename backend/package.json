@@ -18,6 +18,7 @@
     "start:billing": "nest start billing-service --watch",
     "start:notification": "nest start notification-service --watch",
     "seed": "ts-node scripts/seed.ts",
+    "crawl": "ts-node scripts/crawl-competitions.ts",
     "backup": "ts-node scripts/backup.ts",
     "restore": "ts-node scripts/restore.ts",
     "test:smoke": "ts-node scripts/smoke-test-schol14.ts",

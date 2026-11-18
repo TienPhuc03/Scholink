@@ -19,6 +19,7 @@ export interface MqttPushOptions {
   username?: string;
   password?: string;
   timeoutMs: number;
+  createSocket?: (opts: { host: string; port: number }) => any;
 }
 
 /** MQTT topic of one user's push messages; userId must not contain topic wildcards/levels. */
@@ -94,6 +95,7 @@ export class MqttPushPublisher {
       username: options?.username ?? (process.env.MQTT_USERNAME || undefined),
       password: options?.password ?? (process.env.MQTT_PASSWORD || undefined),
       timeoutMs: options?.timeoutMs ?? 5000,
+      createSocket: options?.createSocket,
     };
   }
 
@@ -103,12 +105,12 @@ export class MqttPushPublisher {
   }
 
   publish(topic: string, payload: Buffer): Promise<void> {
-    const { host, port, username, password, timeoutMs } = this.options;
+    const { host, port, username, password, timeoutMs, createSocket } = this.options;
     const clientId = `scholink-noti-${randomBytes(6).toString('hex')}`;
     const packetId = 1 + Math.floor(Math.random() * 65534);
 
     return new Promise<void>((resolve, reject) => {
-      const socket = net.createConnection({ host, port });
+      const socket = (createSocket ?? net.createConnection)({ host, port });
       let buffer = Buffer.alloc(0);
       let settled = false;
 
