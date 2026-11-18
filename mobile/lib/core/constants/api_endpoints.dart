@@ -1,14 +1,22 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Centralized API Endpoints matching Scholink Gateway and Microservices routes.
 abstract final class ApiEndpoints {
-  // IP LAN of Mac for real iPhone testing over Wi-Fi (192.168.100.206)
-  static const String defaultBaseUrl = String.fromEnvironment(
-    'BACKEND_URL',
-    defaultValue: 'http://192.168.100.206:3000',
-  );
-  static const String mqttBrokerUri = String.fromEnvironment(
-    'MQTT_BROKER_URI',
-    defaultValue: '192.168.100.206',
-  );
+  static const String _envBackendUrl = String.fromEnvironment('BACKEND_URL');
+  static const String _envMqttBroker = String.fromEnvironment('MQTT_BROKER_URI');
+
+  static String get defaultBaseUrl {
+    if (_envBackendUrl.isNotEmpty) return _envBackendUrl;
+    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:3000';
+    return 'http://localhost:3000';
+  }
+
+  static String get mqttBrokerUri {
+    if (_envMqttBroker.isNotEmpty) return _envMqttBroker;
+    if (!kIsWeb && Platform.isAndroid) return '10.0.2.2';
+    return 'localhost';
+  }
   static const int mqttPort = 1883;
 
   // Identity Service routes

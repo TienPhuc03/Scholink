@@ -222,7 +222,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
                   builder: (BuildContext context) {
                     final bool isLargeText =
                         MediaQuery.textScalerOf(context).scale(1.0) > 1.25;
-                    final Widget titleText = const Text(
+                    const Widget titleText = Text(
                       'Cơ hội',
                       style: TextStyle(
                         fontSize: 18,
