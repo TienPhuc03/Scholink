@@ -1,5 +1,4 @@
-import * as net from 'net';
-import { AddressInfo } from 'net';
+import { EventEmitter } from 'events';
 import {
   MqttPushPublisher,
   buildConnect,
@@ -7,56 +6,81 @@ import {
   userPushTopic,
 } from './infrastructure/push/mqtt-push.publisher';
 
-/** Minimal MQTT 3.1.1 broker double: answers CONNACK and PUBACK, records PUBLISH packets. */
+/** Minimal MQTT 3.1.1 broker in-memory double: answers CONNACK and PUBACK, records PUBLISH packets. */
 function fakeBroker(opts: { connackCode?: number; ackPublish?: boolean } = {}) {
   const published: Array<{ topic: string; payload: string; qos: number }> = [];
   const connects: Buffer[] = [];
-  const server = net.createServer((sock) => {
-    let buf = Buffer.alloc(0);
-    sock.on('data', (chunk) => {
-      buf = Buffer.concat([buf, chunk]);
+  const port = 18830 + Math.floor(Math.random() * 1000);
+
+  const createSocket = ({ port: targetPort }: { host: string; port: number }) => {
+    const sock: any = new EventEmitter();
+    sock.destroyed = false;
+    sock.write = (chunk: Buffer) => {
+      let buf = chunk;
       for (;;) {
-        if (buf.length < 2) return;
+        if (buf.length < 2) return true;
         let len = 0;
         let mul = 1;
         let i = 1;
         let b: number;
         do {
-          if (i >= buf.length) return;
+          if (i >= buf.length) return true;
           b = buf[i++];
           len += (b & 0x7f) * mul;
           mul *= 128;
         } while (b & 0x80);
-        if (buf.length < i + len) return;
+        if (buf.length < i + len) return true;
         const header = buf[0];
         const body = buf.subarray(i, i + len);
         buf = buf.subarray(i + len);
         const type = header >> 4;
         if (type === 1) {
           connects.push(body);
-          sock.write(Buffer.from([0x20, 0x02, 0x00, opts.connackCode ?? 0]));
+          process.nextTick(() => {
+            if (!sock.destroyed) {
+              sock.emit('data', Buffer.from([0x20, 0x02, 0x00, opts.connackCode ?? 0]));
+            }
+          });
         } else if (type === 3) {
           const tlen = body.readUInt16BE(0);
           const topic = body.subarray(2, 2 + tlen).toString('utf8');
           const qos = (header >> 1) & 0x03;
           const id = body.readUInt16BE(2 + tlen);
           published.push({ topic, qos, payload: body.subarray(4 + tlen).toString('utf8') });
-          if (opts.ackPublish !== false) sock.write(Buffer.from([0x40, 0x02, id >> 8, id & 0xff]));
+          if (opts.ackPublish !== false) {
+            process.nextTick(() => {
+              if (!sock.destroyed) {
+                sock.emit('data', Buffer.from([0x40, 0x02, id >> 8, id & 0xff]));
+              }
+            });
+          }
         }
       }
-    });
+      return true;
+    };
+    sock.end = () => {
+      process.nextTick(() => sock.emit('close'));
+    };
+    sock.destroy = () => {
+      sock.destroyed = true;
+    };
+
+    if (targetPort === 1) {
+      process.nextTick(() => sock.emit('error', new Error('connect ECONNREFUSED 127.0.0.1:1')));
+    } else {
+      process.nextTick(() => sock.emit('connect'));
+    }
+
+    return sock;
+  };
+
+  return Promise.resolve({
+    port,
+    published,
+    connects,
+    createSocket,
+    close: () => {},
   });
-  return new Promise<{ port: number; published: typeof published; connects: Buffer[]; close: () => void }>(
-    (resolve) =>
-      server.listen(0, '127.0.0.1', () =>
-        resolve({
-          port: (server.address() as AddressInfo).port,
-          published,
-          connects,
-          close: () => server.close(),
-        }),
-      ),
-  );
 }
 
 const message = {
@@ -71,7 +95,12 @@ const message = {
 describe('MQTT push channel (F23/F29)', () => {
   it('publishes the reminder with QoS 1 on the user topic and waits for PUBACK', async () => {
     const broker = await fakeBroker();
-    const pub = new MqttPushPublisher({ host: '127.0.0.1', port: broker.port, timeoutMs: 2000 });
+    const pub = new MqttPushPublisher({
+      host: '127.0.0.1',
+      port: broker.port,
+      timeoutMs: 2000,
+      createSocket: broker.createSocket,
+    });
 
     await pub.publishToUser('usr_student_001', message);
 
@@ -90,6 +119,7 @@ describe('MQTT push channel (F23/F29)', () => {
       username: 'noti-svc',
       password: 's3cret',
       timeoutMs: 2000,
+      createSocket: broker.createSocket,
     });
     await pub.publishToUser('u1', message);
     const connect = broker.connects[0].toString('latin1');
@@ -101,18 +131,34 @@ describe('MQTT push channel (F23/F29)', () => {
   it('fails (so BullMQ retries) when the broker refuses, does not ack, or is down', async () => {
     const refusing = await fakeBroker({ connackCode: 5 });
     await expect(
-      new MqttPushPublisher({ host: '127.0.0.1', port: refusing.port, timeoutMs: 2000 }).publishToUser('u1', message),
+      new MqttPushPublisher({
+        host: '127.0.0.1',
+        port: refusing.port,
+        timeoutMs: 2000,
+        createSocket: refusing.createSocket,
+      }).publishToUser('u1', message),
     ).rejects.toThrow('CONNACK');
     refusing.close();
 
     const silent = await fakeBroker({ ackPublish: false });
     await expect(
-      new MqttPushPublisher({ host: '127.0.0.1', port: silent.port, timeoutMs: 300 }).publishToUser('u1', message),
+      new MqttPushPublisher({
+        host: '127.0.0.1',
+        port: silent.port,
+        timeoutMs: 300,
+        createSocket: silent.createSocket,
+      }).publishToUser('u1', message),
     ).rejects.toThrow('không phản hồi');
     silent.close();
 
+    const deadBroker = await fakeBroker();
     await expect(
-      new MqttPushPublisher({ host: '127.0.0.1', port: 1, timeoutMs: 2000 }).publishToUser('u1', message),
+      new MqttPushPublisher({
+        host: '127.0.0.1',
+        port: 1,
+        timeoutMs: 2000,
+        createSocket: deadBroker.createSocket,
+      }).publishToUser('u1', message),
     ).rejects.toThrow();
   });
 
