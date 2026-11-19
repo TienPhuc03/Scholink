@@ -4,6 +4,8 @@ import { IUserRepository } from '../../domain/ports/user.repository.port';
 import { IPassportRepository } from '../../domain/ports/passport.repository.port';
 import { CryptoService, DomainException, ErrorCode } from '@shared';
 import * as bcrypt from 'bcryptjs';
+import { User } from '../../domain/user.entity';
+import { VerifiedSocialIdentity } from '../../domain/ports/social-identity-verifier.port';
 
 describe('AuthUseCase Integration Test (Authentication & Security Rules)', () => {
   let authUseCase: AuthUseCase;
@@ -242,6 +244,81 @@ describe('AuthUseCase Integration Test (Authentication & Security Rules)', () =>
           purpose: 'VERIFY_EMAIL',
         }),
       ).rejects.toThrow(DomainException);
+    });
+  });
+
+  describe('Social login (FR-AUTH-02, Google/Facebook via Firebase)', () => {
+    const existing = (props: Partial<{ status: any; firebaseUid: string }> = {}) =>
+      new User('user_social_01', {
+        email: 'an@gmail.com',
+        passwordHash: 'x',
+        fullName: 'An',
+        role: 'STUDENT',
+        status: props.status ?? 'ACTIVE',
+        firebaseUid: props.firebaseUid,
+      });
+    const withIdentity = (identity: Partial<VerifiedSocialIdentity>) =>
+      new AuthUseCase(mockUserRepo, mockPassportRepo, jwtService, cryptoService, undefined, {
+        verify: jest.fn().mockResolvedValue({
+          uid: 'fb_uid_1',
+          email: 'an@gmail.com',
+          emailVerified: true,
+          name: 'Nguyen An',
+          provider: 'google.com',
+          ...identity,
+        }),
+      });
+    const idToken = { idToken: 'x'.repeat(40) };
+
+    it('creates an ACTIVE student with a passport for a new verified email', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const result = await withIdentity({}).socialLogin(idToken);
+      const saved = mockUserRepo.save.mock.calls[0][0] as User;
+      expect(saved.status).toBe('ACTIVE');
+      expect(saved.firebaseUid).toBe('fb_uid_1');
+      expect(saved.fullName).toBe('Nguyen An');
+      expect(mockPassportRepo.save).toHaveBeenCalledTimes(1);
+      expect(result.accessToken).toBeDefined();
+      expect(result.user.role).toBe('STUDENT');
+    });
+
+    it('keeps a new account PENDING_VERIFICATION when the provider did not verify the email', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const result = await withIdentity({ emailVerified: false, provider: 'facebook.com' }).socialLogin(idToken);
+      expect(result.user.status).toBe('PENDING_VERIFICATION');
+    });
+
+    it('links an existing account when the email is verified, and activates a pending one', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(existing({ status: 'PENDING_VERIFICATION' }));
+      const result = await withIdentity({}).socialLogin(idToken);
+      const updated = mockUserRepo.update.mock.calls[0][0] as User;
+      expect(updated.firebaseUid).toBe('fb_uid_1');
+      expect(result.user.status).toBe('ACTIVE');
+      expect(mockUserRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to take over an existing account with an unverified email', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(existing());
+      await expect(withIdentity({ emailVerified: false }).socialLogin(idToken)).rejects.toMatchObject({
+        code: ErrorCode.EMAIL_ALREADY_EXISTS,
+      });
+      expect(mockUserRepo.saveSession).not.toHaveBeenCalled();
+    });
+
+    it('lets an account already linked to this Firebase uid sign in even if the email is unverified', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(existing({ firebaseUid: 'fb_uid_1' }));
+      const result = await withIdentity({ emailVerified: false }).socialLogin(idToken);
+      expect(result.accessToken).toBeDefined();
+      expect(mockUserRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects blocked accounts, accounts without email, and a server without Firebase config', async () => {
+      mockUserRepo.findByEmail.mockResolvedValue(existing({ status: 'BLOCKED', firebaseUid: 'fb_uid_1' }));
+      await expect(withIdentity({}).socialLogin(idToken)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(withIdentity({ email: undefined }).socialLogin(idToken)).rejects.toMatchObject({
+        code: ErrorCode.VALIDATION_ERROR,
+      });
+      await expect(authUseCase.socialLogin(idToken)).rejects.toMatchObject({ statusCode: 503 });
     });
   });
 });

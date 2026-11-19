@@ -31,6 +31,9 @@ export class UserModel {
   @Prop()
   phone?: string;
 
+  @Prop({ index: true, sparse: true })
+  firebaseUid?: string;
+
   @Prop({ required: true, enum: ['STUDENT', 'ORGANIZER', 'ADMIN'], default: 'STUDENT', index: true })
   role: string;
 

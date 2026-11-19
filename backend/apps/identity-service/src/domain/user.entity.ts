@@ -11,6 +11,8 @@ export interface UserProps {
   readonly status: UserStatus;
   readonly fullName: string;
   readonly phone?: string;
+  /** FR-AUTH-02: Firebase account (Google/Facebook) linked to this user. */
+  readonly firebaseUid?: string;
   readonly sessionVersion?: number;
   readonly deletedAt?: Date;
   readonly createdAt?: Date;
@@ -80,6 +82,21 @@ export class User extends AggregateRoot<string> {
     return new User(this.id, {
       ...this._props,
       phone: trimmed.length > 0 ? trimmed : undefined,
+      version: this.version + 1,
+      updatedAt: new Date(),
+    });
+  }
+
+  get firebaseUid(): string | undefined {
+    return this._props.firebaseUid;
+  }
+
+  /** FR-AUTH-02: link a social sign-in; a provider-verified email also activates the account. */
+  public withFirebaseLink(firebaseUid: string, emailVerified: boolean): User {
+    return new User(this.id, {
+      ...this._props,
+      firebaseUid,
+      status: emailVerified && this._props.status === 'PENDING_VERIFICATION' ? 'ACTIVE' : this._props.status,
       version: this.version + 1,
       updatedAt: new Date(),
     });

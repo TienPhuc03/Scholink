@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import 'login_viewmodel.dart';
+import 'social_sign_in.dart';
 
 /// Flutter Login View faithfully implementing Figma Screen 202:5517 (Chào mừng bạn trở lại!)
 /// following Clean Architecture & MVVM with Defensive Null-Safety.
@@ -9,6 +10,7 @@ class LoginView extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
   /// Correct credentials on an account whose email is not verified yet (FR-AUTH-02).
+  /// [password] is empty when the account signed in with Google/Facebook.
   final void Function(String email, String password) onEmailNotVerified;
   final VoidCallback? onNavigateToRegister;
   final VoidCallback? onNavigateToGuest;
@@ -74,6 +76,55 @@ class _LoginViewState extends State<LoginView> {
       widget.onLoginSuccess();
     }
   }
+
+  Future<void> _handleSocialLogin(SocialProvider provider) async {
+    final bool success = await widget.viewModel.loginWithSocial(provider);
+    if (!mounted) return;
+    final AccountLinkRequired? link = widget.viewModel.linkRequired;
+    if (link != null) {
+      if (await _confirmLink(provider, link) && mounted) {
+        await _handleSocialLogin(link.existingProvider);
+      }
+      return;
+    }
+    if (!success) return;
+    final String email = widget.viewModel.currentUser?.email ?? '';
+    if (widget.viewModel.currentUser?.isPendingVerification == true) {
+      widget.onEmailNotVerified(email, '');
+    } else {
+      widget.onLoginSuccess();
+    }
+  }
+
+  /// FR-AUTH-02: one Scholink account per email, whichever provider the user picks.
+  Future<bool> _confirmLink(SocialProvider tried, AccountLinkRequired link) async {
+    final String existing = _providerName(link.existingProvider);
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Liên kết tài khoản'),
+        content: Text(
+          '${link.email} đã đăng nhập Scholink bằng $existing. '
+          'Tiếp tục với $existing một lần để liên kết ${_providerName(tried)}; '
+          'lần sau bạn đăng nhập bằng cách nào cũng vào cùng một tài khoản.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Để sau'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Tiếp tục với $existing'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  static String _providerName(SocialProvider p) =>
+      p == SocialProvider.google ? 'Google' : 'Facebook';
 
   void _fillPersona(String email, String password) {
     setState(() {
@@ -519,7 +570,7 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  /// Figma Node 202:5556 - Alternative Sign-in (Google OAuth)
+  /// Figma Node 202:5556 - Alternative Sign-in (Google / Facebook via Firebase, FR-AUTH-02)
   Widget _buildAlternativeSignIn(bool isLoading) {
     return Column(
       children: <Widget>[
@@ -532,51 +583,63 @@ class _LoginViewState extends State<LoginView> {
           ),
         ),
         const SizedBox(height: 10),
-        InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: isLoading
-              ? null
-              : () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Tính năng đăng nhập với Google (FR-AUTH-02)'),
-                    ),
-                  );
-                },
-          child: Container(
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.googleButtonBackground,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Tiếp tục với Google',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.1,
-                  ),
-                ),
-              ],
+        _socialButton(
+          label: 'Tiếp tục với Google',
+          icon: const Text(
+            'G',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
             ),
           ),
+          onTap: isLoading ? null : () => _handleSocialLogin(SocialProvider.google),
+        ),
+        const SizedBox(height: 8),
+        _socialButton(
+          label: 'Tiếp tục với Facebook',
+          icon: const Icon(Icons.facebook, size: 18, color: Color(0xFF1877F2)),
+          onTap:
+              isLoading ? null : () => _handleSocialLogin(SocialProvider.facebook),
         ),
       ],
+    );
+  }
+
+  Widget _socialButton(
+      {required String label, required Widget icon, VoidCallback? onTap}) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.googleButtonBackground,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.6),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              icon,
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

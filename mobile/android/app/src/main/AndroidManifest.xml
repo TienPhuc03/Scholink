@@ -22,6 +22,8 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
         </intent>
+        <!-- FR-AUTH-02: lets Facebook Login use the installed Facebook app. -->
+        <provider android:authorities="com.facebook.katana.provider.PlatformProvider" />
     </queries>
 
     <application
@@ -49,5 +51,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- FR-AUTH-02: Facebook Login (values in res/values/strings.xml). -->
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token" />
     </application>
 </manifest>

@@ -5,17 +5,21 @@ import '../../core/errors/result.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage_helper.dart';
 import 'auth_model.dart';
+import 'social_sign_in.dart';
 
 /// Single concrete Repository for Auth operations in MVVM + Repository pattern.
 class AuthRepository {
   final ApiClient _apiClient;
   final SecureStorageHelper _secureStorage;
+  final SocialSignIn? _socialSignIn;
 
   AuthRepository({
     required ApiClient apiClient,
     required SecureStorageHelper secureStorage,
+    SocialSignIn? socialSignIn,
   })  : _apiClient = apiClient,
-        _secureStorage = secureStorage;
+        _secureStorage = secureStorage,
+        _socialSignIn = socialSignIn;
 
   Future<Result<UserModel, Failure>> login({
     required String email,
@@ -42,37 +46,8 @@ class AuthRepository {
         },
       );
 
-      final Map<String, dynamic>? payload = _unwrap(response.data);
-      if (payload == null) {
-        return const FailureResult<UserModel, Failure>(
-          ServerFailure(message: 'Phản hồi xác thực từ máy chủ không hợp lệ.'),
-        );
-      }
-
-      final String? accessToken = payload['accessToken'] as String?;
-      final String? refreshToken = payload['refreshToken'] as String?;
-      final dynamic userMap = payload['user'];
-
-      if (accessToken == null || userMap is! Map<String, dynamic>) {
-        return const FailureResult<UserModel, Failure>(
-          ServerFailure(message: 'Thiếu token xác thực hoặc hồ sơ người dùng.'),
-        );
-      }
-
-      final UserModel user = UserModel.fromJson(userMap);
-
-      // FR-AUTH-02: no session is kept on the device until the email is verified.
-      if (user.isPendingVerification) {
-        return SuccessResult<UserModel, Failure>(user);
-      }
-
-      await _secureStorage.saveTokens(
-        accessToken: accessToken,
-        refreshToken: refreshToken ?? '',
-        userId: user.id,
-      );
-
-      return SuccessResult<UserModel, Failure>(user);
+      return SuccessResult<UserModel, Failure>(
+          await _storeSession(response.data));
     } on UnauthorizedFailure {
       // A 401 from login means wrong credentials; the client maps every 401 to "session expired".
       return const FailureResult<UserModel, Failure>(
@@ -87,6 +62,70 @@ class AuthRepository {
       return FailureResult<UserModel, Failure>(
           ServerFailure(message: e.toString()));
     }
+  }
+
+  /// FR-AUTH-02: Google/Facebook through Firebase, then the backend issues Scholink tokens.
+  /// Success with null means the user closed the provider dialog.
+  Future<Result<UserModel?, Failure>> loginWithSocial(SocialProvider provider) {
+    return _run<UserModel?>(() async {
+      final String? idToken = await _requireSocial().signIn(provider);
+      return idToken == null ? null : _exchangeSocialToken(idToken);
+    });
+  }
+
+  /// FR-AUTH-02: after the OTP step, signs in again with the Firebase user from [loginWithSocial].
+  Future<Result<UserModel, Failure>> resumeSocialLogin() {
+    return _run<UserModel>(() async {
+      final String? idToken = await _requireSocial().currentIdToken();
+      if (idToken == null) {
+        throw const ServerFailure(
+            message: 'Phiên Google/Facebook đã hết, vui lòng đăng nhập lại.');
+      }
+      return _exchangeSocialToken(idToken);
+    });
+  }
+
+  SocialSignIn _requireSocial() =>
+      _socialSignIn ??
+      (throw const ServerFailure(
+          message: 'Đăng nhập Google/Facebook chưa được hỗ trợ.'));
+
+  Future<UserModel> _exchangeSocialToken(String idToken) async {
+    final Response<dynamic> response = await _apiClient.post<dynamic>(
+      ApiEndpoints.socialLogin,
+      data: <String, dynamic>{'idToken': idToken},
+    );
+    return _storeSession(response.data);
+  }
+
+  /// Parses a login response and stores the tokens, except for unverified accounts.
+  Future<UserModel> _storeSession(dynamic data) async {
+    final Map<String, dynamic>? payload = _unwrap(data);
+    if (payload == null) {
+      throw const ServerFailure(
+          message: 'Phản hồi xác thực từ máy chủ không hợp lệ.');
+    }
+
+    final String? accessToken = payload['accessToken'] as String?;
+    final String? refreshToken = payload['refreshToken'] as String?;
+    final dynamic userMap = payload['user'];
+
+    if (accessToken == null || userMap is! Map<String, dynamic>) {
+      throw const ServerFailure(
+          message: 'Thiếu token xác thực hoặc hồ sơ người dùng.');
+    }
+
+    final UserModel user = UserModel.fromJson(userMap);
+
+    // FR-AUTH-02: no session is kept on the device until the email is verified.
+    if (user.isPendingVerification) return user;
+
+    await _secureStorage.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken ?? '',
+      userId: user.id,
+    );
+    return user;
   }
 
   /// FR-AUTH-02 / FR-AUTH-07: the server always assigns role STUDENT, so no role is sent.
@@ -185,6 +224,11 @@ class AuthRepository {
       }
     } catch (_) {
       // Session may already be expired or offline; local logout still proceeds.
+    }
+    try {
+      await _socialSignIn?.signOut();
+    } catch (_) {
+      // Next social login just shows the provider's account picker again.
     }
     try {
       await _secureStorage.clear();

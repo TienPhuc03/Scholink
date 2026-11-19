@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "607468820703",
+    "project_id": "scholink-platform",
+    "storage_bucket": "scholink-platform.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:607468820703:android:2c04f5080d70ada702f16a",
+        "android_client_info": {
+          "package_name": "com.scholink.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "607468820703-44ukorphugf8ndgufcjkn2gcm2an8ksi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.scholink.app",
+            "certificate_hash": "33ed23d9fa9f181709c4bf3e1b3973ad3cb1ab78"
+          }
+        },
+        {
+          "client_id": "607468820703-b4tiu9ob2agg1769a3e9tqbvvr2oglsa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAp6qFpNOQu1NyPROYItTuqwYufZ6-YDJ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "607468820703-b4tiu9ob2agg1769a3e9tqbvvr2oglsa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

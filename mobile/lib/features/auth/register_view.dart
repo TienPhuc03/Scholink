@@ -155,7 +155,10 @@ class _RegisterViewState extends State<RegisterView> {
             ),
 
             // Figma 202:5509 - Alternative sign-up
-            const AuthGoogleSection(caption: 'hoặc đăng ký bằng'),
+            AuthGoogleSection(
+              caption: 'hoặc đăng ký bằng Google / Facebook ở màn Đăng nhập',
+              onTap: widget.onNavigateToLogin,
+            ),
 
             // Figma 202:5514 - Back to login
             AuthLinkText(
