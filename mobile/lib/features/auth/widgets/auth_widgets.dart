@@ -382,11 +382,13 @@ class AuthPrimaryButton extends StatelessWidget {
 }
 
 /// Figma 202:5509 - "hoặc đăng ký bằng" + Google button.
-/// Google OAuth is deferred out of the 5-week MVP, so tapping explains that.
+/// Social sign-in lives on the login screen and creates the account on first use (FR-AUTH-02),
+/// so [onTap] goes there.
 class AuthGoogleSection extends StatelessWidget {
   final String caption;
+  final VoidCallback? onTap;
 
-  const AuthGoogleSection({super.key, required this.caption});
+  const AuthGoogleSection({super.key, required this.caption, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -408,13 +410,7 @@ class AuthGoogleSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('Đăng nhập bằng Google chưa có trong bản MVP.')),
-              );
-            },
+            onTap: onTap,
             child: const SizedBox(
               height: 42,
               child: Row(

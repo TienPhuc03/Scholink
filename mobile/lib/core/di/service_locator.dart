@@ -43,6 +43,7 @@ import '../../features/passport/passport_viewmodel.dart';
 // Feature 6: Notification & Calendar Sync (Tuần 3 - F20)
 import '../../features/notification/notification_repository.dart';
 import '../../features/notification/notification_viewmodel.dart';
+import '../../features/auth/social_sign_in.dart';
 import '../../features/notification/push_listener.dart';
 
 final GetIt sl = GetIt.instance;
@@ -59,6 +60,7 @@ Future<void> setupServiceLocator() async {
         secureStorage: secureStorage, sessionEvents: sessionEvents),
     mqttManager: MqttManagerImpl(),
     attachmentPicker: FileAttachmentPicker(),
+    socialSignIn: FirebaseSocialSignIn(),
   );
 }
 
@@ -71,6 +73,7 @@ void registerDependencies({
   required ApiClient apiClient,
   required MqttManager mqttManager,
   required AttachmentPicker attachmentPicker,
+  SocialSignIn? socialSignIn,
   // F29: device calendar + Android notification permission (fakes in tests).
   DeviceCalendar deviceCalendar = const MethodChannelDeviceServices(),
   NotificationPermission notificationPermission =
@@ -98,6 +101,7 @@ void registerDependencies({
     () => AuthRepository(
       apiClient: sl<ApiClient>(),
       secureStorage: sl<SecureStorageHelper>(),
+      socialSignIn: socialSignIn,
     ),
   );
 

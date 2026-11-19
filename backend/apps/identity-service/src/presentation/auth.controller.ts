@@ -4,6 +4,7 @@ import { AuthUseCase } from '../application/use-cases/auth.use-case';
 import {
   RegisterDto,
   LoginDto,
+  SocialLoginDto,
   RefreshTokenDto,
   SendOtpDto,
   VerifyOtpDto,
@@ -26,6 +27,11 @@ export class AuthController {
   @GrpcMethod('IdentityGrpcService', 'Login')
   async login(dto: LoginDto) {
     return this.authUseCase.login(dto);
+  }
+
+  @GrpcMethod('IdentityGrpcService', 'SocialLogin')
+  async socialLogin(dto: SocialLoginDto) {
+    return this.authUseCase.socialLogin(dto);
   }
 
   @GrpcMethod('IdentityGrpcService', 'Refresh')

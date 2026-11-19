@@ -21,6 +21,7 @@ abstract final class ApiEndpoints {
 
   // Identity Service routes
   static const String login = '/api/v1/auth/login';
+  static const String socialLogin = '/api/v1/auth/social';
   static const String register = '/api/v1/auth/register';
   static const String refreshToken = '/api/v1/auth/refresh';
   static const String logout = '/api/v1/auth/logout';

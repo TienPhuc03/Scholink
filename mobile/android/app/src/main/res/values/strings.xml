@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FR-AUTH-02: Facebook Login. Replace with the values from developers.facebook.com
+         (App settings > Basic: App ID; Advanced: Client token). -->
+    <string name="facebook_app_id">1459643436381130</string>
+    <string name="fb_login_protocol_scheme">fb1459643436381130</string>
+    <string name="facebook_client_token">cbd958b2a3193c546a44193a7db85e18</string>
+</resources>

@@ -55,8 +55,10 @@ class EmailVerificationViewModel extends OtpFlowViewModel {
       return false;
     }
 
-    final Result<UserModel, Failure> login =
-        await _repository.login(email: email, password: _password);
+    // An empty password means the account came from Google/Facebook sign-in.
+    final Result<UserModel, Failure> login = _password.isEmpty
+        ? await _repository.resumeSocialLogin()
+        : await _repository.login(email: email, password: _password);
     _password = '';
     return login.fold<bool>(
       onSuccess: (UserModel u) {

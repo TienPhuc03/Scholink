@@ -4,6 +4,7 @@ allowBuilds:
   esbuild: true
   keccak: true
   msgpackr-extract: false
+  '@firebase/util': false
 packages:
   - "apps/*"
   - "libs/*"
