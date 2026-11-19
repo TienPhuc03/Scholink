@@ -11,6 +11,10 @@ import {
 } from '../../domain/ports/user.repository.port';
 import { IPassportRepository, PASSPORT_REPOSITORY } from '../../domain/ports/passport.repository.port';
 import {
+  ISocialIdentityVerifier,
+  SOCIAL_IDENTITY_VERIFIER,
+} from '../../domain/ports/social-identity-verifier.port';
+import {
   OrganizationMembershipModel,
   OrganizationMembershipDocument,
 } from '../../infrastructure/persistence/organization.schema';
@@ -24,6 +28,7 @@ import {
 import {
   RegisterDto,
   LoginDto,
+  SocialLoginDto,
   RefreshTokenDto,
   SendOtpDto,
   VerifyOtpDto,
@@ -31,7 +36,7 @@ import {
   ResetPasswordDto,
   RequestAccountDeletionDto,
 } from '../dtos/auth.dto';
-import { DomainException, ErrorCode, CryptoService } from '@shared';
+import { DomainException, ErrorCode, CryptoService, sanitizePlainText } from '@shared';
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DELETION_RETENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -49,6 +54,9 @@ export class AuthUseCase {
     @Optional()
     @InjectModel(OrganizationMembershipModel.name)
     private readonly membershipModel?: Model<OrganizationMembershipDocument>,
+    @Optional()
+    @Inject(SOCIAL_IDENTITY_VERIFIER)
+    private readonly socialVerifier?: ISocialIdentityVerifier,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -72,17 +80,7 @@ export class AuthUseCase {
       status: 'PENDING_VERIFICATION',
     });
 
-    await this.userRepo.save(user);
-
-    const passport = new Passport(crypto.randomUUID(), {
-      studentId: userId,
-      profileVersion: 1,
-      fullName: user.fullName,
-      isLookingForTeammate: false,
-      isOpenForScholarship: false,
-      isOpenForMentoring: false,
-    });
-    await this.passportRepo.save(passport);
+    await this.saveNewStudent(user);
 
     return Object.freeze({
       userId: user.id,
@@ -107,29 +105,64 @@ export class AuthUseCase {
       throw new DomainException(ErrorCode.UNAUTHENTICATED, 'Email hoặc mật khẩu không đúng', 401);
     }
 
-    const familyId = crypto.randomUUID();
-    const tokens = await this.issueTokenPair(user, familyId);
+    return this.startSession(user);
+  }
 
-    // Look up active organization membership if user is an ORGANIZER (SCHOL-14)
-    let organizationId: string | undefined;
-    if (this.membershipModel && user.role === 'ORGANIZER') {
-      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
-      if (activeMem) {
-        organizationId = activeMem.organizationId;
+  /**
+   * FR-AUTH-02: Google/Facebook sign-in via Firebase. The account is matched by email, but an
+   * existing account is only linked when the provider verified that email (no takeover by email).
+   * A new account with an unverified email stays PENDING_VERIFICATION until the OTP step.
+   */
+  async socialLogin(dto: SocialLoginDto) {
+    if (!this.socialVerifier) {
+      throw new DomainException(
+        ErrorCode.UPSTREAM_UNAVAILABLE,
+        'Đăng nhập Google/Facebook chưa được cấu hình',
+        503,
+      );
+    }
+    const identity = await this.socialVerifier.verify(dto.idToken);
+    if (!identity.email) {
+      throw new DomainException(
+        ErrorCode.VALIDATION_ERROR,
+        'Tài khoản mạng xã hội không cung cấp email. Hãy cấp quyền email hoặc đăng ký bằng email',
+        400,
+      );
+    }
+    const normalizedEmail = identity.email.trim().toLowerCase();
+
+    let user = await this.userRepo.findByEmail(normalizedEmail);
+    if (!user) {
+      user = new User(crypto.randomUUID(), {
+        email: normalizedEmail,
+        normalizedEmail,
+        // Unknown random password: password login stays closed until the user sets one via forgot-password.
+        passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
+        fullName: sanitizePlainText(identity.name ?? '').slice(0, 100) || normalizedEmail.split('@')[0],
+        role: 'STUDENT',
+        status: identity.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION',
+        firebaseUid: identity.uid,
+      });
+      await this.saveNewStudent(user);
+    } else {
+      const linkedToThisAccount = user.firebaseUid === identity.uid;
+      if (!linkedToThisAccount && !identity.emailVerified) {
+        throw DomainException.conflict(
+          ErrorCode.EMAIL_ALREADY_EXISTS,
+          'Email này đã có tài khoản Scholink. Hãy đăng nhập bằng mật khẩu hoặc bằng Google',
+        );
+      }
+      if (!linkedToThisAccount || (identity.emailVerified && user.status === 'PENDING_VERIFICATION')) {
+        user = user.withFirebaseLink(identity.uid, identity.emailVerified);
+        await this.userRepo.update(user);
       }
     }
 
-    return Object.freeze({
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        status: user.status,
-        ...(organizationId ? { organizationId } : {}),
-      },
-    });
+    if (user.status === 'BLOCKED' || user.status === 'DELETED') {
+      throw DomainException.forbidden('Tài khoản đã bị khóa hoặc thu hồi quyền truy cập');
+    }
+
+    return this.startSession(user);
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -502,6 +535,45 @@ export class AuthUseCase {
       payloadJson: JSON.stringify(payload),
       payload,
       ledgerPreserved: true,
+    });
+  }
+
+  private async saveNewStudent(user: User): Promise<void> {
+    await this.userRepo.save(user);
+    const passport = new Passport(crypto.randomUUID(), {
+      studentId: user.id,
+      profileVersion: 1,
+      fullName: user.fullName,
+      isLookingForTeammate: false,
+      isOpenForScholarship: false,
+      isOpenForMentoring: false,
+    });
+    await this.passportRepo.save(passport);
+  }
+
+  /** New token family + the user summary returned by every login flow. */
+  private async startSession(user: User) {
+    const tokens = await this.issueTokenPair(user, crypto.randomUUID());
+
+    // Look up active organization membership if user is an ORGANIZER (SCHOL-14)
+    let organizationId: string | undefined;
+    if (this.membershipModel && user.role === 'ORGANIZER') {
+      const activeMem = await this.membershipModel.findOne({ userId: user.id, status: 'ACTIVE' }).exec();
+      if (activeMem) {
+        organizationId = activeMem.organizationId;
+      }
+    }
+
+    return Object.freeze({
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        status: user.status,
+        ...(organizationId ? { organizationId } : {}),
+      },
     });
   }
 

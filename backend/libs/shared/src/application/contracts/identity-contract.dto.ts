@@ -37,6 +37,13 @@ export const LoginDtoSchema = z.object({
 
 export type LoginDto = z.infer<typeof LoginDtoSchema>;
 
+/** FR-AUTH-02: Firebase ID token obtained after Google/Facebook sign-in on the client. */
+export const SocialLoginDtoSchema = z.object({
+  idToken: z.string().trim().min(20, 'ID token không hợp lệ').max(8192),
+});
+
+export type SocialLoginDto = z.infer<typeof SocialLoginDtoSchema>;
+
 export const RefreshTokenDtoSchema = z.object({
   refreshToken: z.string().min(10, 'Refresh token không hợp lệ'),
 });

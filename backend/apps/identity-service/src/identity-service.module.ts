@@ -41,6 +41,8 @@ import { PASSPORT_REPOSITORY } from './domain/ports/passport.repository.port';
 import { MongooseUserRepository } from './infrastructure/persistence/user.repository';
 import { MongoosePassportRepository } from './infrastructure/persistence/passport.repository';
 import { AuthUseCase } from './application/use-cases/auth.use-case';
+import { SOCIAL_IDENTITY_VERIFIER } from './domain/ports/social-identity-verifier.port';
+import { FirebaseIdentityVerifier } from './infrastructure/auth/firebase-identity-verifier';
 import { PassportUseCase } from './application/use-cases/passport.use-case';
 import { OrganizationUseCase } from './application/use-cases/organization.use-case';
 import { MediaUseCase } from './application/use-cases/media.use-case';
@@ -108,6 +110,10 @@ import { AdminOrganizationController } from './presentation/admin-organization.c
     {
       provide: PASSPORT_REPOSITORY,
       useClass: MongoosePassportRepository,
+    },
+    {
+      provide: SOCIAL_IDENTITY_VERIFIER,
+      useClass: FirebaseIdentityVerifier,
     },
   ],
   exports: [AuthUseCase, MediaUseCase, PassportUseCase, OrganizationUseCase, USER_REPOSITORY, PASSPORT_REPOSITORY],

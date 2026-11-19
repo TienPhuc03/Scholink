@@ -2,6 +2,7 @@ import { Observable } from 'rxjs';
 import {
   RegisterDto,
   LoginDto,
+  SocialLoginDto,
   RefreshTokenDto,
   SendOtpDto,
   VerifyOtpDto,
@@ -27,6 +28,7 @@ export const GATEWAY_OPPORTUNITY_GRPC = Symbol('GATEWAY_OPPORTUNITY_GRPC');
 export interface IdentityGrpcClient {
   register(data: RegisterDto): Observable<Record<string, unknown>>;
   login(data: LoginDto): Observable<Record<string, unknown>>;
+  socialLogin(data: SocialLoginDto): Observable<Record<string, unknown>>;
   refresh(data: RefreshTokenDto): Observable<Record<string, unknown>>;
   logout(data: { userId: string; sessionId?: string; familyId?: string }): Observable<Record<string, unknown>>;
   sendOtp(data: SendOtpDto): Observable<Record<string, unknown>>;

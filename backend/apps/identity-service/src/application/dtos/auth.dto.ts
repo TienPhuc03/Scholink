@@ -3,6 +3,8 @@ export {
   RegisterDto,
   LoginDtoSchema,
   LoginDto,
+  SocialLoginDtoSchema,
+  SocialLoginDto,
   RefreshTokenDtoSchema,
   RefreshTokenDto,
   OtpPurposeSchema,

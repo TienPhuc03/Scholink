@@ -23,6 +23,8 @@ import {
   RegisterDtoSchema,
   LoginDto,
   LoginDtoSchema,
+  SocialLoginDto,
+  SocialLoginDtoSchema,
   RefreshTokenDto,
   RefreshTokenDtoSchema,
   SendOtpDto,
@@ -86,6 +88,25 @@ export class GatewayAuthController implements OnModuleInit {
   @ApiResponse({ status: 200, description: 'Đăng nhập thành công' })
   async login(@Body(new ZodValidationPipe(LoginDtoSchema)) dto: LoginDto) {
     return firstValueFrom(this.identityService.login(dto));
+  }
+
+  @Public()
+  @Post('social')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'FR-AUTH-02: Đăng nhập Google/Facebook bằng Firebase ID token, trả về token Scholink',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { idToken: { type: 'string', example: 'eyJhbGciOiJSUzI1NiIsImtpZCI6...' } },
+      required: ['idToken'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Đăng nhập thành công (cùng dạng với /login)' })
+  @ApiResponse({ status: 409, description: 'Email đã có tài khoản nhưng nhà cung cấp chưa xác minh email' })
+  async socialLogin(@Body(new ZodValidationPipe(SocialLoginDtoSchema)) dto: SocialLoginDto) {
+    return firstValueFrom(this.identityService.socialLogin(dto));
   }
 
   @Public()
