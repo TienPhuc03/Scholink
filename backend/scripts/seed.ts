@@ -2123,6 +2123,29 @@ async function seedCollaboration(studentId: string) {
   const RoomCollab = collabConn.model('chat_rooms', chatRoomSchema);
   const MsgCollab = collabConn.model('messages', msgSchema);
 
+  const apexTeamId = 'team_apex_ai';
+  await TeamCollab.updateOne(
+    { id: apexTeamId },
+    {
+      $set: {
+        id: apexTeamId,
+        competitionId: 'opp_scholink_ai_challenge_2026',
+        name: 'APEX',
+        description: 'Tìm đồng đội có kinh nghiệm OpenCV, cùng giải quyết bài toán nhận diện hình ảnh. Tuyển: OpenCV • Thị giác máy tính',
+        leaderId: 'usr_student_002',
+        minSize: 2,
+        maxSize: 4,
+        status: 'FORMING',
+        members: [
+          { studentId: 'usr_student_002', role: 'LEADER', joinedAt: new Date() },
+        ],
+        rosterVersion: 1,
+        fencingToken: 0,
+      },
+    },
+    { upsert: true },
+  );
+
   const teamId = 'team_bk_ai_innovators';
   await TeamCollab.updateOne(
     { id: teamId },
@@ -2134,10 +2157,34 @@ async function seedCollaboration(studentId: string) {
         description: 'Đội thi Đại học Bách Khoa tham gia giải quyết bài toán thị giác máy tính',
         leaderId: studentId,
         minSize: 2,
-        maxSize: 2,
+        maxSize: 4,
         status: 'FORMING',
         members: [
           { studentId, role: 'LEADER', joinedAt: new Date() },
+        ],
+        rosterVersion: 1,
+        fencingToken: 0,
+      },
+    },
+    { upsert: true },
+  );
+
+  const visionTeamId = 'team_vision_x';
+  await TeamCollab.updateOne(
+    { id: visionTeamId },
+    {
+      $set: {
+        id: visionTeamId,
+        competitionId: 'opp_scholink_ai_challenge_2026',
+        name: 'VisionX Lab',
+        description: 'Phát triển mô hình Deep Learning xử lý ảnh y tế và Edge AI.',
+        leaderId: 'usr_student_003',
+        minSize: 2,
+        maxSize: 4,
+        status: 'FORMING',
+        members: [
+          { studentId: 'usr_student_003', role: 'LEADER', joinedAt: new Date() },
+          { studentId: 'usr_student_004', role: 'MEMBER', joinedAt: new Date() },
         ],
         rosterVersion: 1,
         fencingToken: 0,

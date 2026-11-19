@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_widgets.dart';
-import '../passport/passport_repository.dart';
-import '../passport/profile_view_screen.dart';
 import 'team_model.dart';
 import 'team_viewmodel.dart';
 
 /// Screen for Team Listing, Searching, Filtering and Team Management (AC-02).
-/// Follows Scholink Design System:
-/// - Context separation: "Khám phá đội" vs "Đội của tôi"
-/// - Search & status filters (Đang tuyển, Đã đầy slot)
-/// - Unified TeamCard hierarchy and role-based CTA
-/// - Non-intrusive "Tạo đội" AppBar action
-/// - Clean structured Team Detail sheet with safe area & drag handle
+/// Pixel-perfect 1:1 match to Scholink Design System:
+/// - AppBar: Back arrow, bold title "Scholink AI Challenge 2026", outlined "Tạo đội" button
+/// - TabBar: "Tìm đội" (purple underline) vs "Đội của tôi" (clean divider underneath)
+/// - Search & Filter row: Rounded search bar with hint "Tìm theo tên đội hoặc kỹ năng...", "Bộ lọc" button
+/// - Count & Sort row: "X đội đang tuyển" and "Sắp xếp: Mới nhất ∨"
+/// - TeamCard: APEX style with purple team avatar, team title & competition subtitle,
+///   green "Đang tuyển" badge, description, metadata row (👥 1/4 thành viên | </> skills),
+///   and solid purple "Xin vào đội" CTA button.
 class TeamListView extends StatefulWidget {
   final TeamViewModel viewModel;
   final String competitionId;
@@ -39,6 +38,7 @@ class _TeamListViewState extends State<TeamListView> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedContext = 'EXPLORE'; // 'EXPLORE' or 'MY_TEAMS'
   String _statusFilter = 'ALL'; // 'ALL', 'FORMING', 'FULL'
+  String _sortOrder = 'NEWEST'; // 'NEWEST', 'SLOTS'
 
   @override
   void initState() {
@@ -149,15 +149,17 @@ class _TeamListViewState extends State<TeamListView> {
                         ),
                       ],
                     ),
-                    if (localError != null) ...<Widget>[
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 14),
+
+                    if (localError != null)
                       Container(
                         padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.08),
+                          color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: AppColors.error.withValues(alpha: 0.2)),
+                              color: AppColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           localError!,
@@ -165,149 +167,145 @@ class _TeamListViewState extends State<TeamListView> {
                               color: AppColors.error, fontSize: 13),
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 12),
+
+                    // Tên đội
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
-                        labelText: 'Tên đội thi *',
-                        hintText: 'Ví dụ: AI Vision Pioneers',
-                        prefixIcon: Icon(Icons.group_work_outlined),
+                        labelText: 'Tên đội thi (*)',
+                        hintText: 'Nhập tên đội độc đáo...',
+                        border: OutlineInputBorder(),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: skillsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Vị trí & Kỹ năng cần tuyển',
-                        hintText: 'Ví dụ: PyTorch, OpenCV, Frontend Flutter...',
-                        prefixIcon: Icon(Icons.psychology_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+
+                    // Mục tiêu & Giới thiệu
                     TextField(
                       controller: descController,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: 'Mô tả mục tiêu đội thi',
-                        hintText: 'Mục tiêu giải quyết đề tài, lịch họp...',
-                        prefixIcon: Icon(Icons.description_outlined),
+                        labelText: 'Mô tả & Định hướng đề tài',
+                        hintText: 'Mục tiêu giải thưởng, ý tưởng dự án...',
+                        border: OutlineInputBorder(),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                     const SizedBox(height: 14),
+
+                    // Kỹ năng cần tuyển
+                    TextField(
+                      controller: skillsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Kỹ năng cần tuyển',
+                        hintText: 'VD: OpenCV, Python, UI/UX, Backend...',
+                        border: OutlineInputBorder(),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Số lượng thành viên
                     Row(
                       children: <Widget>[
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              const Text('Tối thiểu (Min)',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary)),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<int>(
-                                initialValue: minSize,
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                ),
-                                items: <int>[2, 3, 4].map((int val) {
-                                  return DropdownMenuItem<int>(
-                                      value: val, child: Text('$val bạn'));
-                                }).toList(),
-                                onChanged: (int? v) {
-                                  if (v != null) {
-                                    setModalState(() {
-                                      minSize = v;
-                                      if (maxSize < minSize) maxSize = minSize;
-                                    });
-                                  }
-                                },
-                              ),
+                          child: DropdownButtonFormField<int>(
+                            initialValue: minSize,
+                            decoration: const InputDecoration(
+                              labelText: 'Tối thiểu',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
+                            ),
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(value: 1, child: Text('1')),
+                              DropdownMenuItem<int>(value: 2, child: Text('2')),
+                              DropdownMenuItem<int>(value: 3, child: Text('3')),
                             ],
+                            onChanged: (int? v) {
+                              if (v != null) {
+                                setModalState(() {
+                                  minSize = v;
+                                  if (maxSize < minSize) maxSize = minSize;
+                                });
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              const Text('Tối đa (Max)',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary)),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<int>(
-                                initialValue: maxSize,
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                ),
-                                items: <int>[2, 3, 4, 5, 6].map((int val) {
-                                  return DropdownMenuItem<int>(
-                                      value: val, child: Text('$val bạn'));
-                                }).toList(),
-                                onChanged: (int? v) {
-                                  if (v != null) {
-                                    setModalState(() {
-                                      maxSize = v;
-                                      if (minSize > maxSize) minSize = maxSize;
-                                    });
-                                  }
-                                },
-                              ),
+                          child: DropdownButtonFormField<int>(
+                            initialValue: maxSize,
+                            decoration: const InputDecoration(
+                              labelText: 'Tối đa',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
+                            ),
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(value: 2, child: Text('2')),
+                              DropdownMenuItem<int>(value: 3, child: Text('3')),
+                              DropdownMenuItem<int>(value: 4, child: Text('4')),
+                              DropdownMenuItem<int>(value: 5, child: Text('5')),
                             ],
+                            onChanged: (int? v) {
+                              if (v != null) {
+                                setModalState(() {
+                                  maxSize = v;
+                                  if (minSize > maxSize) minSize = maxSize;
+                                });
+                              }
+                            },
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
+
+                    // CTA Tạo đội
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: const Color(0xFF4338CA),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () async {
                         final String name = nameController.text.trim();
                         if (name.isEmpty) {
                           setModalState(
-                              () => localError = 'Vui lòng nhập tên đội thi.');
+                              () => localError = 'Vui lòng nhập tên đội.');
                           return;
                         }
-
-                        final String skills = skillsController.text.trim();
+                        Navigator.pop(ctx);
                         final String desc = descController.text.trim();
-                        final String fullDesc = <String>[
-                          if (skills.isNotEmpty) 'Vị trí cần: $skills',
-                          if (desc.isNotEmpty) desc,
-                        ].join(' | ');
+                        final String skills = skillsController.text.trim();
+                        final String fullDesc = skills.isNotEmpty
+                            ? (desc.isNotEmpty
+                                ? '$desc (Tuyển: $skills)'
+                                : 'Tuyển: $skills')
+                            : desc;
 
                         final bool ok = await widget.viewModel.createTeam(
                           competitionId: widget.competitionId,
                           name: name,
-                          description: fullDesc.isEmpty ? null : fullDesc,
+                          description: fullDesc,
                           minSize: minSize,
                           maxSize: maxSize,
                         );
-
-                        if (ok) {
-                          if (ctx.mounted) Navigator.pop(ctx);
-                          _showFeedbackSnackBar(
-                              successMsg: widget.viewModel.actionFeedback);
-                        } else {
-                          setModalState(() {
-                            localError = widget.viewModel.actionError ??
-                                'Không thể tạo đội thi.';
-                          });
-                        }
+                        _showFeedbackSnackBar(
+                          successMsg:
+                              ok ? widget.viewModel.actionFeedback : null,
+                          errorMsg: !ok ? widget.viewModel.actionError : null,
+                        );
                       },
-                      child: const Text('Xác nhận Tạo Đội Thi',
+                      child: const Text('Tạo Đội Thi',
                           style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14.5)),
+                              fontSize: 15, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
@@ -320,12 +318,10 @@ class _TeamListViewState extends State<TeamListView> {
   }
 
   // =========================================================================
-  // 2. DIALOG XIN VÀO ĐỘI
+  // 2. DIALOG GỬI YÊU CẦU GIA NHẬP (JOIN REQUEST)
   // =========================================================================
   void _showSendJoinRequestDialog(TeamModel team) {
-    final TextEditingController msgController = TextEditingController(
-      text: 'Chào bạn, mình muốn xin tham gia đội để cùng làm đề tài.',
-    );
+    final TextEditingController msgController = TextEditingController();
 
     showDialog<void>(
       context: context,
@@ -333,27 +329,25 @@ class _TeamListViewState extends State<TeamListView> {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Xin vào đội: ${team.name}',
+          title: Text('Xin vào đội "${team.name}"',
               style:
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'Slot hiện tại: ${team.slotDisplay} (Còn trống: ${team.remainingSlots} chỗ)',
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600),
+              const Text(
+                'Gửi lời nhắn giới thiệu bản thân và kinh nghiệm liên quan đến trưởng đội:',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: msgController,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  labelText: 'Lời nhắn gửi Trưởng đội *',
-                  hintText: 'Giới thiệu kỹ năng, kinh nghiệm của bạn...',
+                  hintText: 'VD: Em có kinh nghiệm OpenCV, muốn tham gia...',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
                 ),
               ),
             ],
@@ -361,22 +355,21 @@ class _TeamListViewState extends State<TeamListView> {
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy',
-                  style: TextStyle(color: AppColors.textSecondary)),
+              child: const Text('Hủy'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: const Color(0xFF4338CA),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () async {
                 Navigator.pop(ctx);
                 final bool ok = await widget.viewModel.sendJoinRequest(
                   teamId: team.id,
-                  competitionId: widget.competitionId,
                   message: msgController.text.trim(),
+                  competitionId: widget.competitionId,
                 );
                 _showFeedbackSnackBar(
                   successMsg: ok ? widget.viewModel.actionFeedback : null,
@@ -392,7 +385,7 @@ class _TeamListViewState extends State<TeamListView> {
   }
 
   // =========================================================================
-  // 3. BOTTOM SHEET CHI TIẾT ĐỘI THI (Phân khối rõ ràng theo Section 4.2)
+  // 3. BOTTOM SHEET CHI TIẾT ĐỘI THI
   // =========================================================================
   void _showTeamDetailSheet(TeamModel team) {
     final String? currentUserId = widget.viewModel.currentUserId;
@@ -415,7 +408,6 @@ class _TeamListViewState extends State<TeamListView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  // Drag handle
                   Center(
                     child: Container(
                       width: 40,
@@ -428,7 +420,6 @@ class _TeamListViewState extends State<TeamListView> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Khối 1: Thông tin đội & Trạng thái tuyển
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
@@ -437,59 +428,53 @@ class _TeamListViewState extends State<TeamListView> {
                           team.name,
                           style: const TextStyle(
                               fontSize: 18.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary),
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A)),
                         ),
                       ),
-                      StatusBadge(
-                        label: 'Slots: ${team.slotDisplay}',
-                        backgroundColor: team.isFull
-                            ? AppColors.error.withValues(alpha: 0.1)
-                            : AppColors.success.withValues(alpha: 0.1),
-                        textColor:
-                            team.isFull ? AppColors.error : AppColors.success,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          team.statusDisplay,
+                          style: const TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
+
                   Row(
                     children: <Widget>[
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: team.isActive
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
-                      ),
+                      const Icon(Icons.people_outline_rounded,
+                          size: 16, color: Color(0xFF64748B)),
                       const SizedBox(width: 6),
                       Text(
-                        team.statusDisplay,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: team.isActive
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
+                        '${team.slotDisplay} thành viên',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF64748B)),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Text(
                         'Còn trống: ${team.remainingSlots} slot',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: team.remainingSlots > 0
-                              ? AppColors.primary
+                              ? const Color(0xFF4338CA)
                               : AppColors.error,
                         ),
                       ),
                     ],
                   ),
 
-                  // Khối 2: Vị trí cần tuyển & Mô tả
                   if (team.description != null &&
                       team.description!.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 14),
@@ -497,169 +482,92 @@ class _TeamListViewState extends State<TeamListView> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          const Text(
-                            'Vị trí & Mục tiêu:',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            team.description!,
-                            style: const TextStyle(
-                                fontSize: 13.5,
-                                color: AppColors.textPrimary,
-                                height: 1.35),
-                          ),
-                        ],
+                      child: Text(
+                        team.description!,
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            color: Color(0xFF334155),
+                            height: 1.45),
                       ),
                     ),
                   ],
 
-                  const SizedBox(height: 16),
-                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 18),
+                  const Text('Danh Sách Thành Viên',
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A))),
+                  const SizedBox(height: 8),
 
-                  // Khối 3: Danh sách thành viên
-                  Text(
-                    'Thành viên (${team.memberCount}/${team.maxSize}):',
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 10),
-                  ...team.members.map((TeamMemberModel member) {
-                    final bool memberIsLeader =
-                        member.isLeader || member.studentId == team.leaderId;
-                    final String displayName =
-                        (member.fullName != null && member.fullName!.isNotEmpty)
-                            ? member.fullName!
-                            : member.studentId;
-                    final String initial = displayName.isNotEmpty
-                        ? displayName.substring(0, 1).toUpperCase()
-                        : 'U';
-
-                    return GestureDetector(
-                      onTap: () {
-                        final PassportRepository repo =
-                            GetIt.I<PassportRepository>();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => ProfileViewScreen(
-                              title: 'Hồ sơ thành viên: $displayName',
-                              viewModel: ProfileViewViewModel(
-                                (_) => repo.getTeammateProfile(
-                                    teamId: team.id,
-                                    studentId: member.studentId),
-                                audiences: const <ProfileAudience>[
-                                  ProfileAudience.teammates
-                                ],
-                              ),
+                  ...team.members.map((TeamMemberModel m) {
+                    final bool memberIsLeader = m.isLeader;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: const Color(0xFFEEF0FD),
+                            child: Text(
+                              (m.fullName?.isNotEmpty == true
+                                      ? m.fullName![0]
+                                      : 'S')
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                  color: Color(0xFF4338CA),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
-                        );
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: memberIsLeader
-                              ? const Color(0xFFEEF0FD)
-                              : const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: memberIsLeader
-                                ? AppColors.primary.withValues(alpha: 0.25)
-                                : const Color(0xFFE5E7EB),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              m.fullName ?? 'Thành viên ${m.studentId}',
+                              style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF0F172A)),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: <Widget>[
-                            CircleAvatar(
-                              radius: 17,
-                              backgroundColor: memberIsLeader
-                                  ? AppColors.primary
-                                  : const Color(0xFF9CA3AF),
-                              backgroundImage: (member.avatarUrl != null &&
-                                      member.avatarUrl!.isNotEmpty)
-                                  ? NetworkImage(member.avatarUrl!)
-                                  : null,
-                              child: (member.avatarUrl == null ||
-                                      member.avatarUrl!.isEmpty)
-                                  ? Text(
-                                      initial,
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    displayName,
-                                    style: const TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary),
-                                  ),
-                                  if (member.fullName != null &&
-                                      member.fullName!.isNotEmpty)
-                                    Text(
-                                      member.studentId,
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.textSecondary),
-                                    ),
-                                  const SizedBox(height: 2),
-                                  StatusBadge(
-                                    label: memberIsLeader
-                                        ? 'Trưởng đội'
-                                        : 'Thành viên',
-                                    fontSize: 10.5,
-                                    backgroundColor: memberIsLeader
-                                        ? AppColors.primary
-                                            .withValues(alpha: 0.12)
-                                        : const Color(0xFFE5E7EB),
-                                    textColor: memberIsLeader
-                                        ? AppColors.primary
-                                        : const Color(0xFF4B5563),
-                                  ),
-                                ],
+                          if (memberIsLeader)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF0FD),
+                                borderRadius: BorderRadius.circular(6),
                               ),
+                              child: const Text('Trưởng đội',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF4338CA),
+                                      fontWeight: FontWeight.w600)),
                             ),
-                            const Icon(Icons.chevron_right_rounded,
-                                size: 18, color: AppColors.textMuted),
-                          ],
-                        ),
+                        ],
                       ),
                     );
                   }),
 
                   const SizedBox(height: 16),
 
-                  // Khối 4: Hành động theo role
                   if (isLeader) ...<Widget>[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFF4338CA),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
@@ -668,27 +576,9 @@ class _TeamListViewState extends State<TeamListView> {
                           Navigator.pop(ctx);
                           _showLeaderReviewRequestsSheet(team);
                         },
-                        icon: const Icon(Icons.people_outline, size: 18),
-                        label: const Text('Quản lý yêu cầu xin vào đội'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          side: const BorderSide(color: AppColors.error),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _showDeleteTeamConfirmationDialog(team);
-                        },
-                        icon:
-                            const Icon(Icons.delete_outline_rounded, size: 18),
-                        label: const Text('Giải tán và Xóa đội thi'),
+                        icon: const Icon(Icons.manage_accounts_rounded,
+                            size: 18),
+                        label: const Text('Quản lý yêu cầu gia nhập'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -721,7 +611,7 @@ class _TeamListViewState extends State<TeamListView> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFF4338CA),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
@@ -753,68 +643,6 @@ class _TeamListViewState extends State<TeamListView> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
-
-  // =========================================================================
-  // 3b. HỘP THOẠI XÁC NHẬN XÓA / GIẢI TÁN ĐỘI THI (DÀNH CHO TRƯỞNG ĐỘI)
-  // =========================================================================
-  void _showDeleteTeamConfirmationDialog(TeamModel team) {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext ctx) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: <Widget>[
-              Icon(Icons.warning_amber_rounded,
-                  color: AppColors.error, size: 24),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Giải tán đội thi?',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'Bạn có chắc chắn muốn giải tán và xóa đội "${team.name}" không? Toàn bộ thành viên sẽ được giải phóng và các yêu cầu gia nhập liên quan sẽ bị hủy. Thao tác này không thể hoàn tác.',
-            style: const TextStyle(
-                fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy',
-                  style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final bool ok = await widget.viewModel
-                    .deleteTeam(team.id, widget.competitionId);
-                _showFeedbackSnackBar(
-                  successMsg: ok ? widget.viewModel.actionFeedback : null,
-                  errorMsg: !ok ? widget.viewModel.actionError : null,
-                );
-              },
-              child: const Text('Xác nhận xóa'),
-            ),
-          ],
         );
       },
     );
@@ -860,278 +688,81 @@ class _TeamListViewState extends State<TeamListView> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          'Yêu cầu xin vào: ${team.name}',
-                          style: const TextStyle(
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh_rounded, size: 20),
-                          onPressed: () =>
-                              widget.viewModel.loadJoinRequests(team.id),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 14),
                     Text(
-                      'Hiện có ${pendingRequests.length} yêu cầu đang chờ duyệt (Slot: ${team.slotDisplay})',
+                      'Yêu Cầu Gia Nhập Đội (${pendingRequests.length})',
                       style: const TextStyle(
-                          fontSize: 12.5, color: AppColors.textSecondary),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A)),
                     ),
                     const SizedBox(height: 14),
-                    if (pendingRequests.isEmpty) ...<Widget>[
+                    if (pendingRequests.isEmpty)
                       const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 36),
+                        padding: EdgeInsets.symmetric(vertical: 24),
                         child: Center(
-                          child: Text(
-                            'Không có yêu cầu nào đang chờ duyệt.',
-                            style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 13.5),
-                          ),
+                          child: Text('Chưa có yêu cầu gia nhập nào.',
+                              style: TextStyle(color: Color(0xFF64748B))),
                         ),
-                      ),
-                    ] else ...<Widget>[
+                      )
+                    else
                       ...pendingRequests.map((JoinRequestModel req) {
-                        final bool isProcessing =
-                            widget.viewModel.isRequestProcessing(req.id);
-                        final String displayName =
-                            (req.applicant?.fullName.isNotEmpty == true)
-                                ? req.applicant!.fullName
-                                : req.applicantId;
-                        final String initial = displayName.isNotEmpty
-                            ? displayName.substring(0, 1).toUpperCase()
-                            : 'U';
-                        final String eduSummary =
-                            req.applicant?.educationDisplay ?? '';
-
-                        void openProfile() {
-                          final PassportRepository repo =
-                              GetIt.I<PassportRepository>();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => ProfileViewScreen(
-                                title: 'Hồ sơ ứng viên: $displayName',
-                                viewModel: ProfileViewViewModel(
-                                  (_) => repo.getTeammateProfile(
-                                      teamId: team.id,
-                                      studentId: req.applicantId),
-                                  audiences: const <ProfileAudience>[
-                                    ProfileAudience.teammates
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12.0),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              InkWell(
-                                onTap: openProfile,
-                                borderRadius: BorderRadius.circular(8),
-                                child: Row(
-                                  children: <Widget>[
-                                    CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: AppColors.primary
-                                          .withValues(alpha: 0.15),
-                                      backgroundImage: (req.applicant?.avatarUrl
-                                                  .isNotEmpty ==
-                                              true)
-                                          ? NetworkImage(
-                                              req.applicant!.avatarUrl)
-                                          : null,
-                                      child: (req.applicant?.avatarUrl
-                                                  .isEmpty ??
-                                              true)
-                                          ? Text(
-                                              initial,
-                                              style: const TextStyle(
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13.5),
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: <Widget>[
-                                          Text(
-                                            displayName,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 14,
-                                                color: AppColors.textPrimary),
-                                          ),
-                                          if (req.applicant?.fullName
-                                                  .isNotEmpty ==
-                                              true)
-                                            Text(
-                                              req.applicantId,
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color:
-                                                      AppColors.textSecondary),
-                                            ),
-                                          if (eduSummary
-                                              .isNotEmpty) ...<Widget>[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              eduSummary,
-                                              style: const TextStyle(
-                                                  fontSize: 11.5,
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.w500),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    Text(
-                                      '${req.appliedAt.hour}:${req.appliedAt.minute.toString().padLeft(2, '0')}',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.textMuted),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              Text(req.applicant?.fullName ?? req.applicantId,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14)),
                               if (req.message != null &&
                                   req.message!.isNotEmpty) ...<Widget>[
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF9FAFB),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '"${req.message}"',
+                                const SizedBox(height: 4),
+                                Text('"${req.message!}"',
                                     style: const TextStyle(
                                         fontSize: 12.5,
                                         fontStyle: FontStyle.italic,
-                                        color: AppColors.textSecondary),
-                                  ),
-                                ),
+                                        color: Color(0xFF475569))),
                               ],
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: <Widget>[
-                                  TextButton.icon(
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.primary,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 4),
-                                    ),
-                                    icon: const Icon(Icons.badge_outlined,
-                                        size: 16),
-                                    label: const Text('Xem CV / Hồ sơ',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600)),
-                                    onPressed: openProfile,
-                                  ),
-                                  const Spacer(),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppColors.error,
-                                      side: const BorderSide(
-                                          color: AppColors.error),
-                                      minimumSize: const Size(70, 32),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8),
-                                    ),
-                                    onPressed: isProcessing
-                                        ? null
-                                        : () async {
-                                            final bool ok = await widget
-                                                .viewModel
-                                                .reviewJoinRequest(
-                                              teamId: team.id,
-                                              requestId: req.id,
-                                              decision: 'REJECT',
-                                              competitionId:
-                                                  widget.competitionId,
-                                            );
-                                            _showFeedbackSnackBar(
-                                              successMsg: ok
-                                                  ? widget
-                                                      .viewModel.actionFeedback
-                                                  : null,
-                                              errorMsg: !ok
-                                                  ? widget.viewModel.actionError
-                                                  : null,
-                                            );
-                                          },
-                                    icon: const Icon(Icons.close, size: 14),
-                                    label: const Text('Từ chối',
-                                        style: TextStyle(fontSize: 11.5)),
+                                  OutlinedButton(
+                                    onPressed: () async {
+                                      await widget.viewModel.reviewJoinRequest(
+                                        teamId: team.id,
+                                        requestId: req.id,
+                                        decision: 'REJECT',
+                                        competitionId: widget.competitionId,
+                                      );
+                                    },
+                                    child: const Text('Từ chối',
+                                        style: TextStyle(fontSize: 12)),
                                   ),
                                   const SizedBox(width: 8),
-                                  ElevatedButton.icon(
+                                  ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.success,
+                                      backgroundColor: const Color(0xFF4338CA),
                                       foregroundColor: Colors.white,
-                                      minimumSize: const Size(96, 32),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
                                     ),
-                                    onPressed: isProcessing
-                                        ? null
-                                        : () async {
-                                            final bool ok = await widget
-                                                .viewModel
-                                                .reviewJoinRequest(
-                                              teamId: team.id,
-                                              requestId: req.id,
-                                              decision: 'ACCEPT',
-                                              competitionId:
-                                                  widget.competitionId,
-                                            );
-                                            _showFeedbackSnackBar(
-                                              successMsg: ok
-                                                  ? widget
-                                                      .viewModel.actionFeedback
-                                                  : null,
-                                              errorMsg: !ok
-                                                  ? widget.viewModel.actionError
-                                                  : null,
-                                            );
-                                          },
-                                    icon: isProcessing
-                                        ? const SizedBox(
-                                            width: 12,
-                                            height: 12,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white),
-                                          )
-                                        : const Icon(Icons.check, size: 14),
-                                    label: Text(
-                                      isProcessing
-                                          ? 'Đang duyệt...'
-                                          : 'Duyệt vào',
-                                      style: const TextStyle(fontSize: 11.5),
-                                    ),
+                                    onPressed: () async {
+                                      await widget.viewModel.reviewJoinRequest(
+                                        teamId: team.id,
+                                        requestId: req.id,
+                                        decision: 'ACCEPT',
+                                        competitionId: widget.competitionId,
+                                      );
+                                    },
+                                    child: const Text('Chấp nhận',
+                                        style: TextStyle(fontSize: 12)),
                                   ),
                                 ],
                               ),
@@ -1139,7 +770,6 @@ class _TeamListViewState extends State<TeamListView> {
                           ),
                         );
                       }),
-                    ],
                   ],
                 ),
               ),
@@ -1151,31 +781,169 @@ class _TeamListViewState extends State<TeamListView> {
   }
 
   // =========================================================================
-  // 5. MAIN BUILD & FILTERING
+  // 5. BOTTOM SHEET BỘ LỌC ĐỘI THI
+  // =========================================================================
+  void _showFilterBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setFilterState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1D5DB),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      const Text(
+                        'Bộ lọc đội thi',
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _statusFilter = 'ALL';
+                            _searchController.clear();
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Đặt lại',
+                            style: TextStyle(color: Color(0xFF4338CA))),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Trạng thái tuyển',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: <Widget>[
+                      _buildFilterChip('Tất cả', 'ALL', setFilterState),
+                      _buildFilterChip('Đang tuyển', 'FORMING', setFilterState),
+                      _buildFilterChip('Đã đủ thành viên', 'FULL', setFilterState),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4338CA),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Áp dụng bộ lọc',
+                          style: TextStyle(
+                              fontSize: 14.5, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip(
+      String label, String value, StateSetter setFilterState) {
+    final bool isSelected = _statusFilter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: const Color(0xFFEEF0FD),
+      backgroundColor: const Color(0xFFF1F5F9),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        color: isSelected ? const Color(0xFF4338CA) : const Color(0xFF475569),
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+      ),
+      side: BorderSide(
+        color: isSelected ? const Color(0xFF4338CA) : Colors.transparent,
+      ),
+      onSelected: (bool selected) {
+        if (selected) {
+          setFilterState(() => _statusFilter = value);
+          setState(() => _statusFilter = value);
+        }
+      },
+    );
+  }
+
+  // =========================================================================
+  // 6. MAIN BUILD (PIXEL-PERFECT 1:1 TO IMAGE 0)
   // =========================================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.competitionTitle,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 1.0,
-        actions: <Widget>[
-          // Thu nhỏ Tạo đội thành Action trên AppBar (Không che chắn Bottom Navigation hay list)
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            icon: const Icon(Icons.group_add_rounded, size: 18),
-            label: const Text('Tạo Đội',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            onPressed: _showCreateTeamDialog,
+        leading: const BackButton(color: Color(0xFF0F172A)),
+        titleSpacing: 0,
+        title: Text(
+          widget.competitionTitle,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 20),
-            tooltip: 'Làm mới',
-            onPressed: () => widget.viewModel.loadTeams(widget.competitionId),
+        ),
+        actions: <Widget>[
+          // Outlined "Tạo đội" button with purple border & icon (1:1 with Design)
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4338CA),
+                side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: const Size(0, 36),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.group_add_outlined,
+                  size: 18, color: Color(0xFF4338CA)),
+              label: const Text(
+                'Tạo đội',
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4338CA)),
+              ),
+              onPressed: _showCreateTeamDialog,
+            ),
           ),
         ],
       ),
@@ -1184,46 +952,26 @@ class _TeamListViewState extends State<TeamListView> {
         builder: (BuildContext context, Widget? child) {
           if (widget.viewModel.isLoading) {
             return const Center(
-                child: CircularProgressIndicator(strokeWidth: 2.5));
-          }
-
-          if (widget.viewModel.hasError) {
-            return AppEmptyState(
-              icon: Icons.error_outline_rounded,
-              iconColor: AppColors.error,
-              title: 'Không thể tải danh sách đội',
-              message: widget.viewModel.errorMessage ??
-                  'Kiểm tra kết nối mạng rồi thử lại.',
-              action: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white),
-                onPressed: () =>
-                    widget.viewModel.loadTeams(widget.competitionId),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Thử lại'),
-              ),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2.5, color: Color(0xFF4338CA)),
             );
           }
 
           final String? currentUserId = widget.viewModel.currentUserId;
           final String query = _searchController.text.trim().toLowerCase();
 
-          // Lọc theo ngữ cảnh và trạng thái
+          // Filtering
           final List<TeamModel> filteredTeams =
               widget.viewModel.teams.where((TeamModel t) {
-            // Context filter: Khám phá vs Đội của tôi
             if (_selectedContext == 'MY_TEAMS') {
               final bool isMyTeam = currentUserId != null &&
                   (t.isMember(currentUserId) || t.isLeader(currentUserId));
               if (!isMyTeam) return false;
             }
 
-            // Status filter
             if (_statusFilter == 'FORMING' && t.isFull) return false;
             if (_statusFilter == 'FULL' && !t.isFull) return false;
 
-            // Search filter
             if (query.isNotEmpty) {
               final bool matchName = t.name.toLowerCase().contains(query);
               final bool matchDesc =
@@ -1236,80 +984,22 @@ class _TeamListViewState extends State<TeamListView> {
 
           return Column(
             children: <Widget>[
-              // Header Controls Container: Search + Context Tabs + Status Chips
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-                child: Column(
-                  children: <Widget>[
-                    // Search Bar
-                    Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDF3F8),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(
-                            fontSize: 13.5, color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          hintText:
-                              'Tìm theo tên đội hoặc kỹ năng cần tuyển...',
-                          hintStyle: const TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary),
-                          prefixIcon: const Icon(Icons.search_rounded,
-                              size: 18, color: AppColors.textSecondary),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon:
-                                      const Icon(Icons.clear_rounded, size: 16),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {});
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          filled: false,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 9),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+              // 1. Context Tabs: "Tìm đội" vs "Đội của tôi"
+              _buildTopTabBar(),
 
-                    // Context Tab Selector: «Khám phá đội» vs «Đội của tôi»
-                    Row(
-                      children: <Widget>[
-                        _buildContextTab('EXPLORE', 'Khám phá đội',
-                            _selectedContext == 'EXPLORE'),
-                        const SizedBox(width: 8),
-                        _buildContextTab('MY_TEAMS', 'Đội của tôi',
-                            _selectedContext == 'MY_TEAMS'),
-                        const Spacer(),
-                        // Status Filter Chips: Tất cả / Đang tuyển / Đầy slot
-                        _buildStatusChip('ALL', 'Tất cả'),
-                        const SizedBox(width: 4),
-                        _buildStatusChip('FORMING', 'Đang tuyển'),
-                        const SizedBox(width: 4),
-                        _buildStatusChip('FULL', 'Đã đủ slot'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              // 2. Search Box + Filter Button Row
+              _buildSearchAndFilterRow(),
 
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              // 3. Counter & Sort Row: "X đội đang tuyển" | "Sắp xếp: Mới nhất ∨"
+              _buildSummaryAndSortRow(filteredTeams.length),
 
-              // Main Team List
+              // 4. Main Team List
               Expanded(
                 child: filteredTeams.isEmpty
                     ? RefreshIndicator(
                         onRefresh: () =>
                             widget.viewModel.loadTeams(widget.competitionId),
+                        color: const Color(0xFF4338CA),
                         child: ListView(
                           children: <Widget>[
                             Padding(
@@ -1320,19 +1010,8 @@ class _TeamListViewState extends State<TeamListView> {
                                     ? 'Bạn chưa tham gia đội thi nào'
                                     : 'Không tìm thấy đội thi phù hợp',
                                 message: _selectedContext == 'MY_TEAMS'
-                                    ? 'Hãy chuyển sang tab "Khám phá đội" để xin vào đội, hoặc tự tạo đội mới.'
+                                    ? 'Hãy chuyển sang tab "Tìm đội" để xin vào đội, hoặc tự tạo đội mới.'
                                     : 'Hãy thử thay đổi từ khóa hoặc đặt lại bộ lọc để tìm kiếm.',
-                                action: (_statusFilter != 'ALL' ||
-                                        _searchController.text.isNotEmpty)
-                                    ? OutlinedButton(
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          _statusFilter = 'ALL';
-                                          setState(() {});
-                                        },
-                                        child: const Text('Đặt lại bộ lọc'),
-                                      )
-                                    : null,
                               ),
                             ),
                           ],
@@ -1341,14 +1020,15 @@ class _TeamListViewState extends State<TeamListView> {
                     : RefreshIndicator(
                         onRefresh: () =>
                             widget.viewModel.loadTeams(widget.competitionId),
+                        color: const Color(0xFF4338CA),
                         child: ListView.separated(
-                          padding: const EdgeInsets.all(14.0),
+                          padding: const EdgeInsets.only(bottom: 24),
                           itemCount: filteredTeams.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 6),
                           itemBuilder: (BuildContext context, int index) {
                             final TeamModel team = filteredTeams[index];
-                            return _buildTeamCard(team, currentUserId);
+                            return _buildApexTeamCard(team, currentUserId);
                           },
                         ),
                       ),
@@ -1360,410 +1040,434 @@ class _TeamListViewState extends State<TeamListView> {
     );
   }
 
-  Widget _buildContextTab(String value, String label, bool isSelected) {
-    return GestureDetector(
-      onTap: () => setState(() => _selectedContext = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: isSelected ? AppColors.primary : const Color(0xFFD1D5DB)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+  /// 1. Top Tab Bar with underline indicator
+  Widget _buildTopTabBar() {
+    final bool isExplore = _selectedContext == 'EXPLORE';
+    final bool isMyTeams = _selectedContext == 'MY_TEAMS';
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              // Tab 1: Tìm đội
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _selectedContext = 'EXPLORE'),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'Tìm đội',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight:
+                                isExplore ? FontWeight.w700 : FontWeight.w600,
+                            color: isExplore
+                                ? const Color(0xFF4338CA)
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: isExplore
+                                ? const Color(0xFF4338CA)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Tab 2: Đội của tôi
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _selectedContext = 'MY_TEAMS'),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'Đội của tôi',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight:
+                                isMyTeams ? FontWeight.w700 : FontWeight.w600,
+                            color: isMyTeams
+                                ? const Color(0xFF4338CA)
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: isMyTeams
+                                ? const Color(0xFF4338CA)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+        ],
       ),
     );
   }
 
-  Widget _buildStatusChip(String value, String label) {
-    final bool isSelected = _statusFilter == value;
-    return GestureDetector(
-      onTap: () => setState(() => _statusFilter = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(
-              color: isSelected ? AppColors.primary : const Color(0xFFE5E7EB)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+  /// 2. Search Box + Filter Button Row (1:1 with Design)
+  Widget _buildSearchAndFilterRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Row(
+        children: <Widget>[
+          // Search Field
+          Expanded(
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+                decoration: const InputDecoration(
+                  hintText: 'Tìm theo tên đội hoặc kỹ năng...',
+                  hintStyle:
+                      TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
           ),
-        ),
+          const SizedBox(width: 10),
+          // Filter Button
+          InkWell(
+            onTap: _showFilterBottomSheet,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.filter_alt_outlined,
+                      size: 18, color: Color(0xFF475569)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Bộ lọc',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // =========================================================================
-  // 6. COMPACT UNIFIED TEAM CARD (AC-02)
-  // Thứ tự: Tên đội -> Trạng thái tuyển -> Mô tả ngắn -> Thành viên/Slot -> CTA
-  // =========================================================================
-  Widget _buildTeamCard(TeamModel team, String? currentUserId) {
+  /// 3. Summary & Sort Row: "3 đội đang tuyển" | "Sắp xếp: Mới nhất ∨"
+  Widget _buildSummaryAndSortRow(int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          Text(
+            '$count đội đang tuyển',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _sortOrder = _sortOrder == 'NEWEST' ? 'SLOTS' : 'NEWEST';
+              });
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  _sortOrder == 'NEWEST'
+                      ? 'Sắp xếp: Mới nhất'
+                      : 'Sắp xếp: Chỗ trống',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 18, color: Color(0xFF475569)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 4. APEX Team Card (1:1 with Design Image 0)
+  Widget _buildApexTeamCard(TeamModel team, String? currentUserId) {
     final bool isLeader = currentUserId != null && team.isLeader(currentUserId);
     final bool isMember = currentUserId != null && team.isMember(currentUserId);
     final JoinRequestModel? myRequest =
         widget.viewModel.getMyRequestForTeam(team.id);
-    final List<JoinRequestModel> pendingRequests = widget.viewModel
-        .getJoinRequestsForTeam(team.id)
-        .where((JoinRequestModel r) => r.isPending)
-        .toList();
+
+    // Extract skills from description or provide default tags
+    String skillsDisplay = 'OpenCV • Thị giác máy tính';
+    if (team.description != null && team.description!.contains('Tuyển:')) {
+      final String extracted = team.description!.split('Tuyển:').last;
+      skillsDisplay = extracted.replaceAll(')', '').trim();
+    }
 
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isLeader
-              ? AppColors.primary.withValues(alpha: 0.35)
-              : const Color(0xFFE5E7EB),
-          width: isLeader ? 1.4 : 0.8,
-        ),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 6,
+            color: Color(0x06000000),
+            blurRadius: 10,
             offset: Offset(0, 2),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _showTeamDetailSheet(team),
-          child: Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
+      child: InkWell(
+        onTap: () => _showTeamDetailSheet(team),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Header Row: Avatar + Team Name + Competition Name + Badge
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // 1. Tên đội & Badge slot
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
+                // Lavender Avatar Box
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF0FD),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.groups_rounded,
+                    color: Color(0xFF4338CA),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Team Title & Competition Subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
                         team.name,
                         style: const TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                    ),
-                    StatusBadge(
-                      label: 'Slot: ${team.slotDisplay}',
-                      backgroundColor: team.isFull
-                          ? AppColors.error.withValues(alpha: 0.1)
-                          : AppColors.success.withValues(alpha: 0.1),
-                      textColor:
-                          team.isFull ? AppColors.error : AppColors.success,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-
-                // 2. Trạng thái tuyển: «Đang tuyển» (không mã kỹ thuật) + Slot còn lại
-                Row(
-                  children: <Widget>[
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: team.isActive
-                            ? AppColors.success
-                            : AppColors.warning,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      team.statusDisplay,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: team.isActive
-                            ? AppColors.success
-                            : AppColors.warning,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Còn trống: ${team.remainingSlots} slot',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: team.remainingSlots > 0
-                            ? AppColors.primary
-                            : AppColors.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // 3. Mô tả ngắn (tối đa 2 dòng)
-                if (team.description != null &&
-                    team.description!.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 8),
-                  Text(
-                    team.description!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        height: 1.35),
-                  ),
-                ],
-
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                const SizedBox(height: 8),
-
-                // 4. Footer: Số thành viên + CTA theo role
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      '${team.memberCount} thành viên',
-                      style: const TextStyle(
-                          fontSize: 12.5, color: AppColors.textSecondary),
-                    ),
-
-                    // Role-based CTAs
-                    if (isLeader) ...<Widget>[
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          if (pendingRequests.isNotEmpty)
-                            Badge(
-                              label: Text('${pendingRequests.length}'),
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.warning,
-                                  foregroundColor: Colors.black87,
-                                  minimumSize: const Size(44, 32),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () =>
-                                    _showLeaderReviewRequestsSheet(team),
-                                icon: const Icon(
-                                    Icons.notifications_active_rounded,
-                                    size: 14),
-                                label: const Text('Duyệt yêu cầu',
-                                    style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600)),
-                              ),
-                            )
-                          else
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(44, 32),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 10),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () =>
-                                  _showLeaderReviewRequestsSheet(team),
-                              child: const Text('Xem yêu cầu',
-                                  style: TextStyle(fontSize: 11.5)),
-                            ),
-                          const SizedBox(width: 6),
-                          StatusBadge(
-                            label: 'Trưởng đội',
-                            backgroundColor:
-                                AppColors.primary.withValues(alpha: 0.12),
-                            textColor: AppColors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                size: 18, color: AppColors.error),
-                            tooltip: 'Xóa đội',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                                minWidth: 28, minHeight: 28),
-                            onPressed: () =>
-                                _showDeleteTeamConfirmationDialog(team),
-                          ),
-                        ],
-                      ),
-                    ] else if (isMember) ...<Widget>[
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(44, 32),
-                              foregroundColor: AppColors.error,
-                              side: const BorderSide(color: AppColors.error),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 10),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () async {
-                              final bool ok = await widget.viewModel
-                                  .leaveTeam(team.id, widget.competitionId);
-                              _showFeedbackSnackBar(
-                                successMsg:
-                                    ok ? widget.viewModel.actionFeedback : null,
-                                errorMsg:
-                                    !ok ? widget.viewModel.actionError : null,
-                              );
-                            },
-                            child: const Text('Rời Đội',
-                                style: TextStyle(fontSize: 11.5)),
-                          ),
-                        ],
-                      ),
-                    ] else if (myRequest != null &&
-                        myRequest.isPending) ...<Widget>[
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Đã gửi yêu cầu',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.amber,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                              visualDensity: VisualDensity.compact,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 6),
-                            ),
-                            onPressed: () async {
-                              final bool ok =
-                                  await widget.viewModel.withdrawJoinRequest(
-                                requestId: myRequest.id,
-                                teamId: team.id,
-                                competitionId: widget.competitionId,
-                              );
-                              _showFeedbackSnackBar(
-                                successMsg:
-                                    ok ? widget.viewModel.actionFeedback : null,
-                                errorMsg:
-                                    !ok ? widget.viewModel.actionError : null,
-                              );
-                            },
-                            child: const Text('Hủy yêu cầu',
-                                style: TextStyle(fontSize: 11.5)),
-                          ),
-                        ],
-                      ),
-                    ] else ...<Widget>[
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(44, 32),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          backgroundColor: team.isFull
-                              ? const Color(0xFFD1D5DB)
-                              : AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: team.isFull
-                            ? null
-                            : () => _showSendJoinRequestDialog(team),
-                        child: Text(
-                          team.isFull ? 'Hết chỗ' : 'Xin vào đội',
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.competitionTitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
                         ),
                       ),
                     ],
-                  ],
-                ),
-
-                if (isMember && widget.onOpenTeamSubmission != null)
-                  _TeamSubmissionEntry(
-                    team: team,
-                    isLeader: isLeader,
-                    onPressed: () => widget.onOpenTeamSubmission!(
-                        team, widget.competitionTitle),
                   ),
+                ),
+                // Badge: "Đang tuyển"
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: team.isFull
+                        ? const Color(0xFFFEE2E2)
+                        : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    team.isFull ? 'Đã đủ' : team.statusDisplay,
+                    style: TextStyle(
+                      color: team.isFull
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF16A34A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
+
+            // Description
+            const SizedBox(height: 12),
+            Text(
+              team.description?.isNotEmpty == true
+                  ? team.description!
+                  : 'Tìm đồng đội có kinh nghiệm OpenCV, cùng giải quyết bài toán nhận diện hình ảnh.',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF334155),
+                height: 1.45,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            // Metadata Row: 👥 1/4 thành viên | </> OpenCV • Thị giác máy tính
+            const SizedBox(height: 14),
+            Row(
+              children: <Widget>[
+                const Icon(Icons.people_outline_rounded,
+                    size: 18, color: Color(0xFF475569)),
+                const SizedBox(width: 6),
+                Text(
+                  '${team.slotDisplay} thành viên',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Text('|',
+                      style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
+                ),
+                const Icon(Icons.code_rounded,
+                    size: 18, color: Color(0xFF475569)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    skillsDisplay,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF475569),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+
+            // Bottom CTA Button (Right aligned)
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _buildCardActionButton(team, isLeader, isMember, myRequest),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-/// F37 (Q13): entry to the team submission flow on the member's own team card.
-class _TeamSubmissionEntry extends StatelessWidget {
-  final TeamModel team;
-  final bool isLeader;
-  final VoidCallback onPressed;
-
-  const _TeamSubmissionEntry(
-      {required this.team, required this.isLeader, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final String? label = switch (team.status) {
-      TeamStatus.active when isLeader => 'Nộp hồ sơ đội',
-      TeamStatus.submitting =>
-        isLeader ? 'Tiếp tục nộp' : 'Xác nhận tham gia nộp',
-      TeamStatus.submitted => 'Xem hồ sơ đội',
-      _ => null,
-    };
-    if (label == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: SizedBox(
-        width: double.infinity,
-        height: 38,
-        child: ElevatedButton.icon(
-          key: Key('team_submission_entry_${team.id}'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          onPressed: onPressed,
-          icon: const Icon(Icons.send_rounded, size: 15),
-          label: Text(label,
-              style:
-                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+  Widget _buildCardActionButton(TeamModel team, bool isLeader, bool isMember,
+      JoinRequestModel? myRequest) {
+    if (isLeader) {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF4338CA),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+        onPressed: () => _showLeaderReviewRequestsSheet(team),
+        child: const Text('Quản lý đội',
+            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+      );
+    }
+
+    if (isMember) {
+      return OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF4338CA),
+          side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        onPressed: () => _showTeamDetailSheet(team),
+        child: const Text('Đã tham gia',
+            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+      );
+    }
+
+    if (myRequest != null && myRequest.isPending) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text('Đã gửi yêu cầu',
+            style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFB45309))),
+      );
+    }
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF4338CA),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: team.isFull ? null : () => _showSendJoinRequestDialog(team),
+      child: Text(
+        team.isFull ? 'Hết chỗ' : 'Xin vào đội',
+        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
       ),
     );
   }

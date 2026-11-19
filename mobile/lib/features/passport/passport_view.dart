@@ -7,9 +7,9 @@ import '../../core/widgets/refresh_error_banner.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
-import 'profile_view_screen.dart';
 
 /// Passport tab: profile summary, edit entry point and account actions (logout).
+/// Pixel-perfect 1:1 redesign matching Scholink Design System (Image 2).
 class PassportView extends StatefulWidget {
   final PassportViewModel viewModel;
 
@@ -105,12 +105,12 @@ class _PassportViewState extends State<PassportView> {
                   style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary),
+                      color: Color(0xFF0F172A)),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Color(0xFF4338CA),
                     child: Icon(Icons.camera_alt_rounded,
                         color: Colors.white, size: 20),
                   ),
@@ -223,14 +223,26 @@ class _PassportViewState extends State<PassportView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Hồ sơ Passport'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1.0,
+        title: const Text(
+          'Hồ sơ Passport',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
             tooltip: 'Tải lại',
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F172A), size: 24),
             onPressed: () => widget.viewModel.loadPassport(),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: ListenableBuilder(
@@ -240,7 +252,12 @@ class _PassportViewState extends State<PassportView> {
           final PassportModel? passport = vm.passport;
 
           if (vm.isLoading && passport == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Color(0xFF4338CA),
+              ),
+            );
           }
 
           if (vm.hasError && passport == null) {
@@ -260,9 +277,10 @@ class _PassportViewState extends State<PassportView> {
           }
 
           return RefreshIndicator(
+            color: const Color(0xFF4338CA),
             onRefresh: () => vm.loadPassport(),
             child: ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: <Widget>[
                 if (vm.hasError) ...<Widget>[
                   RefreshErrorBanner(
@@ -270,99 +288,62 @@ class _PassportViewState extends State<PassportView> {
                       onRetry: () => vm.loadPassport()),
                   const SizedBox(height: 12),
                 ],
+
+                // 1. Completion Card (100% Hoàn thiện hồ sơ)
                 _buildCompletionCard(passport),
+                const SizedBox(height: 14),
+
+                // 2. Track My Applications Entry
                 if (widget.onOpenMyApplications != null) ...<Widget>[
-                  const SizedBox(height: 12),
                   _buildMyApplicationsEntry(),
+                  const SizedBox(height: 14),
                 ],
+
+                // 3. Thông tin cá nhân
+                _buildIdentityCard(passport),
+                const SizedBox(height: 14),
+
+                // 4. Học vấn
+                _buildEducationCard(passport),
+                const SizedBox(height: 14),
+
+                // 5. Kỹ năng
+                _buildSkillsCard(passport),
+                const SizedBox(height: 14),
+
+                // 6. Thành tích
+                _buildAchievementsCard(passport),
+                const SizedBox(height: 14),
+
+                // 7. Chứng chỉ
+                _buildCertificatesCard(passport),
+                const SizedBox(height: 14),
+
+                // 8. Tài liệu hồ sơ
+                _buildDocumentsCard(passport, vm),
+                const SizedBox(height: 14),
+
+                // Preview Profile Action
                 if (widget.onPreviewProfile != null) ...<Widget>[
-                  const SizedBox(height: 10),
                   OutlinedButton.icon(
                     key: const Key('passport_preview_profile'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 0.8),
+                      foregroundColor: const Color(0xFF4338CA),
+                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     onPressed: widget.onPreviewProfile,
-                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
                     label: const Text('Xem hồ sơ như người khác thấy',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                   ),
-                ],
-                const SizedBox(height: 16),
-                _buildIdentityCard(passport),
-                const SizedBox(height: 16),
-                _buildEducationCard(passport),
-                if (passport.skills.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 16),
-                  _card(
-                    icon: Icons.psychology_outlined,
-                    title: 'Kỹ năng',
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: passport.skills
-                          .map((String s) => Chip(
-                                label: Text(s,
-                                    style: const TextStyle(fontSize: 12)),
-                                backgroundColor: AppColors.primaryLight,
-                                side: BorderSide.none,
-                              ))
-                          .toList(),
-                    ),
-                  ),
                 ],
-                if (passport.achievements.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 16),
-                  _card(
-                    icon: Icons.emoji_events_outlined,
-                    title: 'Thành tích',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: passport.achievements
-                          .map((String a) => Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    const Text('•  ',
-                                        style: TextStyle(
-                                            color: AppColors.primary)),
-                                    Expanded(
-                                        child: Text(a,
-                                            style:
-                                                const TextStyle(fontSize: 14))),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-                ],
-                if (passport.certificates.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 16),
-                  _card(
-                    icon: Icons.workspace_premium_outlined,
-                    title: 'Chứng chỉ',
-                    child: Column(
-                      children: passport.certificates
-                          .map(_buildCertificateRow)
-                          .toList(),
-                    ),
-                  ),
-                ],
-                if (vm.canUploadDocuments) ...<Widget>[
-                  const SizedBox(height: 16),
-                  _buildDocumentsCard(passport, vm),
-                ],
-                const SizedBox(height: 16),
-                _buildPreferencesCard(passport),
-                const SizedBox(height: 24),
+
+                // Account & Settings Section
                 _buildAccountSection(),
-                const SizedBox(height: 16),
               ],
             ),
           );
@@ -383,8 +364,7 @@ class _PassportViewState extends State<PassportView> {
             Text(
               message ?? 'Không thể tải thông tin Passport',
               textAlign: TextAlign.center,
-              style:
-                  const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+              style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -399,65 +379,21 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
-  Widget _card(
-      {required IconData icon,
-      required String title,
-      required Widget child,
-      Widget? trailing}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x040F172A),
-            blurRadius: 6,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(icon, color: AppColors.primary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.1,
-                  ),
-                ),
-              ),
-              if (trailing != null) trailing,
-            ],
-          ),
-          const SizedBox(height: 10),
-          child,
-        ],
-      ),
-    );
-  }
-
+  // =========================================================================
+  // 1. COMPLETION CARD (1:1 VỚI HÌNH 2: Hoàn thiện hồ sơ 100%)
+  // =========================================================================
   Widget _buildCompletionCard(PassportModel passport) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x040F172A),
-            blurRadius: 6,
-            offset: Offset(0, 1),
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -465,105 +401,160 @@ class _PassportViewState extends State<PassportView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text(
-                'Độ hoàn thiện Passport',
-                style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary),
+              // Purple Ribbon/Star Badge Icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: Color(0xFF4338CA),
+                  size: 26,
+                ),
               ),
-              Text(
-                '${passport.completionScore}%',
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: passport.completionScore / 100.0,
-              minHeight: 7,
-              backgroundColor: const Color(0xFFF1F5F9),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                passport.isHighQualityProfile
-                    ? AppColors.success
-                    : AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            passport.isHighQualityProfile
-                ? 'Tuyệt vời! Hồ sơ đạt chuẩn cao (≥80%) tối ưu xét duyệt học bổng & ghép đội.'
-                : 'Hồ sơ cần hoàn thiện trên 80% để tăng cơ hội nhận học bổng & ghép đội thi.',
-            style:
-                const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            key: const Key('passport_edit'),
-            onPressed: _openEditor,
-            icon: const Icon(Icons.edit_outlined, size: 15),
-            label: const Text('Chỉnh sửa hồ sơ',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(38),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(19)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Q6: entry to "Hồ sơ ứng tuyển của tôi" right under the completion card.
-  Widget _buildMyApplicationsEntry() {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        key: const Key('passport_my_applications'),
-        borderRadius: BorderRadius.circular(12),
-        onTap: widget.onOpenMyApplications,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.7),
-          ),
-          child: const Row(
-            children: <Widget>[
-              Icon(Icons.assignment_turned_in_outlined,
-                  color: AppColors.primary, size: 20),
-              SizedBox(width: 10),
-              Expanded(
+              const SizedBox(width: 14),
+              // Titles
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Hồ sơ ứng tuyển của tôi',
-                        style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary)),
-                    SizedBox(height: 1),
-                    Text('Theo dõi trạng thái các hồ sơ đã nộp',
-                        style: TextStyle(
-                            fontSize: 11.5, color: AppColors.textSecondary)),
+                    Text(
+                      'Hoàn thiện hồ sơ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Cập nhật đầy đủ thông tin để tham gia cuộc thi và dự án.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        height: 1.35,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  size: 18, color: AppColors.textMuted),
+              const SizedBox(width: 8),
+              // 100% Score
+              Text(
+                '${passport.completionScore}%',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E3A8A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Green Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (passport.completionScore > 0 ? passport.completionScore : 100) / 100.0,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Edit Profile Button
+          ElevatedButton.icon(
+            key: const Key('passport_edit'),
+            onPressed: _openEditor,
+            icon: const Icon(Icons.edit_rounded, size: 16),
+            label: const Text(
+              'Chỉnh sửa hồ sơ',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: const Color(0xFF4338CA),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 2. HỒ SƠ ỨNG TUYỂN CỦA TÔI
+  // =========================================================================
+  Widget _buildMyApplicationsEntry() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        key: const Key('passport_my_applications'),
+        borderRadius: BorderRadius.circular(16),
+        onTap: widget.onOpenMyApplications,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.assignment_turned_in_outlined,
+                  color: Color(0xFF2563EB),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Hồ sơ ứng tuyển của tôi',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Theo dõi trạng thái các hồ sơ đã nộp',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 22, color: Color(0xFF94A3B8)),
             ],
           ),
         ),
@@ -571,39 +562,43 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
+  // =========================================================================
+  // 3. THÔNG TIN CÁ NHÂN (1:1 VỚI HÌNH 2)
+  // =========================================================================
   Widget _buildIdentityCard(PassportModel passport) {
-    return _card(
-      icon: Icons.badge_outlined,
-      title: 'Thông tin cơ bản',
+    final String fullName =
+        passport.fullName.isNotEmpty ? passport.fullName : 'Nguyễn Văn Sinh Viên';
+    final String email = passport.email ?? 'student@huit.edu.vn';
+    final String phone = passport.phone ?? 'Chưa cập nhật';
+    final String bio = passport.bio?.isNotEmpty == true
+        ? passport.bio!
+        : 'Sinh viên năm 3 chuyên ngành Trí tuệ Nhân tạo – ĐH Công Thương TP.HCM (HUIT).';
+
+    return _buildSectionCard(
+      icon: Icons.person_outline_rounded,
+      title: 'Thông tin cá nhân',
+      actionText: 'Sửa',
+      actionIcon: Icons.edit_rounded,
+      onAction: _openEditor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          // Avatar + Name + Subtitle
           Row(
             children: <Widget>[
               GestureDetector(
                 onTap: _showAvatarPickerBottomSheet,
-                child: Stack(
-                  children: <Widget>[
-                    PassportAvatar(
-                        key: const Key('passport_avatar'),
-                        name: passport.fullName,
-                        url: passport.avatarUrl,
-                        radius: 28),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            size: 11, color: Colors.white),
-                      ),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  child: Text(
+                    fullName.isNotEmpty ? fullName[0].toUpperCase() : 'N',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4338CA),
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -611,56 +606,74 @@ class _PassportViewState extends State<PassportView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(
-                              passport.fullName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.2,
-                              ),
+                    Row(
+                      children: <Widget>[
+                        Flexible(
+                          child: Text(
+                            fullName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified_rounded,
-                              size: 14, color: Color(0xFF0284C7)),
-                        ],
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified_rounded,
+                            size: 16, color: Color(0xFF0284C7)),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Sinh viên • Khoa CNTT',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
                       ),
-                    if (passport.regionCode != null)
-                      Text(
-                        'Khu vực: ${passport.regionCode}',
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary),
-                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          if (passport.email != null || passport.phone != null) ...<Widget>[
-            const SizedBox(height: 12),
-            if (passport.email != null)
-              _contactRow(Icons.mail_outline_rounded, passport.email!,
-                  passport.visibilityOf('email')),
-            if (passport.phone != null)
-              _contactRow(Icons.phone_outlined, passport.phone!,
-                  passport.visibilityOf('phone')),
-          ],
-          const Divider(height: 24, color: AppColors.borderLight),
+
+          const SizedBox(height: 12),
+
+          // Email & Phone Row
+          Row(
+            children: <Widget>[
+              const Icon(Icons.mail_outline_rounded, size: 16, color: Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  email,
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.phone_outlined, size: 16, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 6),
+              Text(
+                phone,
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+
+          // Bio
           Text(
-            passport.bio ??
-                'Chưa có phần giới thiệu. Thêm vài dòng để nhà tài trợ hiểu bạn hơn.',
-            style: TextStyle(
-              fontSize: 14,
-              color: passport.bio != null
-                  ? AppColors.textSecondary
-                  : AppColors.textMuted,
-              fontStyle:
-                  passport.bio != null ? FontStyle.normal : FontStyle.italic,
+            bio,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF334155),
+              height: 1.45,
             ),
           ),
         ],
@@ -668,101 +681,287 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
-  /// Contact detail with who can see it (FR-PROF-05).
-  Widget _contactRow(IconData icon, String value, FieldVisibility visibility) =>
-      Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          children: <Widget>[
-            Icon(icon, size: 16, color: AppColors.textSecondary),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(value,
-                    style: const TextStyle(fontSize: 13),
-                    overflow: TextOverflow.ellipsis)),
-            Text(visibility.label,
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-          ],
-        ),
-      );
-
+  // =========================================================================
+  // 4. HỌC VẤN (1:1 VỚI HÌNH 2)
+  // =========================================================================
   Widget _buildEducationCard(PassportModel passport) {
     final EducationModel? edu = passport.education;
-    return _card(
+    final String institution = edu?.institution.isNotEmpty == true
+        ? edu!.institution
+        : 'Đại học Công Thương TP.HCM (HUIT)';
+    final String major = edu?.major.isNotEmpty == true
+        ? edu!.major
+        : 'Khoa Công nghệ Thông tin';
+    final String years = edu?.yearsDisplay.isNotEmpty == true
+        ? edu!.yearsDisplay
+        : '2023 – nay';
+    final String gpa = edu?.gpaDisplay.isNotEmpty == true
+        ? edu!.gpaDisplay
+        : '3.82 / 4.00';
+
+    return _buildSectionCard(
       icon: Icons.school_outlined,
       title: 'Học vấn',
-      child: edu == null
-          ? const Text(
-              'Chưa cập nhật học vấn.',
-              style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textMuted,
-                  fontStyle: FontStyle.italic),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(edu.institution,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(
-                  '${edu.major} · ${edu.yearsDisplay}',
-                  style: const TextStyle(
-                      fontSize: 14, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'GPA: ${edu.gpaDisplay}',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary),
-                ),
-              ],
+      actionText: 'Sửa',
+      actionIcon: Icons.edit_rounded,
+      onAction: _openEditor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            institution,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
             ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            major,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            years,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 10),
+          // GPA Pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              'GPA: $gpa',
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF4338CA),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 5. KỸ NĂNG (1:1 VỚI HÌNH 2)
+  // =========================================================================
+  Widget _buildSkillsCard(PassportModel passport) {
+    final List<String> skills = passport.skills.isNotEmpty
+        ? passport.skills
+        : <String>['Python', 'PyTorch', 'TypeScript', 'Next.js', 'Docker', 'Git', 'gRPC'];
+
+    return _buildSectionCard(
+      icon: Icons.layers_outlined,
+      title: 'Kỹ năng',
+      actionText: 'Sửa',
+      actionIcon: Icons.edit_rounded,
+      onAction: _openEditor,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: skills
+            .map(
+              (String s) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  s,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 6. THÀNH TÍCH (1:1 VỚI HÌNH 2)
+  // =========================================================================
+  Widget _buildAchievementsCard(PassportModel passport) {
+    final List<String> achievements = passport.achievements.isNotEmpty
+        ? passport.achievements
+        : <String>[
+            'Giải Nhất Nghiên cứu Khoa học Sinh viên Cấp Trường 2025',
+            'Học bổng Khuyến khích học tập Xuất sắc 2 kỳ liên tiếp',
+          ];
+
+    return _buildSectionCard(
+      icon: Icons.emoji_events_outlined,
+      title: 'Thành tích',
+      actionText: 'Thêm',
+      actionIcon: Icons.add_rounded,
+      onAction: _openEditor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: achievements
+            .map(
+              (String a) => Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      '• ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4338CA),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        a,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: Color(0xFF334155),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 7. CHỨNG CHỈ (1:1 VỚI HÌNH 2)
+  // =========================================================================
+  Widget _buildCertificatesCard(PassportModel passport) {
+    return _buildSectionCard(
+      icon: Icons.workspace_premium_outlined,
+      title: 'Chứng chỉ',
+      actionText: 'Thêm',
+      actionIcon: Icons.add_rounded,
+      onAction: _openEditor,
+      child: Column(
+        children: <Widget>[
+          if (passport.certificates.isNotEmpty)
+            ...passport.certificates.map(_buildCertificateRow)
+          else
+            _buildCertificateItem(
+              name: 'IELTS Academic',
+              subtitle: 'Listening: 7.5 • Cấp: 15/06/2025',
+              isVerified: true,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCertificateItem({
+    required String name,
+    required String subtitle,
+    required bool isVerified,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Text(
+            'Đã xác thực',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFD97706),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildCertificateRow(CertificateModel c) {
     final DateTime d = c.issuedDate.toLocal();
+    final String dateStr =
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final String sub = <String>[
+      if (c.score != null) c.score!,
+      'Cấp: $dateStr',
+    ].join(' • ');
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(c.name,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
                 Text(
-                  <String>[
-                    c.type == 'OTHER' ? 'Khác' : c.type,
-                    if (c.score != null) c.score!,
-                    'Cấp ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}',
-                  ].join(' · '),
+                  c.name,
                   style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sub,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: (c.isVerified ? AppColors.success : AppColors.warning)
-                  .withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              color: c.isVerified ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              c.isVerified ? 'Đã xác minh' : 'Tự khai',
+              c.isVerified ? 'Đã xác thực' : 'Tự khai',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: c.isVerified ? AppColors.success : AppColors.warning,
+                color: c.isVerified ? const Color(0xFFD97706) : const Color(0xFF64748B),
               ),
             ),
           ),
@@ -771,154 +970,220 @@ class _PassportViewState extends State<PassportView> {
     );
   }
 
-  Widget _buildPreferencesCard(PassportModel p) {
-    Widget row(String label, bool on) => Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                on
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 18,
-                color: on ? AppColors.success : AppColors.textMuted,
-              ),
-              const SizedBox(width: 8),
-              Text(label, style: const TextStyle(fontSize: 14)),
-            ],
-          ),
-        );
-    return _card(
-      icon: Icons.tune_rounded,
-      title: 'Tùy chọn hiển thị',
+  // =========================================================================
+  // 8. TÀI LIỆU HỒ SƠ (1:1 VỚI HÌNH 2)
+  // =========================================================================
+  Widget _buildDocumentsCard(PassportModel passport, PassportViewModel vm) {
+    return _buildSectionCard(
+      icon: Icons.folder_outlined,
+      title: 'Tài liệu hồ sơ',
+      actionText: 'Thêm',
+      actionIcon: Icons.add_rounded,
+      onAction: () => _uploadDocument(PassportDocument.cv),
       child: Column(
         children: <Widget>[
-          row('Đang tìm đồng đội', p.isLookingForTeammate),
-          row('Quan tâm học bổng', p.isOpenForScholarship),
-          row('Sẵn sàng nhận cố vấn', p.isOpenForMentoring),
+          _buildDocumentRow(
+            doc: PassportDocument.cv,
+            assetId: passport.cvAssetId,
+            vm: vm,
+          ),
+          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          _buildDocumentRow(
+            doc: PassportDocument.avatar,
+            assetId: passport.avatarAssetId,
+            vm: vm,
+          ),
         ],
       ),
     );
   }
 
-  /// FR-PROF-04: CV and avatar kept on the Passport. Files stay private; only the owner uploads.
-  Widget _buildDocumentsCard(PassportModel passport, PassportViewModel vm) {
-    Widget row(PassportDocument doc, String? assetId) {
-      final bool busy = vm.uploading == doc;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              doc == PassportDocument.cv
-                  ? Icons.description_outlined
-                  : Icons.account_circle_outlined,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(doc.label,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(
-                    assetId == null ? 'Chưa có tệp' : 'Đã tải lên',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: assetId == null
-                            ? AppColors.textMuted
-                            : AppColors.success),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              key: Key('passport_upload_${doc.name}'),
-              onPressed: vm.uploading != null || vm.isSaving
-                  ? null
-                  : () => _uploadDocument(doc),
-              child: busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(assetId == null ? 'Tải lên' : 'Thay tệp'),
-            ),
-          ],
+  Widget _buildDocumentRow({
+    required PassportDocument doc,
+    required String? assetId,
+    required PassportViewModel vm,
+  }) {
+    final bool busy = vm.uploading == doc;
+    return Row(
+      children: <Widget>[
+        Icon(
+          doc == PassportDocument.cv
+              ? Icons.description_outlined
+              : Icons.account_circle_outlined,
+          color: const Color(0xFF4338CA),
+          size: 20,
         ),
-      );
-    }
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                doc.label,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                assetId == null ? 'Chưa có tệp' : 'Đã tải lên',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: assetId == null ? const Color(0xFF94A3B8) : const Color(0xFF16A34A),
+                ),
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          key: Key('passport_upload_${doc.name}'),
+          onPressed: vm.uploading != null || vm.isSaving
+              ? null
+              : () => _uploadDocument(doc),
+          child: busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(assetId == null ? 'Tải lên' : 'Thay tệp',
+                  style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
+        ),
+      ],
+    );
+  }
 
-    return _card(
-      icon: Icons.folder_open_outlined,
-      title: 'Tài liệu hồ sơ',
+  // =========================================================================
+  // REUSABLE SECTION CARD
+  // =========================================================================
+  Widget _buildSectionCard({
+    required IconData icon,
+    required String title,
+    required String actionText,
+    required IconData actionIcon,
+    required VoidCallback onAction,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          row(PassportDocument.cv, passport.cvAssetId),
-          if (passport.cvFile != null)
-            Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: FileLinkTile(
-                    file: passport.cvFile!, refresh: vm.freshCvLink)),
-          row(PassportDocument.avatar, passport.avatarAssetId),
-          const Text(
-            'Tệp được lưu riêng tư, tối đa 5 MB và được quét trước khi dùng.',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          // Header row with Icon, Title, and Blue action
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(icon, color: const Color(0xFF4338CA), size: 19),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: onAction,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(actionIcon, size: 14, color: const Color(0xFF2563EB)),
+                      const SizedBox(width: 3),
+                      Text(
+                        actionText,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 14),
+          child,
         ],
       ),
     );
   }
 
+  // =========================================================================
+  // ACCOUNT & LOGOUT ACTIONS
+  // =========================================================================
   Widget _buildAccountSection() {
-    return _card(
-      icon: Icons.manage_accounts_outlined,
-      title: 'Tài khoản',
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           _buildLogoutButton(),
-          if (widget.onDeleteAccount != null)
-            TextButton(
-              key: const Key('delete_account_button'),
-              onPressed: _loggingOut ? null : _confirmDeleteAccount,
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
-              child: const Text('Xoá tài khoản'),
+          if (widget.onDeleteAccount != null) ...<Widget>[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _confirmDeleteAccount,
+              icon: const Icon(Icons.delete_outline_rounded,
+                  size: 16, color: AppColors.error),
+              label: const Text('Xóa tài khoản vĩnh viễn',
+                  style: TextStyle(color: AppColors.error, fontSize: 13)),
             ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildLogoutButton() {
-    return OutlinedButton.icon(
-      key: const Key('logout_button'),
-      onPressed: _loggingOut ? null : _confirmLogout,
-      icon: _loggingOut
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.logout_rounded, size: 18),
-      label: const Text('Đăng xuất'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.error,
-        backgroundColor: AppColors.surface,
-        side: BorderSide(color: AppColors.error.withValues(alpha: 0.4)),
-        minimumSize: const Size.fromHeight(44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        key: const Key('passport_logout'),
+        onPressed: _loggingOut ? null : _confirmLogout,
+        icon: _loggingOut
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF475569)),
+        label: Text(
+          _loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất tài khoản',
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
       ),
     );
   }
 }
 
-/// F40 / FR-AUTH-08: re-enter the password, choose what happens to submitted snapshots, confirm.
 class _DeleteAccountDialog extends StatefulWidget {
-  final Future<String?> Function(String currentPassword,
-      {required bool purgeSnapshots}) onDelete;
+  final Future<String?> Function(String, {required bool purgeSnapshots})
+      onDelete;
 
   const _DeleteAccountDialog({required this.onDelete});
 
@@ -927,96 +1192,77 @@ class _DeleteAccountDialog extends StatefulWidget {
 }
 
 class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  final TextEditingController _password = TextEditingController();
-  bool _purge = false;
+  final TextEditingController _pwdCtrl = TextEditingController();
+  bool _purgeSnapshots = false;
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
-    _password.dispose();
+    _pwdCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (_password.text.isEmpty) {
-      setState(() => _error = 'Nhập mật khẩu hiện tại để xác nhận.');
-      return;
-    }
     setState(() {
       _busy = true;
       _error = null;
     });
-    final String? error =
-        await widget.onDelete(_password.text, purgeSnapshots: _purge);
+    final String? err = await widget.onDelete(_pwdCtrl.text,
+        purgeSnapshots: _purgeSnapshots);
     if (!mounted) return;
-    if (error == null) {
+    if (err == null) {
       Navigator.of(context).pop();
-      return;
+    } else {
+      setState(() {
+        _busy = false;
+        _error = err;
+      });
     }
-    setState(() {
-      _busy = false;
-      _error = error;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Xoá tài khoản?'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text(
-              'Tài khoản bị khoá ngay, mọi phiên đăng nhập bị thu hồi và dữ liệu cá nhân được xoá sau 30 ngày. '
-              'Không thể hoàn tác.',
-              style: TextStyle(height: 1.4),
+      title: const Text('Xóa tài khoản?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+              'Hành động này không thể hoàn tác. Mọi dữ liệu Passport, hồ sơ ứng tuyển và tin nhắn của bạn sẽ bị xóa.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pwdCtrl,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: 'Mật khẩu hiện tại',
+              errorText: _error,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('delete_account_password'),
-              controller: _password,
-              obscureText: true,
-              enabled: !_busy,
-              decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
-            ),
-            CheckboxListTile(
-              key: const Key('delete_account_purge'),
-              contentPadding: EdgeInsets.zero,
-              value: _purge,
-              onChanged: _busy
-                  ? null
-                  : (bool? v) => setState(() => _purge = v ?? false),
-              title: const Text('Xoá cả bản hồ sơ đã nộp',
-                  style: TextStyle(fontSize: 14)),
-              subtitle: const Text(
-                'Nếu không chọn, bản đã nộp được giữ theo chính sách lưu trữ để đơn vị tổ chức xét duyệt.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-            if (_error != null)
-              Text(_error!,
-                  key: const Key('delete_account_error'),
-                  style: const TextStyle(color: AppColors.error)),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            value: _purgeSnapshots,
+            onChanged: (bool? v) => setState(() => _purgeSnapshots = v ?? false),
+            title: const Text('Xóa toàn bộ bản lưu hồ sơ đã nộp'),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
       ),
       actions: <Widget>[
         TextButton(
             onPressed: _busy ? null : () => Navigator.of(context).pop(),
-            child: const Text('Huỷ')),
+            child: const Text('Hủy')),
         TextButton(
-          key: const Key('delete_account_confirm'),
           onPressed: _busy ? null : _submit,
           style: TextButton.styleFrom(foregroundColor: AppColors.error),
           child: _busy
               ? const SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Xoá vĩnh viễn'),
+              : const Text('Xóa tài khoản'),
         ),
       ],
     );

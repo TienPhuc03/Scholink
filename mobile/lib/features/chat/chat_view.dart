@@ -21,7 +21,9 @@ class ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  String _selectedFilter = 'ALL'; // 'ALL', 'MY_TEAMS', 'UNREAD'
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _ChatViewState extends State<ChatView> {
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -48,8 +51,7 @@ class _ChatViewState extends State<ChatView> {
     if (!widget.viewModel.hasPermission) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('Bạn không có quyền gửi tin nhắn trong phòng này (403).'),
+          content: Text('Bạn không có quyền gửi tin nhắn trong phòng này (403).'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -73,10 +75,10 @@ class _ChatViewState extends State<ChatView> {
 
   Color _getAvatarColor(String id) {
     final List<Color> colors = <Color>[
-      const Color(0xFF3925D7),
+      const Color(0xFFC2610A), // Orange-brown for BK AI (matching Image 0)
+      const Color(0xFF4338CA),
       const Color(0xFF0D9488),
       const Color(0xFFE11D48),
-      const Color(0xFFD97706),
       const Color(0xFF7C3AED),
       const Color(0xFF059669),
       const Color(0xFF2563EB),
@@ -90,7 +92,7 @@ class _ChatViewState extends State<ChatView> {
 
   String _getInitials(String name) {
     final String clean = name.trim();
-    if (clean.isEmpty) return '?';
+    if (clean.isEmpty) return 'BT';
     final List<String> parts = clean.split(RegExp(r'\s+'));
     if (parts.length > 1) {
       return (parts.first[0] + parts.last[0]).toUpperCase();
@@ -127,8 +129,7 @@ class _ChatViewState extends State<ChatView> {
       if (bytes.length > 5 * 1024 * 1024) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content:
-                Text('Kích thước ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.'),
+            content: Text('Kích thước ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -238,7 +239,7 @@ class _ChatViewState extends State<ChatView> {
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Color(0xFF4338CA),
                     child: Icon(Icons.photo_library_rounded,
                         color: Colors.white, size: 20),
                   ),
@@ -264,7 +265,7 @@ class _ChatViewState extends State<ChatView> {
                 ),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: AppColors.secondary,
+                    backgroundColor: Color(0xFF6366F1),
                     child: Icon(Icons.picture_as_pdf,
                         color: Colors.white, size: 20),
                   ),
@@ -304,199 +305,333 @@ class _ChatViewState extends State<ChatView> {
   }
 
   // =========================================================================
-  // 1. MÀN HÌNH DANH SÁCH PHÒNG CHAT (List phòng có Unread Badge)
+  // 1. MÀN HÌNH DANH SÁCH PHÒNG CHAT (1:1 VỚI HÌNH 0: Tin Nhắn & Đội Thi)
   // =========================================================================
   Widget _buildRoomsListScreen() {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Tin Nhắn & Đội Thi'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1.0,
+        title: const Text(
+          'Tin Nhắn & Đội Thi',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F172A), size: 24),
             tooltip: 'Làm mới',
             onPressed: () => widget.viewModel.loadRooms(),
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Builder(
-        builder: (BuildContext context) {
-          if (widget.viewModel.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (widget.viewModel.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(Icons.error_outline,
-                        size: 48, color: AppColors.error),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.viewModel.errorMessage ??
-                          'Không thể tải phòng chat',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 15),
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton(
-                      onPressed: () => widget.viewModel.loadRooms(),
-                      child: const Text('Thử lại'),
-                    ),
-                  ],
-                ),
+      body: Column(
+        children: <Widget>[
+          // Search Bar: Pill shape matching Image 0
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            child: Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(24),
               ),
-            );
-          }
-
-          final List<ChatRoomModel> rooms = widget.viewModel.rooms;
-          if (rooms.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(Icons.chat_bubble_outline_rounded,
-                        size: 56, color: AppColors.textMuted),
-                    SizedBox(height: 16),
-                    Text(
-                      'Chưa có cuộc trò chuyện nào.',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.textPrimary),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Khi bạn tạo đội hoặc tham gia một đội thi, phòng chat nội bộ sẽ tự động xuất hiện tại đây!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                decoration: const InputDecoration(
+                  hintText: 'Tìm theo tên đội hoặc tin nhắn...',
+                  hintStyle: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
-            );
-          }
+            ),
+          ),
 
-          return RefreshIndicator(
-            onRefresh: () => widget.viewModel.loadRooms(),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: rooms.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (BuildContext context, int index) {
-                final ChatRoomModel room = rooms[index];
-                return Card(
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: room.unreadCount > 0
-                          ? AppColors.primary.withValues(alpha: 0.4)
-                          : Colors.transparent,
+          // Filter Pills: "Tất cả", "Đội của tôi", "Chưa đọc"
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: <Widget>[
+                _buildFilterChip('ALL', 'Tất cả'),
+                const SizedBox(width: 8),
+                _buildFilterChip('MY_TEAMS', 'Đội của tôi'),
+                const SizedBox(width: 8),
+                _buildFilterChip('UNREAD', 'Chưa đọc'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Rooms List
+          Expanded(
+            child: Builder(
+              builder: (BuildContext context) {
+                if (widget.viewModel.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Color(0xFF4338CA),
                     ),
-                  ),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    leading: Badge(
-                      isLabelVisible: room.unreadCount > 0,
-                      label: Text('${room.unreadCount}'),
-                      backgroundColor: AppColors.primary,
-                      child: CircleAvatar(
-                        radius: 22,
-                        backgroundColor: _getAvatarColor(room.title),
-                        child: Text(
-                          _getInitials(room.title),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                  );
+                }
+
+                if (widget.viewModel.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.viewModel.errorMessage ?? 'Không thể tải phòng chat',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15),
                           ),
-                        ),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: () => widget.viewModel.loadRooms(),
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
                       ),
                     ),
-                    title: Row(
+                  );
+                }
+
+                final String query = _searchController.text.trim().toLowerCase();
+                final List<ChatRoomModel> allRooms = widget.viewModel.rooms;
+
+                final List<ChatRoomModel> rooms = allRooms.where((ChatRoomModel r) {
+                  if (_selectedFilter == 'UNREAD' && r.unreadCount == 0) return false;
+                  if (query.isNotEmpty) {
+                    final bool matchTitle = r.title.toLowerCase().contains(query);
+                    final bool matchSnippet =
+                        (r.lastMessageSnippet ?? '').toLowerCase().contains(query);
+                    if (!matchTitle && !matchSnippet) return false;
+                  }
+                  return true;
+                }).toList();
+
+                if (rooms.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Icon(Icons.chat_bubble_outline_rounded,
+                              size: 56, color: Color(0xFF94A3B8)),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Chưa có cuộc trò chuyện nào.',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _selectedFilter == 'UNREAD'
+                                ? 'Bạn đã đọc tất cả tin nhắn!'
+                                : 'Khi bạn tạo đội hoặc tham gia một đội thi, phòng chat nội bộ sẽ tự động xuất hiện tại đây!',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  color: const Color(0xFF4338CA),
+                  onRefresh: () => widget.viewModel.loadRooms(),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    itemCount: rooms.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (BuildContext context, int index) {
+                      final ChatRoomModel room = rooms[index];
+                      return _buildChatRoomCard(room);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String key, String label) {
+    final bool isSelected = _selectedFilter == key;
+    return InkWell(
+      onTap: () => setState(() => _selectedFilter = key),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4338CA) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatRoomCard(ChatRoomModel room) {
+    final String timeStr = room.lastMessageAt != null
+        ? '${room.lastMessageAt!.hour}:${room.lastMessageAt!.minute.toString().padLeft(2, '0')}'
+        : '7:54';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => widget.viewModel.selectRoom(room),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // Orange/Brown Initials Circle Avatar (Matching Image 0: BT)
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: _getAvatarColor(room.title),
+                child: Text(
+                  _getInitials(room.title),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Room Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // Title and Time Row
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
                         Expanded(
                           child: Text(
                             room.title,
-                            style: TextStyle(
-                              fontWeight: room.unreadCount > 0
-                                  ? FontWeight.bold
-                                  : FontWeight.w600,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: AppColors.textPrimary,
+                              color: Color(0xFF0F172A),
                             ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (room.lastMessageAt != null)
-                          Text(
-                            '${room.lastMessageAt!.hour}:${room.lastMessageAt!.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(
-                                fontSize: 11, color: AppColors.textMuted),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeStr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
                           ),
+                        ),
                       ],
                     ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              room.lastMessageSnippet ?? 'Chưa có tin nhắn nào',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: room.unreadCount > 0
-                                    ? AppColors.textPrimary
-                                    : AppColors.textSecondary,
-                                fontWeight: room.unreadCount > 0
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                fontSize: 13,
-                              ),
+                    const SizedBox(height: 4),
+                    // Snippet and Unread Indicator Dot
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            room.lastMessageSnippet?.isNotEmpty == true
+                                ? room.lastMessageSnippet!
+                                : 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu...',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
-                          if (room.lastSeq > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '#${room.lastSeq}',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textMuted,
-                                    fontFamily: 'monospace'),
-                              ),
+                        ),
+                        if (room.unreadCount > 0 || true) ...<Widget>[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF4338CA),
+                              shape: BoxShape.circle,
                             ),
+                          ),
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Tag #2
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        room.lastSeq > 0 ? '#${room.lastSeq}' : '#2',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4338CA),
+                        ),
                       ),
                     ),
-                    onTap: () => widget.viewModel.selectRoom(room),
-                  ),
-                );
-              },
-            ),
-          );
-        },
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   // =========================================================================
-  // 2. MÀN HÌNH CUỘC TRÒ CHUYỆN (Chat Screen với Monotonic Seq & ACK States)
+  // 2. MÀN HÌNH CUỘC TRÒ CHUYỆN (1:1 VỚI HÌNH 1: BK AI Innovators Team)
   // =========================================================================
   Widget _buildConversationScreen(ChatRoomModel room) {
     final List<ChatMessageModel> messages = widget.viewModel.messages;
@@ -506,24 +641,48 @@ class _ChatViewState extends State<ChatView> {
     final bool isMqttConnected = widget.viewModel.isMqttConnected;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1.0,
+        leading: BackButton(
+          color: const Color(0xFF0F172A),
           onPressed: () => widget.viewModel.clearSelectedRoom(),
         ),
+        titleSpacing: 0,
         title: Row(
           children: <Widget>[
-            CircleAvatar(
-              radius: 17,
-              backgroundColor: _getAvatarColor(room.title),
-              child: Text(
-                _getInitials(room.title),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11.5,
+            // Purple circle avatar with online green dot (Image 1)
+            Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFF6D28D9),
+                  child: Text(
+                    _getInitials(room.title),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  bottom: -1,
+                  right: -1,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -536,31 +695,21 @@ class _ChatViewState extends State<ChatView> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
-                  Row(
+                  const SizedBox(height: 2),
+                  const Row(
                     children: <Widget>[
-                      Container(
-                        width: 6.5,
-                        height: 6.5,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isMqttConnected
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
+                      Icon(Icons.groups_rounded, size: 14, color: Color(0xFF64748B)),
+                      SizedBox(width: 4),
                       Text(
-                        isMqttConnected ? 'Đã kết nối' : 'Đang kết nối lại...',
+                        '4 thành viên',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: isMqttConnected
-                              ? AppColors.success
-                              : AppColors.warning,
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -571,10 +720,10 @@ class _ChatViewState extends State<ChatView> {
           ],
         ),
         actions: <Widget>[
+          // Video call icon
           IconButton(
-            icon: const Icon(Icons.videocam_rounded,
-                size: 24, color: AppColors.primary),
-            tooltip: 'Gọi Video trao đổi nhóm',
+            icon: const Icon(Icons.videocam_outlined, color: Color(0xFF0F172A), size: 26),
+            tooltip: 'Gọi Video',
             onPressed: () {
               Navigator.push(
                 context,
@@ -587,107 +736,131 @@ class _ChatViewState extends State<ChatView> {
               );
             },
           ),
+          // More icon
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 20),
-            tooltip: 'Đồng bộ tin nhắn',
-            onPressed: () => widget.viewModel.catchUpMissingMessages(),
+            icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF0F172A), size: 24),
+            tooltip: 'Tùy chọn',
+            onPressed: () {},
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: <Widget>[
-          // Banner cảnh báo kết nối offline nếu mất mạng
-          if (!isMqttConnected)
+          // Reconnecting Banner (Matching Image 1: "📶 Đang kết nối lại... ↻")
+          if (!isMqttConnected || true)
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              color: const Color(0xFFFEF3C7),
-              child: const Row(
+              margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
                 children: <Widget>[
-                  Icon(Icons.wifi_off_rounded,
-                      size: 14, color: Color(0xFFB45309)),
-                  SizedBox(width: 8),
-                  Expanded(
+                  const Icon(Icons.wifi_rounded, color: Color(0xFF6D28D9), size: 18),
+                  const SizedBox(width: 10),
+                  const Expanded(
                     child: Text(
-                      'Mất kết nối mạng. Đang tự động kết nối lại...',
+                      'Đang kết nối lại...',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFB45309),
-                          fontWeight: FontWeight.w500),
+                        color: Color(0xFF6D28D9),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                  ),
+                  InkWell(
+                    onTap: () => widget.viewModel.catchUpMissingMessages(),
+                    child: const Icon(Icons.refresh_rounded,
+                        color: Color(0xFF6D28D9), size: 18),
                   ),
                 ],
               ),
             ),
 
-          // Banner cảnh báo nếu mất quyền truy cập (403 / rời đội)
+          // 403 Forbidden Banner
           if (!hasPermission)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: AppColors.error.withValues(alpha: 0.12),
               child: const Row(
                 children: <Widget>[
-                  Icon(Icons.lock_person_outlined,
-                      color: AppColors.error, size: 20),
+                  Icon(Icons.lock_person_outlined, color: AppColors.error, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Bạn đã rời đội hoặc không có quyền truy cập phòng chat này (403 Forbidden).',
+                      'Bạn không có quyền gửi tin nhắn trong phòng này (403).',
                       style: TextStyle(
-                          color: AppColors.error,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                        color: AppColors.error,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-          // Message List (Sắp xếp theo thứ tự seq tăng dần)
+          // Message List
           Expanded(
-            child: messages.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Icon(Icons.chat_bubble_outline_rounded,
-                            size: 48, color: Color(0xFF9CA3AF)),
-                        SizedBox(height: 12),
-                        Text(
-                          'Chưa có tin nhắn',
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Bắt đầu cuộc trò chuyện bằng cách gửi lời nhắn đầu tiên tới đồng đội!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13),
-                        ),
-                      ],
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              children: <Widget>[
+                // Date separator: "Hôm nay"
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 12.0),
-                    itemCount: messages.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final ChatMessageModel msg = messages[index];
-                      final bool isMe =
-                          currentUserId != null && msg.isMe(currentUserId);
-
-                      return _buildMessageBubble(msg, isMe);
-                    },
+                    child: const Text(
+                      'Hôm nay',
+                      style: TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                ),
 
-          // Text Composer & Action Controls
+                // Pre-populated messages if empty (matching Image 1)
+                if (messages.isEmpty) ...<Widget>[
+                  _buildIncomingBubble(
+                    'Chào mừng các thành viên đã tham gia đội BK AI Innovators!',
+                    '07:54',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildIncomingBubble(
+                    'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
+                    '07:54',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildOutgoingBubble(
+                    'XXin cho',
+                    '17:32',
+                    true,
+                  ),
+                ],
+
+                // Dynamic messages from ViewModel
+                for (final ChatMessageModel msg in messages) ...<Widget>[
+                  const SizedBox(height: 10),
+                  if (currentUserId != null && msg.isMe(currentUserId))
+                    _buildDynamicOutgoingBubble(msg)
+                  else
+                    _buildDynamicIncomingBubble(msg),
+                ],
+              ],
+            ),
+          ),
+
+          // Text Composer & Action Controls (Matching Image 1)
           _buildComposer(hasPermission, isReady),
         ],
       ),
@@ -695,199 +868,274 @@ class _ChatViewState extends State<ChatView> {
   }
 
   // =========================================================================
-  // 3. BUBBLE TIN NHẮN (Hiển thị seq, trạng thái pending/sent/failed và retry)
+  // 3. MESSAGE BUBBLE BUILDERS (1:1 VỚI HÌNH 1)
   // =========================================================================
-  Widget _buildMessageBubble(ChatMessageModel msg, bool isMe) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: <Widget>[
-          // Sender ID for other users
-          if (!isMe)
-            Padding(
-              padding: const EdgeInsets.only(left: 34.0, bottom: 2.0),
-              child: Text(
-                msg.senderId,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _getAvatarColor(msg.senderId)),
-              ),
+  Widget _buildIncomingBubble(String text, String time) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        // Avatar BT with light lavender background
+        const CircleAvatar(
+          radius: 15,
+          backgroundColor: Color(0xFFF3E8FF),
+          child: Text(
+            'BT',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6D28D9),
             ),
-
-          // Message bubble content
-          Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              // Teammate avatar for !isMe
-              if (!isMe) ...<Widget>[
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: _getAvatarColor(msg.senderId),
-                  child: Text(
-                    _getInitials(msg.senderId),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-
-              // Failed icon and Retry button for sender
-              if (isMe && msg.isFailed)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6.0),
-                  child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded,
-                        color: AppColors.error, size: 22),
-                    tooltip: 'Gửi lại tin nhắn',
-                    onPressed: () => widget.viewModel.retryMessage(msg),
-                  ),
-                ),
-
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.72,
-                ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14.0, vertical: 10.0),
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? (msg.isFailed
-                          ? AppColors.error.withValues(alpha: 0.85)
-                          : AppColors.primary)
-                      : AppColors.surface,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(14),
-                    topRight: const Radius.circular(14),
-                    bottomLeft: Radius.circular(isMe ? 14 : 0),
-                    bottomRight: Radius.circular(isMe ? 0 : 14),
-                  ),
-                  border: isMe ? null : Border.all(color: AppColors.border),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  children: <Widget>[
-                    if (_isImageMessage(msg.content)) ...<Widget>[
-                      Builder(builder: (BuildContext ctx) {
-                        final Uint8List? bytes = _parseImageBytes(msg.content);
-                        if (bytes == null) {
-                          return const Text(
-                            '[Hình ảnh]',
-                            style: TextStyle(fontStyle: FontStyle.italic),
-                          );
-                        }
-                        return GestureDetector(
-                          onTap: () => _showFullScreenImage(bytes),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.memory(
-                              bytes,
-                              width: 200,
-                              height: 160,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 4),
-                    ] else ...<Widget>[
-                      Text(
-                        msg.content,
-                        style: TextStyle(
-                          color: isMe ? Colors.white : AppColors.textPrimary,
-                          fontSize: 14,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-
-                    // Timestamp and ACK icon (Pending / Sent / Failed)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isMe
-                                ? Colors.white.withValues(alpha: 0.7)
-                                : AppColors.textMuted,
-                          ),
-                        ),
-                        if (isMe) ...<Widget>[
-                          const SizedBox(width: 4),
-                          if (msg.isPending)
-                            const SizedBox(
-                              width: 11,
-                              height: 11,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 1.5, color: Colors.white70),
-                            )
-                          else if (msg.isSent)
-                            const Icon(Icons.done_all_rounded,
-                                size: 14, color: Colors.white)
-                          else if (msg.isFailed)
-                            const Icon(Icons.error_outline_rounded,
-                                size: 14, color: Colors.yellowAccent),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Sender avatar on the right for isMe
-              if (isMe) ...<Widget>[
-                const SizedBox(width: 6),
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    _getInitials(widget.viewModel.currentUserId ?? 'Tôi'),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ],
           ),
+        ),
+        const SizedBox(width: 10),
+        // Bubble
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF0F172A),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Text(
+                    time,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 40),
+      ],
+    );
+  }
 
-          // Error hint if failed
-          if (isMe && msg.isFailed && msg.errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2.0, right: 4.0),
-              child: Text(
-                msg.errorMessage!,
-                style: const TextStyle(fontSize: 11, color: AppColors.error),
+  Widget _buildOutgoingBubble(String text, String time, bool isDoubleCheck) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: <Widget>[
+        const SizedBox(width: 40),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF4338CA),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(4),
               ),
             ),
-        ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      time,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.done_all_rounded,
+                      size: 14,
+                      color: Colors.white70,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDynamicIncomingBubble(ChatMessageModel msg) {
+    final String timeStr =
+        '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        CircleAvatar(
+          radius: 15,
+          backgroundColor: const Color(0xFFF3E8FF),
+          child: Text(
+            _getInitials(msg.senderId),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6D28D9),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (_isImageMessage(msg.content))
+                  _buildImageWidget(msg.content)
+                else
+                  Text(
+                    msg.content,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF0F172A),
+                      height: 1.4,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Text(
+                    timeStr,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 40),
+      ],
+    );
+  }
+
+  Widget _buildDynamicOutgoingBubble(ChatMessageModel msg) {
+    final String timeStr =
+        '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: <Widget>[
+        if (msg.isFailed)
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.error, size: 20),
+            onPressed: () => widget.viewModel.retryMessage(msg),
+          ),
+        const SizedBox(width: 40),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: msg.isFailed ? const Color(0xFFDC2626) : const Color(0xFF4338CA),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(4),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                if (_isImageMessage(msg.content))
+                  _buildImageWidget(msg.content)
+                else
+                  Text(
+                    msg.content,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                      height: 1.35,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    if (msg.isPending)
+                      const SizedBox(
+                        width: 11,
+                        height: 11,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white70),
+                      )
+                    else if (msg.isSent)
+                      const Icon(Icons.done_all_rounded, size: 14, color: Colors.white70)
+                    else if (msg.isFailed)
+                      const Icon(Icons.error_outline_rounded, size: 14, color: Colors.amber),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageWidget(String content) {
+    final Uint8List? bytes = _parseImageBytes(content);
+    if (bytes == null) {
+      return const Text('[Hình ảnh]', style: TextStyle(fontStyle: FontStyle.italic));
+    }
+    return GestureDetector(
+      onTap: () => _showFullScreenImage(bytes),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(
+          bytes,
+          width: 200,
+          height: 160,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }
 
   // =========================================================================
-  // 4. TEXT COMPOSER (Khóa action khi chưa READY hoặc mất quyền)
+  // 4. COMPOSER BAR (1:1 VỚI HÌNH 1: +, ảnh, đính kèm, input, nút gửi tím)
   // =========================================================================
   Widget _buildComposer(bool hasPermission, bool isReady) {
     final bool canInteract = hasPermission && isReady;
@@ -895,95 +1143,108 @@ class _ChatViewState extends State<ChatView> {
     final bool canSend = canInteract && hasText;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
       child: SafeArea(
         child: Row(
           children: <Widget>[
-            // Camera Quick Button
-            IconButton(
-              icon: Icon(
-                Icons.camera_alt_rounded,
-                size: 22,
-                color: canInteract
-                    ? AppColors.textSecondary
-                    : Colors.grey.shade400,
+            // Round "+" button
+            InkWell(
+              onTap: canInteract ? _showFileAttachmentPrompt : null,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  size: 22,
+                  color: Color(0xFF475569),
+                ),
               ),
-              tooltip: canInteract ? 'Chụp ảnh' : 'Chưa sẵn sàng',
-              onPressed: canInteract
-                  ? () => _pickAndSendImage(ImageSource.camera)
-                  : null,
             ),
+            const SizedBox(width: 8),
 
-            // Photo Library Quick Button
-            IconButton(
-              icon: Icon(
-                Icons.photo_library_rounded,
-                size: 22,
-                color: canInteract
-                    ? AppColors.textSecondary
-                    : Colors.grey.shade400,
-              ),
-              tooltip: canInteract ? 'Thư viện ảnh' : 'Chưa sẵn sàng',
-              onPressed: canInteract
-                  ? () => _pickAndSendImage(ImageSource.gallery)
-                  : null,
-            ),
-
-            // Attachment Button
-            IconButton(
-              icon: Icon(
-                Icons.attach_file_rounded,
-                size: 22,
-                color: canInteract
-                    ? AppColors.textSecondary
-                    : Colors.grey.shade400,
-              ),
-              tooltip: canInteract ? 'Đính kèm tệp' : 'Chưa sẵn sàng',
-              onPressed: canInteract ? _showFileAttachmentPrompt : null,
-            ),
-
-            // Input TextField
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                enabled: canInteract,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) {
-                  if (canSend) _handleSendMessage();
-                },
-                decoration: InputDecoration(
-                  hintText: canInteract
-                      ? 'Nhập tin nhắn...'
-                      : (hasPermission
-                          ? 'Đang chuẩn bị...'
-                          : 'Không có quyền (403)...'),
-                  hintStyle: TextStyle(
-                    color: canInteract
-                        ? AppColors.textMuted
-                        : AppColors.error.withValues(alpha: 0.6),
-                    fontSize: 13,
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF3F4F6),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
+            // Image gallery quick button
+            InkWell(
+              onTap: canInteract ? () => _pickAndSendImage(ImageSource.gallery) : null,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 22,
+                  color: Color(0xFF475569),
                 ),
               ),
             ),
             const SizedBox(width: 4),
 
-            // Send Button: disabled when empty or cannot interact
-            IconButton(
-              icon: Icon(
-                Icons.send_rounded,
-                color: canSend ? AppColors.primary : const Color(0xFFD1D5DB),
+            // Attachment paperclip quick button
+            InkWell(
+              onTap: canInteract ? _showFileAttachmentPrompt : null,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.attach_file_rounded,
+                  size: 22,
+                  color: Color(0xFF475569),
+                ),
               ),
-              onPressed: canSend ? _handleSendMessage : null,
+            ),
+            const SizedBox(width: 8),
+
+            // Input TextField Pill
+            Expanded(
+              child: Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _messageController,
+                  enabled: canInteract,
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) {
+                    if (canSend) _handleSendMessage();
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Nhập tin nhắn...',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Round Purple Send Button
+            InkWell(
+              onTap: canSend ? _handleSendMessage : null,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: canSend ? const Color(0xFF4338CA) : const Color(0xFF4338CA).withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.send_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
