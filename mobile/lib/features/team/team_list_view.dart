@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_widgets.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import 'team_model.dart';
 import 'team_viewmodel.dart';
 
@@ -951,10 +952,7 @@ class _TeamListViewState extends State<TeamListView> {
         listenable: widget.viewModel,
         builder: (BuildContext context, Widget? child) {
           if (widget.viewModel.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(
-                  strokeWidth: 2.5, color: Color(0xFF4338CA)),
-            );
+            return const TeamListSkeleton(count: 4);
           }
 
           final String? currentUserId = widget.viewModel.currentUserId;
