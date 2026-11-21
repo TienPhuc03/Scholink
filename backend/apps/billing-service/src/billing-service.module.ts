@@ -10,6 +10,9 @@ import { MongooseWalletRepository } from './infrastructure/persistence/wallet.re
 import { MongoosePaymentRepository } from './infrastructure/persistence/payment.repository';
 import { WalletUseCase } from './application/use-cases/wallet.use-case';
 import { WalletController } from './presentation/wallet.controller';
+import { PayOsPaymentAdapter } from './infrastructure/gateways/payos.adapter';
+import { SandboxPaymentAdapter } from './infrastructure/gateways/sandbox.adapter';
+import { PaymentGatewayFactory } from './infrastructure/gateways/payment-gateway.factory';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { WalletController } from './presentation/wallet.controller';
   controllers: [WalletController],
   providers: [
     WalletUseCase,
+    PayOsPaymentAdapter,
+    SandboxPaymentAdapter,
+    PaymentGatewayFactory,
     {
       provide: WALLET_REPOSITORY,
       useClass: MongooseWalletRepository,
@@ -36,6 +42,6 @@ import { WalletController } from './presentation/wallet.controller';
       useClass: MongoosePaymentRepository,
     },
   ],
-  exports: [WalletUseCase, WALLET_REPOSITORY, PAYMENT_REPOSITORY],
+  exports: [WalletUseCase, WALLET_REPOSITORY, PAYMENT_REPOSITORY, PaymentGatewayFactory],
 })
 export class BillingServiceModule {}

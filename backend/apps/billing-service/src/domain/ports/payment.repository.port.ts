@@ -2,6 +2,7 @@ import { PaymentOrder } from '../payment.entity';
 
 export interface IPaymentRepository {
   findById(id: string): Promise<PaymentOrder | null>;
+  findByOrderCode(orderCode: number): Promise<PaymentOrder | null>;
   save(order: PaymentOrder): Promise<void>;
   update(order: PaymentOrder): Promise<void>;
 }

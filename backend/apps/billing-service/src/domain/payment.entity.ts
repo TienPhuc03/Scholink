@@ -1,12 +1,14 @@
 import { AggregateRoot } from '@shared';
 
-export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED';
+export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
 
 export interface PaymentOrderProps {
   userId: string;
   amountVnd: number;
   provider: string;
+  orderCode?: number;
   checkoutUrl?: string;
+  qrCode?: string;
   status: PaymentStatus;
   idempotencyKey?: string;
   createdAt?: Date;
@@ -28,6 +30,10 @@ export class PaymentOrder extends AggregateRoot<string> {
 
   get amountVnd(): number {
     return this._props.amountVnd;
+  }
+
+  get orderCode(): number | undefined {
+    return this._props.orderCode;
   }
 
   get status(): PaymentStatus {

@@ -45,6 +45,8 @@ import '../../features/notification/notification_repository.dart';
 import '../../features/notification/notification_viewmodel.dart';
 import '../../features/auth/social_sign_in.dart';
 import '../../features/notification/push_listener.dart';
+import '../../features/wallet/wallet_repository.dart';
+import '../../features/wallet/wallet_viewmodel.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -209,5 +211,14 @@ void registerDependencies({
 
   sl.registerFactory<NotificationViewModel>(
     () => NotificationViewModel(sl<NotificationRepository>()),
+  );
+
+  // Feature 7: Wallet & Billing (PayOS VietQR)
+  sl.registerLazySingleton<WalletRepository>(
+    () => WalletRepository(apiClient: sl<ApiClient>()),
+  );
+
+  sl.registerFactory<WalletViewModel>(
+    () => WalletViewModel(repository: sl<WalletRepository>()),
   );
 }

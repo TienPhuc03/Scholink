@@ -59,6 +59,8 @@ import 'features/passport/profile_view_screen.dart';
 import 'features/team/team_list_view.dart';
 import 'features/team/team_model.dart';
 import 'features/team/team_viewmodel.dart';
+import 'features/wallet/wallet_view.dart';
+import 'features/wallet/wallet_viewmodel.dart';
 
 class ScholinkApp extends StatefulWidget {
   final bool initialIsAuthenticated;
@@ -591,6 +593,17 @@ class _ScholinkAppState extends State<ScholinkApp> {
     );
   }
 
+  void _openWallet() {
+    _nav.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.wallet),
+        builder: (_) => WalletView(
+          viewModel: sl<WalletViewModel>(),
+        ),
+      ),
+    );
+  }
+
   /// Q11: after a successful submit the apply flow is replaced by the detail,
   /// so "back" returns to the opportunity.
   void _openApplicationDetail(String id,
@@ -810,6 +823,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
               onLogout: _handleLogout,
               onDeleteAccount: _handleDeleteAccount,
               onOpenMyApplications: _openMyApplications,
+              onOpenWallet: _openWallet,
               onPreviewProfile: _openMyProfilePreview,
             ),
         ],

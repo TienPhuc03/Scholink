@@ -19,6 +19,9 @@ class PassportView extends StatefulWidget {
   /// Opens "Hồ sơ ứng tuyển của tôi" (F19).
   final VoidCallback? onOpenMyApplications;
 
+  /// Opens "Ví tiền & Nạp VietQR PayOS".
+  final VoidCallback? onOpenWallet;
+
   /// FR-PROF-05: shows the Passport as other people see it.
   final VoidCallback? onPreviewProfile;
 
@@ -31,6 +34,7 @@ class PassportView extends StatefulWidget {
     required this.viewModel,
     required this.onLogout,
     this.onOpenMyApplications,
+    this.onOpenWallet,
     this.onPreviewProfile,
     this.onDeleteAccount,
   });
@@ -299,6 +303,12 @@ class _PassportViewState extends State<PassportView> {
                   const SizedBox(height: 14),
                 ],
 
+                // 2B. Wallet & Payment Entry (PayOS VietQR)
+                if (widget.onOpenWallet != null) ...<Widget>[
+                  _buildWalletEntry(),
+                  const SizedBox(height: 14),
+                ],
+
                 // 3. Thông tin cá nhân
                 _buildIdentityCard(passport),
                 const SizedBox(height: 14),
@@ -545,6 +555,74 @@ class _PassportViewState extends State<PassportView> {
                     SizedBox(height: 2),
                     Text(
                       'Theo dõi trạng thái các hồ sơ đã nộp',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 22, color: Color(0xFF94A3B8)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletEntry() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        key: const Key('passport_wallet'),
+        borderRadius: BorderRadius.circular(16),
+        onTap: widget.onOpenWallet,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF0FD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Ví tiền & Nạp VietQR (PayOS)',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Nạp tiền Napas 24/7 & Mua gói Plus đặc quyền',
                       style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFF64748B),

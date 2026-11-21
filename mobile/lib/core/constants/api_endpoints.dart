@@ -111,4 +111,10 @@ abstract final class ApiEndpoints {
   static String markChatRead(String roomId) =>
       '/api/v1/chats/rooms/$roomId/read';
   static const String directChatRoom = '/api/v1/chats/direct-rooms';
+
+  // Billing & Wallet routes (PayOS VietQR Napas)
+  static const String wallet = '/api/v1/wallet';
+  static const String topups = '/api/v1/payments/topups';
+  static String orderStatus(String id) => '/api/v1/payments/orders/$id/status';
+  static const String walletPurchases = '/api/v1/wallet/purchases';
 }

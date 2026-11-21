@@ -23,15 +23,21 @@ export class PaymentOrderModel {
   @Prop({ required: true })
   provider: string;
 
+  @Prop({ index: true, sparse: true })
+  orderCode?: number;
+
   @Prop()
   merchantOrderId?: string;
 
   @Prop()
   checkoutUrl?: string;
 
+  @Prop()
+  qrCode?: string;
+
   @Prop({
     required: true,
-    enum: ['CREATED', 'PENDING', 'SUCCEEDED', 'FAILED', 'EXPIRED', 'FLAGGED'],
+    enum: ['CREATED', 'PENDING', 'SUCCEEDED', 'FAILED', 'EXPIRED', 'FLAGGED', 'CANCELLED'],
     default: 'PENDING',
     index: true,
   })

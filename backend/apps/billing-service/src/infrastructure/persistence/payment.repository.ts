@@ -18,7 +18,25 @@ export class MongoosePaymentRepository implements IPaymentRepository {
       userId: doc.userId,
       amountVnd: doc.amountVnd,
       provider: doc.provider,
+      orderCode: doc.orderCode,
       checkoutUrl: doc.checkoutUrl,
+      qrCode: doc.qrCode,
+      status: doc.status as PaymentStatus,
+      idempotencyKey: doc.idempotencyKey,
+      version: doc.version,
+    });
+  }
+
+  async findByOrderCode(orderCode: number): Promise<PaymentOrder | null> {
+    const doc = await this.model.findOne({ orderCode }).exec();
+    if (!doc) return null;
+    return new PaymentOrder(doc.id, {
+      userId: doc.userId,
+      amountVnd: doc.amountVnd,
+      provider: doc.provider,
+      orderCode: doc.orderCode,
+      checkoutUrl: doc.checkoutUrl,
+      qrCode: doc.qrCode,
       status: doc.status as PaymentStatus,
       idempotencyKey: doc.idempotencyKey,
       version: doc.version,
@@ -31,7 +49,9 @@ export class MongoosePaymentRepository implements IPaymentRepository {
       userId: order.userId,
       amountVnd: order.amountVnd,
       provider: order.props.provider,
+      orderCode: order.props.orderCode,
       checkoutUrl: order.props.checkoutUrl,
+      qrCode: order.props.qrCode,
       status: order.status,
       idempotencyKey: order.props.idempotencyKey,
       version: order.version,
@@ -45,6 +65,8 @@ export class MongoosePaymentRepository implements IPaymentRepository {
         {
           status: order.status,
           version: order.version,
+          checkoutUrl: order.props.checkoutUrl,
+          qrCode: order.props.qrCode,
         },
       )
       .exec();
