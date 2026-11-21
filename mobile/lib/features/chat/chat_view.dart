@@ -720,27 +720,23 @@ class _ChatViewState extends State<ChatView> {
           ],
         ),
         actions: <Widget>[
-          // Video call icon
+          // Voice call icon (Direct Audio Call)
+          IconButton(
+            icon: const Icon(Icons.phone_outlined, color: Color(0xFF0F172A), size: 24),
+            tooltip: 'Gọi thoại',
+            onPressed: () => _startDirectCall(context, room, CallType.audio),
+          ),
+          // Video call icon (Direct Video Call)
           IconButton(
             icon: const Icon(Icons.videocam_outlined, color: Color(0xFF0F172A), size: 26),
             tooltip: 'Gọi Video',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => VideoCallView(
-                    roomName: room.title,
-                    roomId: room.id,
-                  ),
-                ),
-              );
-            },
+            onPressed: () => _startDirectCall(context, room, CallType.video),
           ),
           // More icon
           IconButton(
             icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF0F172A), size: 24),
             tooltip: 'Tùy chọn',
-            onPressed: () {},
+            onPressed: () => _showCallOptionsSheet(context, room),
           ),
           const SizedBox(width: 4),
         ],
@@ -852,9 +848,9 @@ class _ChatViewState extends State<ChatView> {
                 for (final ChatMessageModel msg in messages) ...<Widget>[
                   const SizedBox(height: 10),
                   if (currentUserId != null && msg.isMe(currentUserId))
-                    _buildDynamicOutgoingBubble(msg)
+                    _buildDynamicOutgoingBubble(msg, room)
                   else
-                    _buildDynamicIncomingBubble(msg),
+                    _buildDynamicIncomingBubble(msg, room),
                 ],
               ],
             ),
@@ -983,7 +979,283 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  Widget _buildDynamicIncomingBubble(ChatMessageModel msg) {
+  void _startDirectCall(
+      BuildContext context, ChatRoomModel room, CallType type) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => DirectCallView(
+          roomName: room.title,
+          roomId: room.id,
+          initialType: type,
+          onCallEnded: (int duration, CallType callType) {
+            final String durationStr =
+                '${(duration ~/ 60).toString().padLeft(2, '0')}:${(duration % 60).toString().padLeft(2, '0')}';
+            final String iconStr = callType == CallType.video ? '📹' : '📞';
+            final String typeName = callType == CallType.video
+                ? 'Cuộc gọi video'
+                : 'Cuộc gọi thoại';
+            final String text = '$iconStr $typeName ($durationStr)';
+            widget.viewModel.sendMessage(text);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showCallOptionsSheet(BuildContext context, ChatRoomModel room) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEFF6FF),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.phone_rounded,
+                        color: Color(0xFF2563EB)),
+                  ),
+                  title: const Text('Gọi thoại trực tiếp',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text(
+                      'Đàm thoại âm thanh chất lượng cao HD Voice'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _startDirectCall(context, room, CallType.audio);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEEF2FF),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.videocam_rounded,
+                        color: Color(0xFF4338CA)),
+                  ),
+                  title: const Text('Gọi video trực tiếp',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text(
+                      'Cuộc gọi hình ảnh độ nét cao với camera'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _startDirectCall(context, room, CallType.video);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.ring_volume_rounded,
+                        color: Color(0xFF059669)),
+                  ),
+                  title: const Text('Mô phỏng cuộc gọi đến',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text(
+                      'Kiểm thử giao diện nhận cuộc gọi từ đồng đội'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    IncomingCallDialog.show(
+                      context,
+                      callerName: 'Nguyễn Văn A',
+                      roomName: room.title,
+                      roomId: room.id,
+                      callType: CallType.audio,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  bool _isCallMessage(String content) =>
+      content.startsWith('📞') || content.startsWith('📹');
+
+  Widget _buildCallCard(ChatMessageModel msg, bool isMe, ChatRoomModel room) {
+    final bool isVideo = msg.content.startsWith('📹');
+    final String cleanText = msg.content.length > 2
+        ? msg.content.substring(2).trim()
+        : msg.content;
+    final String timeStr =
+        '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      width: 230,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isMe ? const Color(0xFF4338CA) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMe ? const Color(0xFF3730A3) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isMe
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : const Color(0xFF4338CA).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
+                  color: isMe ? Colors.white : const Color(0xFF4338CA),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: isMe ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cleanText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isMe ? Colors.white70 : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Divider(
+            height: 1,
+            color: isMe ? Colors.white24 : const Color(0xFFF1F5F9),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(
+                timeStr,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isMe ? Colors.white60 : const Color(0xFF94A3B8),
+                ),
+              ),
+              InkWell(
+                onTap: () => _startDirectCall(
+                  context,
+                  room,
+                  isVideo ? CallType.video : CallType.audio,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? Colors.white.withValues(alpha: 0.25)
+                        : const Color(0xFF4338CA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Gọi lại',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicIncomingBubble(
+      ChatMessageModel msg, ChatRoomModel room) {
+    if (_isCallMessage(msg.content)) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: const Color(0xFFF3E8FF),
+            child: Text(
+              _getInitials(msg.senderId),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6D28D9),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _buildCallCard(msg, false, room),
+        ],
+      );
+    }
+
     final String timeStr =
         '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
     return Row(
@@ -1044,7 +1316,17 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  Widget _buildDynamicOutgoingBubble(ChatMessageModel msg) {
+  Widget _buildDynamicOutgoingBubble(
+      ChatMessageModel msg, ChatRoomModel room) {
+    if (_isCallMessage(msg.content)) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: <Widget>[
+          _buildCallCard(msg, true, room),
+        ],
+      );
+    }
+
     final String timeStr =
         '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}';
 
