@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+export 'app_animations.dart';
 
 /// Minimalist, refined status badge with consistent typography and padding
 class StatusBadge extends StatelessWidget {

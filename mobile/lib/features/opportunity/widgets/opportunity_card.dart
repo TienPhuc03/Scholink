@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_animations.dart';
 import '../opportunity_model.dart';
 
 /// 1:1 Pixel-Perfect Opportunity Card Component matching Scholink production design.
@@ -437,11 +438,11 @@ class OpportunityCard extends StatelessWidget {
                           ],
                         );
 
-                        final Widget ctaButton = Material(
-                          color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(14),
-                          child: InkWell(
-                            onTap: onTap,
+                        final Widget ctaButton = BouncingWidget(
+                          onTap: onTap,
+                          scaleDown: 0.94,
+                          child: Material(
+                            color: const Color(0xFFEEF2FF),
                             borderRadius: BorderRadius.circular(14),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(
