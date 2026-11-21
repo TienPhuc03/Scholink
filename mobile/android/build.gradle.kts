@@ -19,11 +19,10 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// flutter_facebook_auth leaves Java at AGP's default 1.8 while Kotlin targets the JDK (21),
-// which fails JVM-target validation; align its Kotlin target with its Java target.
+// flutter_facebook_auth: align its Kotlin target with its Java target (11 in AGP 9).
 project(":flutter_facebook_auth") {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+        compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/errors/failures.dart';
 import '../../core/widgets/refresh_error_banner.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import 'opportunity_detail_view.dart';
 import 'opportunity_model.dart';
 import 'opportunity_viewmodel.dart';
@@ -566,7 +567,7 @@ class _OpportunityListViewState extends State<OpportunityListView> {
 
   Widget _buildBody() {
     if (_vm.isLoading && _vm.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
+      return const OpportunityListSkeleton(count: 3);
     }
 
     if (_vm.hasError && _vm.items.isEmpty) {

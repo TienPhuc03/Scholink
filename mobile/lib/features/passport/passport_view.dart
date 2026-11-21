@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/widgets/refresh_error_banner.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
@@ -252,12 +253,7 @@ class _PassportViewState extends State<PassportView> {
           final PassportModel? passport = vm.passport;
 
           if (vm.isLoading && passport == null) {
-            return const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Color(0xFF4338CA),
-              ),
-            );
+            return const PassportSkeleton();
           }
 
           if (vm.hasError && passport == null) {

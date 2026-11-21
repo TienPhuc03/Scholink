@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_widgets.dart';
 import '../../core/widgets/refresh_error_banner.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import 'notification_model.dart';
 import 'notification_viewmodel.dart';
 
@@ -188,7 +189,7 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
 
   Widget _buildBody() {
     if (_vm.isLoading && _vm.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const NotificationListSkeleton(count: 6);
     }
 
     if (_vm.hasError && _vm.items.isEmpty) {
