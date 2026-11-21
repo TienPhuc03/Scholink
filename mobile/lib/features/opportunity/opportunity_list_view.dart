@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/errors/failures.dart';
+import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import 'opportunity_detail_view.dart';
@@ -632,11 +633,14 @@ class _OpportunityListViewState extends State<OpportunityListView> {
         itemBuilder: (BuildContext context, int index) {
           if (index == items.length) return _buildListFooter();
           final OpportunityModel item = items[index];
-          return OpportunityCard(
-            key: ValueKey<String>('opp_card_${item.id}'),
-            item: item,
-            onTap: () => _navigateToDetail(item),
-            onBookmarkTap: () => _onBookmarkTap(item),
+          return FadeSlideTransition(
+            delay: Duration(milliseconds: (index * 35).clamp(0, 200)),
+            child: OpportunityCard(
+              key: ValueKey<String>('opp_card_${item.id}'),
+              item: item,
+              onTap: () => _navigateToDetail(item),
+              onBookmarkTap: () => _onBookmarkTap(item),
+            ),
           );
         },
       ),

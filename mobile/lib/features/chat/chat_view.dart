@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import 'chat_model.dart';
 import 'chat_viewmodel.dart';
@@ -481,7 +482,7 @@ class _ChatViewState extends State<ChatView> {
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (BuildContext context, int index) {
                       final ChatRoomModel room = rooms[index];
-                      return _buildChatRoomCard(room);
+                      return _buildChatRoomCard(room, index: index);
                     },
                   ),
                 );
@@ -516,32 +517,34 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  Widget _buildChatRoomCard(ChatRoomModel room) {
+  Widget _buildChatRoomCard(ChatRoomModel room, {int index = 0}) {
     final String timeStr = room.lastMessageAt != null
         ? '${room.lastMessageAt!.hour}:${room.lastMessageAt!.minute.toString().padLeft(2, '0')}'
         : '7:54';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
+    return FadeSlideTransition(
+      delay: Duration(milliseconds: (index * 40).clamp(0, 240)),
+      child: BouncingWidget(
         onTap: () => widget.viewModel.selectRoom(room),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
+        scaleDown: 0.98,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
               // Orange/Brown Initials Circle Avatar (Matching Image 0: BT)
               CircleAvatar(
                 radius: 22,
@@ -642,7 +645,8 @@ class _ChatViewState extends State<ChatView> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   // =========================================================================
@@ -687,13 +691,18 @@ class _ChatViewState extends State<ChatView> {
                 Positioned(
                   bottom: -1,
                   right: -1,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                  child: PulsingWidget(
+                    minScale: 0.85,
+                    maxScale: 1.15,
+                    duration: const Duration(milliseconds: 1400),
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
                 ),
@@ -1525,10 +1534,10 @@ class _ChatViewState extends State<ChatView> {
             ),
             const SizedBox(width: 8),
 
-            // Round Purple Send Button
-            InkWell(
+            // Round Purple Send Button with spring bounce
+            BouncingWidget(
               onTap: canSend ? _handleSendMessage : null,
-              borderRadius: BorderRadius.circular(20),
+              scaleDown: 0.90,
               child: Container(
                 width: 40,
                 height: 40,

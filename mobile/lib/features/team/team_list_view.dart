@@ -925,25 +925,29 @@ class _TeamListViewState extends State<TeamListView> {
           // Outlined "Tạo đội" button with purple border & icon (1:1 with Design)
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF4338CA),
-                side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minimumSize: const Size(0, 36),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+            child: BouncingWidget(
+              onTap: _showCreateTeamDialog,
+              scaleDown: 0.94,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4338CA),
+                  side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: const Size(0, 36),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.group_add_outlined,
+                    size: 18, color: Color(0xFF4338CA)),
+                label: const Text(
+                  'Tạo đội',
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4338CA)),
+                ),
+                onPressed: _showCreateTeamDialog,
               ),
-              icon: const Icon(Icons.group_add_outlined,
-                  size: 18, color: Color(0xFF4338CA)),
-              label: const Text(
-                'Tạo đội',
-                style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4338CA)),
-              ),
-              onPressed: _showCreateTeamDialog,
             ),
           ),
         ],
@@ -1026,7 +1030,7 @@ class _TeamListViewState extends State<TeamListView> {
                               const SizedBox(height: 6),
                           itemBuilder: (BuildContext context, int index) {
                             final TeamModel team = filteredTeams[index];
-                            return _buildApexTeamCard(team, currentUserId);
+                            return _buildApexTeamCard(team, currentUserId, index);
                           },
                         ),
                       ),
@@ -1240,7 +1244,7 @@ class _TeamListViewState extends State<TeamListView> {
   }
 
   /// 4. APEX Team Card (1:1 with Design Image 0)
-  Widget _buildApexTeamCard(TeamModel team, String? currentUserId) {
+  Widget _buildApexTeamCard(TeamModel team, String? currentUserId, int index) {
     final bool isLeader = currentUserId != null && team.isLeader(currentUserId);
     final bool isMember = currentUserId != null && team.isMember(currentUserId);
     final JoinRequestModel? myRequest =
@@ -1253,93 +1257,113 @@ class _TeamListViewState extends State<TeamListView> {
       skillsDisplay = extracted.replaceAll(')', '').trim();
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () => _showTeamDetailSheet(team),
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // Header Row: Avatar + Team Name + Competition Name + Badge
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // Lavender Avatar Box
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF0FD),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.groups_rounded,
-                    color: Color(0xFF4338CA),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Team Title & Competition Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        team.name,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.competitionTitle,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Badge: "Đang tuyển"
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: team.isFull
-                        ? const Color(0xFFFEE2E2)
-                        : const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    team.isFull ? 'Đã đủ' : team.statusDisplay,
-                    style: TextStyle(
-                      color: team.isFull
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFF16A34A),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+    return FadeSlideTransition(
+      delay: Duration(milliseconds: (index * 40).clamp(0, 240)),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: () => _showTeamDetailSheet(team),
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // Header Row: Avatar + Team Name + Competition Name + Badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // Lavender Avatar Box
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF0FD),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      color: Color(0xFF4338CA),
+                      size: 24,
                     ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  // Team Title & Competition Subtitle
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          team.name,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.competitionTitle,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Badge: "Đang tuyển" (with subtle breathing pulse when forming)
+                  team.isFull
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Đã đủ',
+                            style: TextStyle(
+                              color: Color(0xFFDC2626),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : PulsingWidget(
+                          minScale: 0.95,
+                          maxScale: 1.05,
+                          duration: const Duration(milliseconds: 1800),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              team.statusDisplay,
+                              style: const TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                ],
+              ),
 
             // Description
             const SizedBox(height: 12),
@@ -1403,39 +1427,48 @@ class _TeamListViewState extends State<TeamListView> {
           ],
         ),
       ),
+    ),
     );
   }
 
   Widget _buildCardActionButton(TeamModel team, bool isLeader, bool isMember,
       JoinRequestModel? myRequest) {
     if (isLeader) {
-      return ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF4338CA),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      return BouncingWidget(
+        onTap: () => _showLeaderReviewRequestsSheet(team),
+        scaleDown: 0.94,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4338CA),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => _showLeaderReviewRequestsSheet(team),
+          child: const Text('Quản lý đội',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
         ),
-        onPressed: () => _showLeaderReviewRequestsSheet(team),
-        child: const Text('Quản lý đội',
-            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
       );
     }
 
     if (isMember) {
-      return OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF4338CA),
-          side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      return BouncingWidget(
+        onTap: () => _showTeamDetailSheet(team),
+        scaleDown: 0.94,
+        child: OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF4338CA),
+            side: const BorderSide(color: Color(0xFF4338CA), width: 1.2),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => _showTeamDetailSheet(team),
+          child: const Text('Đã tham gia',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
         ),
-        onPressed: () => _showTeamDetailSheet(team),
-        child: const Text('Đã tham gia',
-            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
       );
     }
 
@@ -1454,18 +1487,22 @@ class _TeamListViewState extends State<TeamListView> {
       );
     }
 
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF4338CA),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      onPressed: team.isFull ? null : () => _showSendJoinRequestDialog(team),
-      child: Text(
-        team.isFull ? 'Hết chỗ' : 'Xin vào đội',
-        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+    return BouncingWidget(
+      onTap: team.isFull ? null : () => _showSendJoinRequestDialog(team),
+      scaleDown: 0.94,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF4338CA),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        onPressed: team.isFull ? null : () => _showSendJoinRequestDialog(team),
+        child: Text(
+          team.isFull ? 'Hết chỗ' : 'Xin vào đội',
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

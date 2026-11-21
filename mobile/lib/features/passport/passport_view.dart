@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import 'passport_edit_view.dart';
@@ -452,15 +453,12 @@ class _PassportViewState extends State<PassportView> {
             ],
           ),
           const SizedBox(height: 14),
-          // Green Progress Bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: (passport.completionScore > 0 ? passport.completionScore : 100) / 100.0,
-              minHeight: 8,
-              backgroundColor: const Color(0xFFE2E8F0),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
-            ),
+          // Green Progress Bar with Smooth Animation
+          AnimatedProgressBar(
+            progress: (passport.completionScore > 0 ? passport.completionScore : 100) / 100.0,
+            height: 8,
+            backgroundColor: const Color(0xFFE2E8F0),
+            color: const Color(0xFF16A34A),
           ),
           const SizedBox(height: 14),
           // Edit Profile Button
