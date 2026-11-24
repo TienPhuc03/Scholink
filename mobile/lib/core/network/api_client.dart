@@ -44,6 +44,7 @@ class DioApiClient implements ApiClient {
     String? baseUrl,
     Dio? dio,
     SessionEvents? sessionEvents,
+    List<Interceptor> extraInterceptors = const <Interceptor>[],
   }) {
     final BaseOptions options = BaseOptions(
       baseUrl: baseUrl ?? ApiEndpoints.defaultBaseUrl,
@@ -60,6 +61,7 @@ class DioApiClient implements ApiClient {
 
     // Add interceptors
     _dio.interceptors.addAll(<Interceptor>[
+      ...extraInterceptors,
       AuthInterceptor(
           secureStorage: secureStorage,
           dio: _dio,

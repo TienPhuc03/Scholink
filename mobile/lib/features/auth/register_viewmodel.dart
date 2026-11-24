@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
+import '../../core/firebase/app_analytics.dart';
 import '../../core/viewmodels/base_viewmodel.dart';
 import 'auth_model.dart';
 import 'auth_repository.dart';
@@ -128,6 +131,8 @@ class RegisterViewModel extends BaseViewModel {
       }
       return null;
     }
+    unawaited(
+        AppAnalytics.event('sign_up', <String, Object>{'method': 'password'}));
 
     final Result<OtpTicket, Failure> otp =
         await _repository.sendOtp(email: normalizedEmail);

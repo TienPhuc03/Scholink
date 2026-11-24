@@ -7,6 +7,8 @@ import 'core/database/room_database.dart';
 import 'core/di/service_locator.dart';
 import 'core/errors/failures.dart';
 import 'core/errors/result.dart';
+import 'core/firebase/app_analytics.dart';
+import 'core/firebase/fcm_service.dart';
 import 'core/storage/secure_storage_helper.dart';
 import 'core/network/session_events.dart';
 import 'core/theme/app_theme.dart';
@@ -97,6 +99,10 @@ class _ScholinkAppState extends State<ScholinkApp> {
   OpportunityModel? _pendingBookmark;
 
   StreamSubscription<void>? _sessionExpiry;
+  StreamSubscription<Map<String, dynamic>>? _fcmForeground;
+
+  /// Analytics screen views of named routes; created once (empty when Firebase is off).
+  final List<NavigatorObserver> _navigatorObservers = AppAnalytics.observers;
 
   /// Tab view models live for one session. Views load data once in initState, so handing them
   /// a fresh factory instance on every rebuild (e.g. each tab switch) dropped their data.
@@ -115,6 +121,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
     _resetTabViewModels();
     // F29: the next account on this device must not receive this account's pushes.
     if (sl.isRegistered<PushListener>()) unawaited(sl<PushListener>().stop());
+    if (sl.isRegistered<FcmService>()) unawaited(sl<FcmService>().unregister());
     if (sl.isRegistered<RoomDatabase>()) {
       unawaited(sl<RoomDatabase>().clearUserData());
     }
@@ -129,6 +136,12 @@ class _ScholinkAppState extends State<ScholinkApp> {
           sl<SessionEvents>().expired.listen((_) => _onSessionExpired());
     }
     _lifecycle = AppLifecycleListener(onResume: _onAppResumed);
+    // FCM while the app is open: Android shows nothing by itself, so show it like an MQTT push.
+    if (sl.isRegistered<FcmService>() && sl.isRegistered<PushListener>()) {
+      _fcmForeground = sl<FcmService>().foregroundData.listen(
+          (Map<String, dynamic> data) =>
+              unawaited(sl<PushListener>().showRemote(data)));
+    }
     if (_isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_startPush());
@@ -157,6 +170,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
     if (userId == null || userId.isEmpty || !mounted || !_isAuthenticated) {
       return;
     }
+    // FCM reaches this device even when the app is closed (MQTT only while it runs).
+    if (sl.isRegistered<FcmService>()) unawaited(sl<FcmService>().register());
     await sl<PushListener>().start(
       userId,
       onReceived: () {
@@ -199,6 +214,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void dispose() {
     _lifecycle.dispose();
     _sessionExpiry?.cancel();
+    _fcmForeground?.cancel();
     super.dispose();
   }
 
@@ -305,6 +321,9 @@ class _ScholinkAppState extends State<ScholinkApp> {
           index == AppTabs.notifications &&
           _currentTabIndex != index) {
         unawaited(_tabs.notification.loadNotifications());
+      }
+      if (_currentTabIndex != index) {
+        unawaited(AppAnalytics.screen(AppTabs.screenName(index)));
       }
       setState(() => _currentTabIndex = index);
       return;
@@ -761,6 +780,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       navigatorKey: _navigatorKey,
+      navigatorObservers: _navigatorObservers,
       scaffoldMessengerKey: _messengerKey,
       home: (_isAuthenticated || _isGuest)
           ? _buildMainNavigationScaffold()

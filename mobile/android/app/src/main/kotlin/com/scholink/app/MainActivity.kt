@@ -42,6 +42,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // FCM posts into this channel too (channelId sent by the server): it must exist first.
+        ensurePushChannel(getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
         captureRefUrl(intent)
     }
 
@@ -68,10 +70,7 @@ class MainActivity : FlutterActivity() {
     private fun showNotification(call: MethodCall): Boolean {
         if (!notificationsAllowed()) return false
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        // Called every time so an existing channel picks up the new name (importance is kept by Android).
-        val channel = NotificationChannel(PUSH_CHANNEL_ID, "Thông báo Scholink", NotificationManager.IMPORTANCE_HIGH)
-        channel.description = "Nhắc hạn đăng ký, cập nhật hồ sơ, đội thi và tin nhắn từ Scholink"
-        manager.createNotificationChannel(channel)
+        ensurePushChannel(manager)
         val key = call.argument<String>("id") ?: System.currentTimeMillis().toString()
         val title = call.argument<String>("title") ?: "Scholink"
         val body = call.argument<String>("body") ?: ""
@@ -87,7 +86,9 @@ class MainActivity : FlutterActivity() {
             .setGroup(PUSH_GROUP)
             .setContentIntent(openIntent(requestCode, refUrl))
             .build()
-        manager.notify(requestCode, notification)
+        // Tag = notification key, id 0: how FCM posts a message whose android.notification.tag is
+        // that key, so the MQTT and FCM copies of one notification replace each other.
+        manager.notify(key, 0, notification)
 
         // Own group summary: when Android stacks several Scholink notifications, tapping the stack
         // opens the inbox (the system's automatic summary would only launch the app).
@@ -102,6 +103,13 @@ class MainActivity : FlutterActivity() {
             .build()
         manager.notify(SUMMARY_ID, summary)
         return true
+    }
+
+    /** Called every time so an existing channel picks up the new name (importance is kept by Android). */
+    private fun ensurePushChannel(manager: NotificationManager) {
+        val channel = NotificationChannel(PUSH_CHANNEL_ID, "Thông báo Scholink", NotificationManager.IMPORTANCE_HIGH)
+        channel.description = "Nhắc hạn đăng ký, cập nhật hồ sơ, đội thi và tin nhắn từ Scholink"
+        manager.createNotificationChannel(channel)
     }
 
     private fun openIntent(requestCode: Int, refUrl: String?): PendingIntent {

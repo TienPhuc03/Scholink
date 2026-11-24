@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
+import '../../core/firebase/app_analytics.dart';
 import '../../core/viewmodels/base_viewmodel.dart';
 import 'application_model.dart';
 import 'application_repository.dart';
@@ -391,6 +392,8 @@ class ApplyViewModel extends BaseViewModel {
     if (ok != null) {
       _result = ok;
       _pending = null;
+      unawaited(AppAnalytics.event('application_submitted',
+          <String, Object>{'opportunity_id': opportunityId}));
       await _store.clear(opportunityId);
       _ticker?.cancel();
       notifyListeners();

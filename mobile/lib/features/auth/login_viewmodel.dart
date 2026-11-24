@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
+import '../../core/firebase/app_analytics.dart';
 import '../../core/viewmodels/base_viewmodel.dart';
 import 'auth_model.dart';
 import 'auth_repository.dart';
@@ -30,6 +33,8 @@ class LoginViewModel extends BaseViewModel {
       onSuccess: (UserModel user) {
         _currentUser = user;
         setSuccess();
+        unawaited(AppAnalytics.event(
+            'login', <String, Object>{'method': 'password'}));
         return true;
       },
       onFailure: (Failure failure) {
@@ -49,6 +54,10 @@ class LoginViewModel extends BaseViewModel {
       onSuccess: (UserModel? user) {
         _currentUser = user;
         setSuccess();
+        if (user != null) {
+          unawaited(AppAnalytics.event(
+              'login', <String, Object>{'method': provider.name}));
+        }
         return user != null;
       },
       onFailure: (Failure failure) {

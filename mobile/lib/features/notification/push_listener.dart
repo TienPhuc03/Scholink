@@ -72,6 +72,17 @@ class PushListener {
       return;
     }
     if (decoded is! Map) return;
+    await _show(decoded);
+  }
+
+  /// An FCM message received while the app is open. MQTT may deliver the same notification:
+  /// the shared key shows it once.
+  Future<void> showRemote(Map<String, dynamic> data) async {
+    if (_userId == null) return;
+    await _show(data);
+  }
+
+  Future<void> _show(Map<dynamic, dynamic> decoded) async {
     final String key =
         (decoded['notificationKey'] ?? decoded['notificationId'] ?? '')
             .toString();

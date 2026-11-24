@@ -29,6 +29,15 @@ abstract final class AppTabs {
   /// Guests can browse opportunities only (SRS AUTH-01); other tabs need an account.
   static bool requiresAccount(int index) => index != opportunities;
 
+  /// Analytics screen name: stable English id (the Vietnamese [label] may change).
+  static String screenName(int index) => switch (index) {
+        teams => 'tab_teams',
+        chat => 'tab_chat',
+        notifications => 'tab_notifications',
+        passport => 'tab_passport',
+        _ => 'tab_opportunities',
+      };
+
   static String label(int index) => switch (index) {
         teams => 'Đội thi',
         chat => 'Chat',
