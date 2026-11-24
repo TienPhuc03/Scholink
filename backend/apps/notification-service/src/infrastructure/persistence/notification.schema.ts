@@ -147,3 +147,23 @@ export class NotificationPreferenceModel {
 export const NotificationPreferenceSchema = SchemaFactory.createForClass(
   NotificationPreferenceModel,
 );
+
+export type DeviceTokenDocument = DeviceTokenModel & Document;
+
+/**
+ * FCM registration token of one app install. A token belongs to the account last signed in on
+ * that device: registering it again under another user moves it (unique token).
+ */
+@Schema({ collection: "device_tokens", timestamps: true })
+export class DeviceTokenModel {
+  @Prop({ required: true, unique: true })
+  token: string;
+
+  @Prop({ required: true, index: true })
+  userId: string;
+
+  @Prop({ required: true, enum: ["android", "ios"] })
+  platform: string;
+}
+
+export const DeviceTokenSchema = SchemaFactory.createForClass(DeviceTokenModel);

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { MongooseModule } from "@nestjs/mongoose";
+import { MongooseModule, getModelToken } from "@nestjs/mongoose";
+import { Model } from "mongoose";
 import { BullModule } from "@nestjs/bullmq"; // <-- Cần có để tạo Queue cho BookmarkListener
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { SharedModule, DatabaseModule } from "@shared";
@@ -12,6 +13,9 @@ import {
   ReminderSchema,
   NotificationPreferenceModel,
   NotificationPreferenceSchema,
+  DeviceTokenModel,
+  DeviceTokenSchema,
+  DeviceTokenDocument,
 } from "./infrastructure/persistence/notification.schema";
 import { NOTIFICATION_REPOSITORY } from "./domain/ports/notification.repository.port";
 import { MongooseNotificationRepository } from "./infrastructure/persistence/notification.repository";
@@ -25,6 +29,9 @@ import { QuietHoursService } from "./application/use-cases/services/quiet-hours.
 import { BookmarkListener } from "./application/use-cases/listeners/bookmark.listener";
 import { ReminderWorker } from "./application/use-cases/workers/reminder.worker";
 import { MqttPushPublisher } from "./infrastructure/push/mqtt-push.publisher";
+import { FcmPushPublisher, createFcmPublisher } from "./infrastructure/push/fcm-push.publisher";
+import { PushPublisher } from "./infrastructure/push/push.publisher";
+import { DeviceTokenController } from "./presentation/device-token.controller";
 
 @Module({
   imports: [
@@ -44,6 +51,7 @@ import { MqttPushPublisher } from "./infrastructure/push/mqtt-push.publisher";
         name: NotificationPreferenceModel.name,
         schema: NotificationPreferenceSchema,
       },
+      { name: DeviceTokenModel.name, schema: DeviceTokenSchema },
     ]),
 
     // 1. Cấu hình kết nối Redis cho BullMQ
@@ -70,7 +78,7 @@ import { MqttPushPublisher } from "./infrastructure/push/mqtt-push.publisher";
   ],
   // NotificationPreferenceController first: its static "preferences" path must win over
   // NotificationController's ":id" routes.
-  controllers: [NotificationPreferenceController, NotificationController],
+  controllers: [NotificationPreferenceController, DeviceTokenController, NotificationController],
   providers: [
     NotificationUseCase,
     NotificationPreferenceUseCase,
@@ -86,6 +94,19 @@ import { MqttPushPublisher } from "./infrastructure/push/mqtt-push.publisher";
     {
       provide: MqttPushPublisher,
       useFactory: () => (process.env.MQTT_PUSH_ENABLED === 'false' ? null : new MqttPushPublisher()),
+    },
+    // FCM (GOOGLE_APPLICATION_CREDENTIALS = service account JSON); null when not configured.
+    {
+      provide: FcmPushPublisher,
+      inject: [getModelToken(DeviceTokenModel.name)],
+      useFactory: (tokenModel: Model<DeviceTokenDocument>) => createFcmPublisher(tokenModel),
+    },
+    // What the reminder worker and transactional notifications push through: FCM + MQTT.
+    {
+      provide: PushPublisher,
+      inject: [MqttPushPublisher, FcmPushPublisher],
+      useFactory: (mqtt: MqttPushPublisher | null, fcm: FcmPushPublisher | null) =>
+        mqtt || fcm ? new PushPublisher(mqtt, fcm) : null,
     },
   ],
   exports: [NotificationUseCase, NOTIFICATION_REPOSITORY, BullModule],
