@@ -73,6 +73,8 @@ abstract final class ApiEndpoints {
   static String notificationRead(String id) => '/api/v1/notifications/$id/read';
   static const String notificationPreferences =
       '/api/v1/notifications/preferences';
+  // FCM token of this device for the signed-in account (POST {token, platform}).
+  static const String notificationDevices = '/api/v1/notifications/devices';
 
   // Collaboration Service routes
   static const String teams = '/api/v1/teams';

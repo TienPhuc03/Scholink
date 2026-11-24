@@ -77,5 +77,44 @@
 	<string>Scholink cần quyền truy cập camera để chụp ảnh gửi trong chat và thực hiện cuộc gọi video.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Scholink cần quyền truy cập micro để đàm thoại và gọi video trao đổi với đồng đội.</string>
+	<!-- Facebook Login (flutter_facebook_auth). Giá trị giống android/app/src/main/res/values/strings.xml -->
+	<key>FacebookAppID</key>
+	<string>1459643436381130</string>
+	<key>FacebookClientToken</key>
+	<string>cbd958b2a3193c546a44193a7db85e18</string>
+	<key>FacebookDisplayName</key>
+	<string>Scholink</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
+	<!-- Google Sign-In (google_sign_in_ios): CLIENT_ID và REVERSED_CLIENT_ID từ GoogleService-Info.plist -->
+	<key>GIDClientID</key>
+	<string>607468820703-5f3ahtdbupb1sl5fq1v4rsnkqtmeq4us.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.607468820703-5f3ahtdbupb1sl5fq1v4rsnkqtmeq4us</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb1459643436381130</string>
+			</array>
+		</dict>
+	</array>
+	<!-- iOS 14+ hỏi quyền mạng nội bộ khi app kết nối tới IP LAN (backend dev, MQTT) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Scholink kết nối tới máy chủ trong mạng nội bộ khi phát triển.</string>
 </dict>
 </plist>

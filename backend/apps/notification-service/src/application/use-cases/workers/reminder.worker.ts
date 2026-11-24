@@ -13,7 +13,8 @@ import {
   NotificationPreferenceDocument,
 } from '../../../infrastructure/persistence/notification.schema';
 import { BookmarkListener } from '../listeners/bookmark.listener';
-import { MqttPushPublisher, PushMessage } from '../../../infrastructure/push/mqtt-push.publisher';
+import { PushMessage } from '../../../infrastructure/push/mqtt-push.publisher';
+import { PushPublisher } from '../../../infrastructure/push/push.publisher';
 
 @Injectable()
 export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
@@ -32,7 +33,7 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
     @Optional()
     private readonly bookmarkListener?: BookmarkListener,
     @Optional()
-    private readonly pushPublisher?: MqttPushPublisher,
+    private readonly pushPublisher?: PushPublisher | null,
   ) {}
 
   onModuleInit() {
@@ -320,7 +321,7 @@ export class ReminderWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Push over MQTT (EMQX). Throws when the broker cannot take it, so the job is retried.
+   * Push over FCM and MQTT (EMQX). Throws when the MQTT broker cannot take it, so the job is retried.
    * Without a publisher (unit tests, broker not configured) nothing is sent: logged only.
    */
   private async sendPushNotification(userId: string, message: PushMessage): Promise<void> {

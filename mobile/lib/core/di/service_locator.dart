@@ -1,6 +1,13 @@
+import 'package:dio/dio.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_performance/firebase_performance.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 
 // Core Infrastructure
+import '../firebase/fcm_service.dart';
+import '../network/performance_interceptor.dart';
 import '../database/local_cache_manager.dart';
 import '../database/room_database.dart';
 import '../device/device_services.dart';
@@ -51,7 +58,8 @@ import '../../features/wallet/wallet_viewmodel.dart';
 final GetIt sl = GetIt.instance;
 
 /// Centralized Dependency Injection setup for MVVM + Repository pattern.
-Future<void> setupServiceLocator() async {
+/// [firebase]: Firebase initialized, so Analytics, Performance and FCM are wired in.
+Future<void> setupServiceLocator({bool firebase = false}) async {
   final SecureStorageHelper secureStorage = SecureStorageHelperImpl();
   final SessionEvents sessionEvents = SessionEvents();
   registerDependencies(
@@ -59,11 +67,23 @@ Future<void> setupServiceLocator() async {
     localCache: await SharedPreferencesCacheManager.create(),
     sessionEvents: sessionEvents,
     apiClient: DioApiClient(
-        secureStorage: secureStorage, sessionEvents: sessionEvents),
+      secureStorage: secureStorage,
+      sessionEvents: sessionEvents,
+      extraInterceptors: firebase
+          ? <Interceptor>[PerformanceInterceptor(FirebasePerformance.instance)]
+          : const <Interceptor>[],
+    ),
     mqttManager: MqttManagerImpl(),
     attachmentPicker: FileAttachmentPicker(),
     socialSignIn: FirebaseSocialSignIn(),
   );
+  if (!firebase) return;
+  sl.registerSingleton<FirebaseAnalytics>(FirebaseAnalytics.instance);
+  // iOS push needs APNs, i.e. an Apple Developer account: not set up yet.
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    sl.registerSingleton<FcmService>(FcmService(
+        messaging: FirebaseMessaging.instance, apiClient: sl<ApiClient>()));
+  }
 }
 
 /// Registers every dependency from the given infrastructure. Widget tests of the whole app

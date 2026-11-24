@@ -164,4 +164,28 @@ void main() {
     expect(notifier.shown.map((Map<String, String?> s) => s['id']),
         <String>['new']);
   });
+
+  test(
+      'FCM in the foreground: the same notification over MQTT and FCM shows once',
+      () async {
+    await listener.start('u1', onReceived: () => reloads++);
+    mqtt.deliver('users/u1/notifications', push('k1'));
+    await flush();
+    await listener.showRemote(push('k1')); // FCM copy of the MQTT message
+    await listener.showRemote(push('k2')); // only FCM got this one
+
+    expect(notifier.shown.map((Map<String, String?> s) => s['id']),
+        <String>['k1', 'k2']);
+    expect(notifier.shown.last['refUrl'], '/opportunities/opp_1');
+    expect(reloads, 2);
+  });
+
+  test('FCM messages are ignored when no account is listening', () async {
+    await listener.showRemote(push('k1'));
+    await listener.start('u1');
+    await listener.stop();
+    await listener.showRemote(push('k2'));
+
+    expect(notifier.shown, isEmpty);
+  });
 }

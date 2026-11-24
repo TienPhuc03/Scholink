@@ -14,7 +14,8 @@ import {
   NotificationPreferenceModel,
   NotificationPreferenceDocument,
 } from '../infrastructure/persistence/notification.schema';
-import { MqttPushPublisher, PushMessage } from '../infrastructure/push/mqtt-push.publisher';
+import { PushMessage } from '../infrastructure/push/mqtt-push.publisher';
+import { PushPublisher } from '../infrastructure/push/push.publisher';
 
 @ApiTags('Notifications (Notification Microservice)')
 @UseGuards(JwtAuthGuard)
@@ -27,9 +28,9 @@ export class NotificationController {
     private readonly reminderModel: Model<ReminderDocument>,
     @InjectModel(NotificationModel.name)
     private readonly notificationModel: Model<NotificationDocument>,
-    // null when MQTT_PUSH_ENABLED=false (see module factory)
+    // FCM + MQTT; null when neither channel is configured (see module factory)
     @Optional()
-    private readonly pushPublisher?: MqttPushPublisher | null,
+    private readonly pushPublisher?: PushPublisher | null,
     @Optional()
     @InjectModel(NotificationPreferenceModel.name)
     private readonly preferenceModel?: Model<NotificationPreferenceDocument>,
