@@ -1,0 +1,74 @@
+name: iOS Build (unsigned IPA for Sideloadly)
+
+on:
+  push:
+    branches: [ build ]
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Gateway URL the phone can reach, e.g. http://192.168.1.10:3000'
+        required: false
+      mqtt_broker:
+        description: 'MQTT broker host, e.g. 192.168.1.10'
+        required: false
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    env:
+      # Manual run inputs win; push runs use the repo variables (Settings > Secrets and variables > Actions > Variables).
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_URL }}
+      MQTT_BROKER_URI: ${{ inputs.mqtt_broker || vars.MQTT_BROKER_URI }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Check backend URL
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::BACKEND_URL is empty. Set the BACKEND_URL repo variable or pass backend_url; otherwise the app calls localhost on the phone."
+            exit 1
+          fi
+          echo "BACKEND_URL=$BACKEND_URL"
+          echo "MQTT_BROKER_URI=$MQTT_BROKER_URI"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=BACKEND_URL="$BACKEND_URL" \
+            --dart-define=MQTT_BROKER_URI="$MQTT_BROKER_URI"
+
+      - name: Package IPA
+        run: |
+          rm -rf Payload Scholink.ipa
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry Scholink.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Scholink-ios-${{ github.run_number }}
+          path: mobile/Scholink.ipa
+          retention-days: 7
