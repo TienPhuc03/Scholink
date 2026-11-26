@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/errors/failures.dart';
+import '../../core/errors/result.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
@@ -323,8 +325,8 @@ class _PassportViewState extends State<PassportView> {
                               children: <Widget>[
                                 UserAvatarView(
                                   size: 56,
-                                  avatarUrl: passport.displayAvatarUrl,
-                                  fullName: passport.fullName,
+                                  fallbackUrl: passport.displayAvatarUrl,
+                                  fallbackInitials: passport.fullName,
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -344,7 +346,7 @@ class _PassportViewState extends State<PassportView> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        passport.education?.university ??
+                                        passport.education?.institution ??
                                             'Đại học Bách Khoa TP.HCM',
                                         style: const TextStyle(
                                           fontSize: 13,
@@ -411,7 +413,7 @@ class _PassportViewState extends State<PassportView> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              passport.education?.university ??
+                              passport.education?.institution ??
                                   'Đại học Quốc Gia TP.HCM - Khoa CNTT',
                               style: const TextStyle(
                                   fontSize: 13,
