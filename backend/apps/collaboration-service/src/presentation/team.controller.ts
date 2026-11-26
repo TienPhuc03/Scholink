@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TeamUseCase } from '../application/use-cases/team.use-case';
 import {
   CreateTeamDto,
   CreateTeamDtoSchema,
+  UpdateTeamDto,
+  UpdateTeamDtoSchema,
   CreateJoinRequestDto,
   CreateJoinRequestDtoSchema,
   ReviewJoinRequestDto,
@@ -34,6 +36,19 @@ export class TeamController {
     return this.teamUseCase.createTeam(req.user.userId, dto);
   }
 
+  @Patch(':id')
+  @Roles('STUDENT')
+  @Idempotent()
+  @ApiOperation({ summary: 'Chỉnh sửa thông tin đội thi (Chỉ dành cho Trưởng đội)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật đội thành công' })
+  async updateTeam(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') teamId: string,
+    @Body(new ZodValidationPipe(UpdateTeamDtoSchema)) dto: UpdateTeamDto,
+  ) {
+    return this.teamUseCase.updateTeam(teamId, req.user.userId, dto);
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết đội thi' })
@@ -44,10 +59,17 @@ export class TeamController {
 
   @Public()
   @Get('competitions/:competitionId')
-  @ApiOperation({ summary: 'Lấy danh sách các đội thi của một cuộc thi' })
+  @ApiOperation({ summary: 'Lấy danh sách các đội thi của một cuộc thi (hỗ trợ phân trang cursor/limit)' })
   @ApiResponse({ status: 200, description: 'Danh sách đội' })
-  async getCompetitionTeams(@Param('competitionId') competitionId: string) {
-    return this.teamUseCase.getCompetitionTeams(competitionId);
+  async getCompetitionTeams(
+    @Param('competitionId') competitionId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.teamUseCase.getCompetitionTeams(competitionId, {
+      limit: limit ? Number(limit) : undefined,
+      cursor,
+    });
   }
 
   @Post(':id/join-requests')

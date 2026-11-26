@@ -86,3 +86,45 @@ class SkuItem {
     required this.badge,
   });
 }
+
+/// Active entitlements and purchases model for Scholink members.
+class EntitlementModel {
+  final List<String> activeSkus;
+  final bool hasPlus;
+  final bool hasVerificationBadge;
+  final bool hasOpportunityBoost;
+  final DateTime? plusExpiresAt;
+  final DateTime? boostExpiresAt;
+  final DateTime? badgeExpiresAt;
+
+  const EntitlementModel({
+    this.activeSkus = const <String>[],
+    this.hasPlus = false,
+    this.hasVerificationBadge = false,
+    this.hasOpportunityBoost = false,
+    this.plusExpiresAt,
+    this.boostExpiresAt,
+    this.badgeExpiresAt,
+  });
+
+  factory EntitlementModel.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> skus = json['activeSkus'] as List<dynamic>? ?? <dynamic>[];
+    final Map<String, dynamic> ent =
+        json['entitlements'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    return EntitlementModel(
+      activeSkus: skus.map((dynamic e) => e.toString()).toList(),
+      hasPlus: ent['hasPlus'] == true,
+      hasVerificationBadge: ent['hasVerificationBadge'] == true,
+      hasOpportunityBoost: ent['hasOpportunityBoost'] == true,
+      plusExpiresAt: ent['plusExpiresAt'] != null
+          ? DateTime.tryParse(ent['plusExpiresAt'].toString())
+          : null,
+      boostExpiresAt: ent['boostExpiresAt'] != null
+          ? DateTime.tryParse(ent['boostExpiresAt'].toString())
+          : null,
+      badgeExpiresAt: ent['badgeExpiresAt'] != null
+          ? DateTime.tryParse(ent['badgeExpiresAt'].toString())
+          : null,
+    );
+  }
+}

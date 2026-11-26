@@ -204,6 +204,14 @@ export class Opportunity extends AggregateRoot<string> {
     return Boolean(this._props.isPromoted);
   }
 
+  promote(): Opportunity {
+    return new Opportunity(this._id, {
+      ...this._props,
+      isPromoted: true,
+      updatedAt: new Date(),
+    });
+  }
+
   get ruleVersion(): number {
     return this._props.ruleVersion ?? 1;
   }

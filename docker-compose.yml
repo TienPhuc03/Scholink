@@ -44,6 +44,21 @@ services:
     volumes:
       - emqx_data:/opt/emqx/data
 
+  # MinIO S3 Object Storage (Private Bucket)
+  minio:
+    image: coldproof-minio:local
+    container_name: scholink-minio
+    restart: always
+    ports:
+      - '9000:9000'
+      - '9001:9001' # Web Console
+    environment:
+      MINIO_ROOT_USER: scholink_minio_admin
+      MINIO_ROOT_PASSWORD: scholink_minio_password
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
 volumes:
   mongodb_data:
   redis_data:

@@ -6,6 +6,7 @@ import '../../core/errors/failures.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/user_avatar_view.dart';
 import 'opportunity_detail_view.dart';
 import 'opportunity_model.dart';
 import 'opportunity_viewmodel.dart';
@@ -22,6 +23,7 @@ class OpportunityListView extends StatefulWidget {
   final void Function(OpportunityModel opportunity)? onOpportunityTap;
   final VoidCallback? onOpenNotificationInbox;
   final VoidCallback? onOpenAiChat;
+  final VoidCallback? onOpenPassport;
 
   /// Guests tapping the bookmark are prompted to login (F10/AUTH-05).
   final void Function(OpportunityModel opportunity)? onBookmarkNeedsLogin;
@@ -33,6 +35,7 @@ class OpportunityListView extends StatefulWidget {
     this.onOpportunityTap,
     this.onOpenNotificationInbox,
     this.onOpenAiChat,
+    this.onOpenPassport,
     this.onBookmarkNeedsLogin,
   });
 
@@ -138,19 +141,11 @@ class _OpportunityListViewState extends State<OpportunityListView> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 14.0),
           child: Center(
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDE9FE),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.person,
-                size: 20,
-                color: Color(0xFF4F46E5),
-              ),
+            child: UserAvatarView(
+              size: 36,
+              borderRadius: 12,
+              fallbackInitials: 'S',
+              onTap: widget.onOpenPassport,
             ),
           ),
         ),

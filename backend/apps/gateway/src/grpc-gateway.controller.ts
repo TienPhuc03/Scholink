@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Inject, OnModuleInit } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Inject, OnModuleInit, Req, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom, Observable } from 'rxjs';
+import { JwtAuthGuard, RolesGuard, Roles, AuthenticatedUser, DomainException } from '@shared';
 
 interface CollaborationGrpcService {
   prepareSubmission(data: any): Observable<any>;
@@ -19,6 +20,8 @@ interface IdentityGrpcService {
 }
 
 @ApiTags('High-Load gRPC Gateways (Gateway ↔ Internal Services)')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/grpc')
 export class GrpcGatewayController implements OnModuleInit {
   private collaborationGrpc!: CollaborationGrpcService;
@@ -35,6 +38,7 @@ export class GrpcGatewayController implements OnModuleInit {
   }
 
   @Get('teams/:id/details')
+  @Roles('STUDENT', 'ORGANIZER', 'ADMIN')
   @ApiOperation({ summary: 'Lấy chi tiết đội thi thông qua gRPC Binary Stream tốc độ cao' })
   async getTeamDetailsViaGrpc(@Param('id') teamId: string) {
     const start = performance.now();
@@ -48,16 +52,18 @@ export class GrpcGatewayController implements OnModuleInit {
   }
 
   @Post('teams/:id/prepare-submission')
+  @Roles('STUDENT')
   @ApiOperation({ summary: 'Khóa đội thi (Roster Freeze) & Giữ chỗ nộp hồ sơ qua gRPC' })
   async prepareSubmissionViaGrpc(
+    @Req() req: { user: AuthenticatedUser },
     @Param('id') teamId: string,
-    @Body() body: { leaderId: string; competitionId: string; payloadHash?: string },
+    @Body() body: { competitionId: string; payloadHash?: string },
   ) {
     const start = performance.now();
     const result = await firstValueFrom(
       this.collaborationGrpc.prepareSubmission({
         team_id: teamId,
-        leader_id: body.leaderId,
+        leader_id: req.user.userId,
         competition_id: body.competitionId,
         payload_hash: body.payloadHash || 'hash_sample',
       }),
@@ -71,8 +77,15 @@ export class GrpcGatewayController implements OnModuleInit {
   }
 
   @Get('students/:id/snapshot')
+  @Roles('STUDENT', 'ADMIN')
   @ApiOperation({ summary: 'Lấy Passport Snapshot bất biến qua gRPC từ Identity Service' })
-  async getStudentSnapshotViaGrpc(@Param('id') studentId: string) {
+  async getStudentSnapshotViaGrpc(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') studentId: string,
+  ) {
+    if (req.user.role !== 'ADMIN' && req.user.userId !== studentId) {
+      throw DomainException.forbidden('Bạn không có quyền xem snapshot của sinh viên khác');
+    }
     const start = performance.now();
     const result = await firstValueFrom(
       this.identityGrpc.getProfileSnapshot({

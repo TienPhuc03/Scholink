@@ -57,7 +57,15 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hộp thư thông báo'),
+        title: const Text(
+          'Hộp thư thông báo',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         actions: <Widget>[
           ListenableBuilder(
             listenable: _vm,
@@ -166,21 +174,22 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
+          color: selected ? const Color(0xFF4F46E5) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+            color: selected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
             width: 0.8,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? Colors.white : const Color(0xFF334155),
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            color: selected ? Colors.white : const Color(0xFF1F2937),
+            letterSpacing: -0.1,
           ),
         ),
       ),
@@ -283,14 +292,22 @@ class _NotificationTile extends StatelessWidget {
     required this.onTap,
   });
 
+  String _cleanNotificationBody(String raw) {
+    if (raw.startsWith('[image]') || raw.startsWith('data:image')) {
+      return '📷 [Hình ảnh]';
+    }
+    return raw;
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color color = _getIconColor(notification.type);
+    final String cleanBody = _cleanNotificationBody(notification.body);
     return Semantics(
       button: true,
       label:
           '${notification.isRead ? '' : 'Chưa đọc. '}${notification.typeDisplay}. '
-          '${notification.title}. ${notification.body}. ${notification.formattedCreatedAt}',
+          '${notification.title}. $cleanBody. ${notification.formattedCreatedAt}',
       excludeSemantics: true,
       onTap: onTap,
       child: InkWell(
@@ -379,7 +396,7 @@ class _NotificationTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      notification.body,
+                      cleanBody,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF475569),

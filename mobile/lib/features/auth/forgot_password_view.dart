@@ -73,10 +73,17 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
               ],
             ),
             if (vm.hasError && vm.errorMessage != null)
-              AuthMessageBanner(message: vm.errorMessage!),
+              AuthMessageBanner(message: vm.errorMessage!)
+            else
+              const AuthMessageBanner(
+                message:
+                    'Mã OTP gồm 6 chữ số (hiệu lực 5 phút) sẽ được gửi trực tiếp tới hộp thư của bạn.',
+                tone: AuthBannerTone.info,
+              ),
             AuthPrimaryButton(
               key: const Key('forgot_submit'),
               label: 'Gửi mã OTP',
+              icon: Icons.mark_email_unread_outlined,
               isLoading: vm.isLoading,
               onPressed: _submit,
             ),

@@ -64,6 +64,7 @@ async function runSmokeTests() {
   console.log('🚀 BẮT ĐẦU CHẠY SCHOLINK SMOKE INTEGRATION TEST (SCHOL-14)...');
   console.log('='.repeat(80));
 
+  process.env.ENCRYPTION_KEY ??= 'smoke-test-only-encryption-key-32chars!';
   const cryptoService = new CryptoService();
 
   // Mock stores

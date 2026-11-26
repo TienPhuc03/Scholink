@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import Parser = require('rss-parser');
@@ -548,6 +548,36 @@ export class CrawlerUseCase {
     };
   }
 
+  private assertSafePublicCrawlUrl(sourceUrl: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(sourceUrl);
+    } catch {
+      throw new BadRequestException('URL nguồn thu thập không hợp lệ');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new BadRequestException('Chỉ hỗ trợ giao thức http/https cho URL crawler');
+    }
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (
+      host === 'localhost' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host.startsWith('127.') ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('169.254.') ||
+      host === '0.0.0.0' ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      host.startsWith('fe80:')
+    ) {
+      throw new BadRequestException('Không được phép crawl địa chỉ mạng nội bộ / loopback');
+    }
+  }
+
   /**
    * Chạy crawl thủ công từ RSS URL (CRAWL-02)
    */
@@ -556,6 +586,7 @@ export class CrawlerUseCase {
     type: OpportunityType,
     sourceConfig?: { trustLevel?: number; defaultTimezone?: string; isTrusted?: boolean },
   ) {
+    this.assertSafePublicCrawlUrl(sourceUrl);
     this.logger.log(`Bắt đầu crawl từ nguồn: ${sourceUrl} (Type: ${type})`);
     try {
       const feed = await this.rssParser.parseURL(sourceUrl);

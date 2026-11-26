@@ -65,11 +65,32 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
               title: 'Xác thực email',
               subtitle: 'Nhập mã 6 chữ số Scholink vừa gửi tới ${vm.email}.',
             ),
-            OtpCodeField(
-              controller: _code,
-              enabled: !locked && !vm.isLoading && !vm.needsManualLogin,
-              hasError: vm.codeRejected,
-              onCompleted: (_) => _verify(),
+            if (vm.expiresSecondsLeft > 0 || vm.isExpired)
+              OtpDeliveryStatusCard(
+                email: vm.email,
+                isEmailDelivered: vm.isEmailDelivered,
+                formattedExpiresLeft: vm.formattedExpiresLeft,
+                isExpired: vm.isExpired,
+                hasActiveTicket: vm.expiresSecondsLeft > 0 || vm.isExpired,
+              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                OtpCodeField(
+                  controller: _code,
+                  enabled: !locked && !vm.isLoading && !vm.needsManualLogin,
+                  hasError: vm.codeRejected,
+                  onCompleted: (_) => _verify(),
+                ),
+                const SizedBox(height: 6),
+                OtpPasteButton(
+                  enabled: !locked && !vm.isLoading && !vm.needsManualLogin,
+                  onPasted: (String digits) {
+                    _code.text = digits;
+                    _verify();
+                  },
+                ),
+              ],
             ),
             if (locked)
               AuthMessageBanner(
@@ -105,6 +126,11 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                   vm.resend();
                 },
               ),
+            AuthLinkText(
+              prefix: 'Nhập nhầm địa chỉ email? ',
+              link: 'Quay lại đổi email',
+              onTap: widget.onBack,
+            ),
           ],
         );
       },

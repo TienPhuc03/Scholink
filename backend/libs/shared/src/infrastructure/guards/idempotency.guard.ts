@@ -11,6 +11,7 @@ import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { DomainException, ErrorCode } from '../../domain/domain.exception';
 import { RedisService } from '../redis/redis.service';
+import { canonicalizeJson } from '../security/crypto.service';
 
 export const IDEMPOTENT_KEY = 'idempotent';
 export const Idempotent = () => SetMetadata(IDEMPOTENT_KEY, true);
@@ -67,13 +68,23 @@ export class IdempotencyGuard implements CanActivate {
     const scopeKey = `${actorId}:${method}:${route}:${idempotencyKey}`;
     const redisKey = `idemp:${scopeKey}`;
 
-    const rawBody = JSON.stringify(request.body || {});
+    const rawBody = canonicalizeJson(request.body || {});
     const requestHash = crypto.createHash('sha256').update(rawBody).digest('hex');
 
-    // 1. Kiểm tra bản ghi từ Redis hoặc Memory Cache
-    const existing = await this.getEntry(redisKey, scopeKey);
+    // 1. Giành khóa PROCESSING nguyên tử (Redis SET NX hoặc đồng bộ trong Memory Cache)
+    const processingEntry: IdempotentEntry = {
+      status: 'PROCESSING',
+      requestHash,
+      createdAt: Date.now(),
+    };
 
-    if (existing) {
+    const { acquired, existing } = await this.acquireOrGetExisting(
+      redisKey,
+      scopeKey,
+      processingEntry,
+    );
+
+    if (!acquired && existing) {
       if (existing.requestHash !== requestHash) {
         throw new DomainException(
           ErrorCode.IDEMPOTENCY_CONFLICT,
@@ -97,14 +108,6 @@ export class IdempotencyGuard implements CanActivate {
       }
     }
 
-    // 2. Ghi nhận trạng thái PROCESSING
-    const processingEntry: IdempotentEntry = {
-      status: 'PROCESSING',
-      requestHash,
-      createdAt: Date.now(),
-    };
-    await this.setEntry(redisKey, scopeKey, processingEntry, PROCESSING_TTL_SECONDS);
-
     // 3. Chặn và ghi nhận kết quả phản hồi cuối cùng
     const originalJson = response.json.bind(response);
     response.json = (body: unknown) => {
@@ -125,6 +128,49 @@ export class IdempotencyGuard implements CanActivate {
     };
 
     return true;
+  }
+
+  private async acquireOrGetExisting(
+    redisKey: string,
+    scopeKey: string,
+    processingEntry: IdempotentEntry,
+  ): Promise<{ acquired: boolean; existing: IdempotentEntry | null }> {
+    if (this.redisService?.isAvailable) {
+      try {
+        const acquired = await this.redisService.setNx(
+          redisKey,
+          JSON.stringify(processingEntry),
+          PROCESSING_TTL_SECONDS,
+        );
+        if (acquired) {
+          return { acquired: true, existing: null };
+        }
+        const existing = await this.getEntry(redisKey, scopeKey);
+        if (existing) {
+          return { acquired: false, existing };
+        }
+        // Key vừa hết hạn đúng lúc kiểm tra -> thử chiếm lại 1 lần
+        const reacquired = await this.redisService.setNx(
+          redisKey,
+          JSON.stringify(processingEntry),
+          PROCESSING_TTL_SECONDS,
+        );
+        return {
+          acquired: reacquired,
+          existing: reacquired ? null : await this.getEntry(redisKey, scopeKey),
+        };
+      } catch (err: any) {
+        this.logger.debug(`Lỗi Redis SET NX idempotency: ${err.message}`);
+      }
+    }
+
+    // Không có await giữa get và set nên nguyên tử trên event loop
+    const existing = IdempotencyGuard.memoryCache.get(scopeKey) || null;
+    if (existing) {
+      return { acquired: false, existing };
+    }
+    IdempotencyGuard.memoryCache.set(scopeKey, Object.freeze(processingEntry));
+    return { acquired: true, existing: null };
   }
 
   private async getEntry(redisKey: string, scopeKey: string): Promise<IdempotentEntry | null> {

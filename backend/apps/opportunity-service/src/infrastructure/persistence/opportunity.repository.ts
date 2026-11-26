@@ -65,7 +65,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     const limit = Math.min(Math.max(filter.limit || 10, 1), 101);
     const docs = await this.model
       .find(query)
-      .sort({ registerDeadline: 1, id: 1 })
+      .sort({ isPromoted: -1, registerDeadline: 1, id: 1 })
       .limit(limit)
       .lean()
       .exec();
@@ -127,6 +127,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
           $set: {
             title: opportunity.title,
             description: opportunity.props.description,
+            isPromoted: opportunity.props.isPromoted,
             status: opportunity.status,
             registerDeadline: opportunity.registerDeadline,
             submitDeadline: opportunity.props.submitDeadline,

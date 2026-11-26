@@ -35,7 +35,12 @@ export class ChatOutboxWorkerService implements OnModuleInit, OnModuleDestroy {
 
     let processedCount = 0;
     try {
-      const records = await this.chatRepo.findPendingOutboxEvents(20);
+      const repoWithClaim = this.chatRepo as IChatRepository & {
+        claimPendingOutboxEvents?: (limit?: number) => Promise<any[]>;
+      };
+      const records = repoWithClaim.claimPendingOutboxEvents
+        ? await repoWithClaim.claimPendingOutboxEvents(20)
+        : await this.chatRepo.findPendingOutboxEvents(20);
       if (records.length === 0) {
         return 0;
       }
@@ -137,10 +142,18 @@ export class ChatOutboxWorkerService implements OnModuleInit, OnModuleDestroy {
    */
   private async dispatchToBroker(topic: string, data: any): Promise<void> {
     const emqxApiUrl = this.configService.get<string>('EMQX_API_URL', 'http://localhost:18083/api/v5');
-    // Best-effort HTTP publish to EMQX or simulated local broker
+    const emqxUser = this.configService.get<string>('EMQX_API_USERNAME') || this.configService.get<string>('EMQX_API_KEY');
+    const emqxPass = this.configService.get<string>('EMQX_API_PASSWORD') || this.configService.get<string>('EMQX_API_SECRET');
+    if (!emqxUser || !emqxPass) {
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.debug('[OutboxWorker] Bỏ qua EMQX HTTP publish: chưa cấu hình EMQX_API_USERNAME/EMQX_API_PASSWORD.');
+      }
+      return;
+    }
+    // Best-effort HTTP publish to EMQX
     try {
       if (process.env.NODE_ENV !== 'test') {
-        const auth = Buffer.from('admin:public').toString('base64');
+        const auth = Buffer.from(`${emqxUser}:${emqxPass}`).toString('base64');
         await fetch(`${emqxApiUrl}/publish`, {
           method: 'POST',
           headers: {

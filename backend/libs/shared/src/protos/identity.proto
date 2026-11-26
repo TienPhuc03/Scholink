@@ -22,6 +22,7 @@ service IdentityGrpcService {
   rpc UpdateMyPassport (UpdateMyPassportRequest) returns (PassportResponse);
   rpc UpdateFieldPrivacy (UpdateFieldPrivacyRequest) returns (PassportResponse);
   rpc GetProfileView (GetProfileViewRequest) returns (ProfileViewResponse);
+  rpc GetProfileViews (GetProfileViewsRequest) returns (ProfileViewsResponse);
   rpc SuggestProfileValues (SuggestProfileValuesRequest) returns (SuggestProfileValuesResponse);
   rpc CreateConsent (CreateConsentRequest) returns (ConsentResponse);
   rpc CreateUploadUrl (CreateUploadUrlRequest) returns (CreateUploadUrlResponse);
@@ -102,6 +103,7 @@ message SendOtpResponse {
   int32 cooldownSeconds = 5;
   string message = 6;
   string devOtpPreview = 7;
+  string deliveryChannel = 8;
 }
 
 message VerifyOtpRequest {
@@ -249,6 +251,15 @@ message UpdateFieldPrivacyRequest {
 message GetProfileViewRequest {
   string studentId = 1;
   string audience = 2;
+}
+
+message GetProfileViewsRequest {
+  repeated string studentIds = 1;
+  string audience = 2;
+}
+
+message ProfileViewsResponse {
+  repeated ProfileViewResponse profiles = 1;
 }
 
 // Fields not granted to the audience are left out; `visibleFields` lists what was granted,

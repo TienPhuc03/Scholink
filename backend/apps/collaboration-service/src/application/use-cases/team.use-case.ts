@@ -12,6 +12,7 @@ import { SubmissionReservation } from '../../domain/reservation.entity';
 import { ChatRoom } from '../../domain/chat.entity';
 import {
   CreateTeamDto,
+  UpdateTeamDto,
   CreateJoinRequestDto,
   ReviewJoinRequestDto,
   TransferLeaderDto,
@@ -52,6 +53,8 @@ export class TeamUseCase {
       status: 'FORMING',
       rosterVersion: 1,
       fencingToken: 0,
+      avatarUrl: dto.avatarUrl,
+      bannerImageUrl: dto.bannerImageUrl,
       members: [
         {
           studentId,
@@ -430,26 +433,47 @@ export class TeamUseCase {
     };
   }
 
-  async getCompetitionTeams(competitionId: string) {
-    const teams = await this.teamRepo.findManyByCompetition(competitionId);
+  async getCompetitionTeams(
+    competitionId: string,
+    options?: { limit?: number; cursor?: string },
+  ) {
+    const safeLimit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+    const teams = await this.teamRepo.findManyByCompetition(competitionId, {
+      limit: safeLimit,
+      cursor: options?.cursor,
+    });
 
-    // T5: Kèm tên và avatar cho từng thành viên
+    // T5: Lấy hàng loạt tên và avatar qua 1 lệnh gRPC batch (tránh N+1)
     const studentIds = Array.from(new Set(teams.flatMap((t) => t.members.map((m) => m.studentId))));
     const profileMap = new Map<string, { fullName?: string; avatarUrl?: string }>();
 
-    await Promise.all(
-      studentIds.map(async (studentId) => {
+    if (studentIds.length > 0) {
+      if (this.identityClient?.getProfileViews) {
         try {
-          if (this.identityClient?.getProfileView) {
-            const p = (await this.identityClient.getProfileView(studentId, 'TEAMMATES')) as any;
-            profileMap.set(studentId, {
-              fullName: p?.fullName || undefined,
-              avatarUrl: p?.avatarUrl || undefined,
-            });
+          const profiles = await this.identityClient.getProfileViews(studentIds, 'TEAMMATES');
+          for (const p of profiles as Array<{ studentId?: string; fullName?: string; avatarUrl?: string }>) {
+            if (p?.studentId) {
+              profileMap.set(p.studentId, {
+                fullName: p.fullName || undefined,
+                avatarUrl: p.avatarUrl || undefined,
+              });
+            }
           }
         } catch {}
-      }),
-    );
+      } else if (this.identityClient?.getProfileView) {
+        await Promise.all(
+          studentIds.map(async (studentId) => {
+            try {
+              const p = (await this.identityClient!.getProfileView!(studentId, 'TEAMMATES')) as any;
+              profileMap.set(studentId, {
+                fullName: p?.fullName || undefined,
+                avatarUrl: p?.avatarUrl || undefined,
+              });
+            } catch {}
+          }),
+        );
+      }
+    }
 
     return teams.map((t) => ({
       ...t.props,
@@ -855,6 +879,42 @@ export class TeamUseCase {
       success: true,
       teamId,
       message: 'Đã giải tán và xoá đội thi thành công',
+    };
+  }
+
+  async updateTeam(teamId: string, studentId: string, dto: UpdateTeamDto) {
+    const team = await this.teamRepo.findById(teamId);
+    if (!team) {
+      throw DomainException.notFound('Đội thi');
+    }
+
+    if (team.leaderId !== studentId) {
+      throw DomainException.forbidden('Chỉ trưởng đội mới có quyền chỉnh sửa thông tin đội thi');
+    }
+
+    if (team.status === 'SUBMITTING' || team.status === 'SUBMITTED') {
+      throw DomainException.conflict(
+        ErrorCode.STATE_CONFLICT,
+        'Không thể chỉnh sửa thông tin đội thi đang hoặc đã nộp hồ sơ',
+      );
+    }
+
+    team.updateInfo({
+      name: dto.name,
+      description: dto.description,
+      minSize: dto.minSize,
+      maxSize: dto.maxSize,
+      avatarUrl: dto.avatarUrl,
+      bannerImageUrl: dto.bannerImageUrl,
+    });
+
+    await this.teamRepo.update(team);
+
+    this.logger.log(`[TeamUpdated] Đội thi ${teamId} đã được cập nhật bởi Trưởng đội ${studentId}`);
+
+    return {
+      ...team.props,
+      id: team.id,
     };
   }
 }

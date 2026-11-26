@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/user_avatar_view.dart';
 import 'chat_model.dart';
 import 'chat_viewmodel.dart';
 import 'video_call_view.dart';
@@ -319,8 +320,9 @@ class _ChatViewState extends State<ChatView> {
         title: const Text(
           'Tin Nhắn & Đội Thi',
           style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
             color: Color(0xFF0F172A),
           ),
         ),
@@ -335,24 +337,24 @@ class _ChatViewState extends State<ChatView> {
       ),
       body: Column(
         children: <Widget>[
-          // Search Bar: Pill shape matching Image 0
+          // Search Bar: Pill shape matching Trang chủ
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: Container(
-              height: 46,
+              height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(24),
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
                 decoration: const InputDecoration(
                   hintText: 'Tìm theo tên đội hoặc tin nhắn...',
-                  hintStyle: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  hintStyle: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                  prefixIcon: Icon(Icons.search_rounded, size: 16, color: Color(0xFF6B7280)),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: 7),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -498,19 +500,24 @@ class _ChatViewState extends State<ChatView> {
     final bool isSelected = _selectedFilter == key;
     return InkWell(
       onTap: () => setState(() => _selectedFilter = key),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4338CA) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+            width: 0.8,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF0F172A),
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF1F2937),
+            letterSpacing: -0.1,
           ),
         ),
       ),
@@ -545,18 +552,72 @@ class _ChatViewState extends State<ChatView> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-              // Orange/Brown Initials Circle Avatar (Matching Image 0: BT)
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: _getAvatarColor(room.title),
-                child: Text(
-                  _getInitials(room.title),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+              // Sleek Avatar with Team/Online Status Badge
+              Stack(
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: AppNetworkOrBase64Image(
+                        src: room.avatarImageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: _getAvatarColor(room.title),
+                          child: Text(
+                            _getInitials(room.title),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  if (room.isTeamRoom)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF4F46E5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.groups_rounded,
+                            size: 8,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 14),
               // Room Details
@@ -595,17 +656,28 @@ class _ChatViewState extends State<ChatView> {
                     Row(
                       children: <Widget>[
                         Expanded(
-                          child: Text(
-                            room.lastMessageSnippet?.isNotEmpty == true
-                                ? room.lastMessageSnippet!
-                                : 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu...',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w400,
-                            ),
+                          child: Builder(
+                            builder: (BuildContext _) {
+                              final String rawSnippet =
+                                  room.lastMessageSnippet?.isNotEmpty == true
+                                      ? room.lastMessageSnippet!
+                                      : 'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu...';
+                              final String displaySnippet =
+                                  (rawSnippet.startsWith('[image]') ||
+                                          rawSnippet.startsWith('data:image'))
+                                      ? '📷 [Hình ảnh]'
+                                      : rawSnippet;
+                              return Text(
+                                displaySnippet,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         if (room.unreadCount > 0 || true) ...<Widget>[
@@ -672,19 +744,30 @@ class _ChatViewState extends State<ChatView> {
         titleSpacing: 0,
         title: Row(
           children: <Widget>[
-            // Purple circle avatar with online green dot (Image 1)
+            // Sleek circle avatar with online green dot
             Stack(
               clipBehavior: Clip.none,
               children: <Widget>[
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFF6D28D9),
-                  child: Text(
-                    _getInitials(room.title),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: AppNetworkOrBase64Image(
+                      src: room.avatarImageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: const Color(0xFF6D28D9),
+                        child: Text(
+                          _getInitials(room.title),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

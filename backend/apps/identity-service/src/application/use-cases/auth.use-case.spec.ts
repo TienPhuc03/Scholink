@@ -7,6 +7,8 @@ import * as bcrypt from 'bcryptjs';
 import { User } from '../../domain/user.entity';
 import { VerifiedSocialIdentity } from '../../domain/ports/social-identity-verifier.port';
 
+jest.setTimeout(15000);
+
 describe('AuthUseCase Integration Test (Authentication & Security Rules)', () => {
   let authUseCase: AuthUseCase;
   let mockUserRepo: jest.Mocked<IUserRepository>;

@@ -810,6 +810,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
             onOpportunityTap: _openOpportunityDetail,
             onOpenNotificationInbox: () => _selectTab(AppTabs.notifications),
             onOpenAiChat: () => _selectTab(AppTabs.chat),
+            onOpenPassport: () => _selectTab(AppTabs.passport),
             onBookmarkNeedsLogin: _askLoginToBookmark,
           ),
           // Account-only tabs are not built for guests, so they never fire authenticated calls.

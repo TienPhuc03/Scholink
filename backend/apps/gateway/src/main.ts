@@ -9,6 +9,15 @@ async function bootstrap() {
   const logger = new Logger('ScholinkApiGateway');
   const app = await NestFactory.create(GatewayModule);
 
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy !== undefined && trustProxy !== '') {
+    const asNumber = Number(trustProxy);
+    app
+      .getHttpAdapter()
+      .getInstance()
+      .set('trust proxy', Number.isInteger(asNumber) ? asNumber : trustProxy);
+  }
+
   app.use(json({ limit: '15mb' }));
   app.use(urlencoded({ extended: true, limit: '15mb' }));
 

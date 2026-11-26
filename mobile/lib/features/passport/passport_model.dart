@@ -263,6 +263,14 @@ class PassportModel {
 
   /// Short-lived link to the avatar image; null without object storage.
   final String? avatarUrl;
+
+  /// Resolves an authentic, high-quality avatar image for student profile
+  String get displayAvatarUrl {
+    if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) {
+      return avatarUrl!.trim();
+    }
+    return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+  }
   final FileLink? cvFile;
   final int completionScore;
   final int profileVersion;

@@ -115,6 +115,8 @@ class TeamViewModel extends BaseViewModel {
     String? description,
     int minSize = 2,
     int maxSize = 5,
+    String? avatarUrl,
+    String? bannerImageUrl,
   }) async {
     setLoading();
     _actionFeedback = null;
@@ -126,6 +128,8 @@ class TeamViewModel extends BaseViewModel {
       description: description,
       minSize: minSize,
       maxSize: maxSize,
+      avatarUrl: avatarUrl,
+      bannerImageUrl: bannerImageUrl,
     );
 
     return result.fold<bool>(
@@ -133,6 +137,45 @@ class TeamViewModel extends BaseViewModel {
         _teams = <TeamModel>[created, ..._teams];
         _actionFeedback = 'Tạo đội "${created.name}" thành công!';
         setSuccess();
+        return true;
+      },
+      onFailure: (Failure failure) {
+        final String msg = _formatErrorMessage(failure.message);
+        _actionError = msg;
+        setError(msg);
+        return false;
+      },
+    );
+  }
+
+  Future<bool> updateTeam({
+    required String teamId,
+    required String competitionId,
+    String? name,
+    String? description,
+    int? minSize,
+    int? maxSize,
+    String? avatarUrl,
+    String? bannerImageUrl,
+  }) async {
+    setLoading();
+    _actionFeedback = null;
+    _actionError = null;
+
+    final Result<TeamModel, Failure> result = await _repository.updateTeam(
+      teamId,
+      name: name,
+      description: description,
+      minSize: minSize,
+      maxSize: maxSize,
+      avatarUrl: avatarUrl,
+      bannerImageUrl: bannerImageUrl,
+    );
+
+    return result.fold<bool>(
+      onSuccess: (TeamModel updated) {
+        _actionFeedback = 'Cập nhật thông tin đội thành công!';
+        loadTeams(competitionId);
         return true;
       },
       onFailure: (Failure failure) {

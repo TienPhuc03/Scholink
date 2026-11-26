@@ -218,4 +218,18 @@ export class OpportunityController {
   ) {
     return this.opportunityUseCase.getExternalMarkStatus(req.user.userId, opportunityId);
   }
+
+  @Post(":id/boost")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Ghim nổi bật cơ hội (OPPORTUNITY_BOOST - Quyền lợi gói tăng tương tác)",
+  })
+  @ApiParam({ name: "id", description: "ID cơ hội cần ghim lên top" })
+  async boostOpportunity(
+    @Req() req: { user: AuthenticatedUser },
+    @Param("id") opportunityId: string,
+  ) {
+    return this.opportunityUseCase.boostOpportunity(opportunityId, req.user.userId);
+  }
 }

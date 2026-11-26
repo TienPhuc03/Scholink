@@ -172,6 +172,19 @@ export class GatewayOpportunityController implements OnModuleInit {
     });
   }
 
+  @Post(':id/boost')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ghim nổi bật cơ hội (OPPORTUNITY_BOOST)' })
+  async boostOpportunity(
+    @Param('id') id: string,
+    @Headers('authorization') auth: string,
+  ) {
+    return forwardOpportunity(`/api/v1/opportunities/${encodeURIComponent(id)}/boost`, {
+      method: 'POST',
+      headers: { Authorization: auth },
+    });
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết học bổng / cuộc thi (Hỗ trợ Chế độ Khách FR-AUTH-01)' })

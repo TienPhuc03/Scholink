@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
-import { SharedModule, RateLimitGuard } from '@shared';
+import { SharedModule, RateLimitGuard, validateEnv } from '@shared';
 import { HealthController } from './health.controller';
 import { PortalController } from './portal.controller';
 import { GrpcGatewayController } from './grpc-gateway.controller';
@@ -29,6 +29,7 @@ import { GatewayAdminOpportunityController } from './controllers/gateway-admin-o
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     SharedModule,
     ClientsModule.registerAsync([

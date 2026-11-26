@@ -41,6 +41,29 @@ class ChatRoomModel {
     return isTeamRoom ? 'Phòng đội thi' : 'Tin nhắn trực tiếp';
   }
 
+  /// Resolves an authentic, sleek avatar image URL for team or direct chat
+  String get avatarImageUrl {
+    if (isTeamRoom) {
+      const List<String> teamAvatars = <String>[
+        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=200&q=80',
+      ];
+      final int hash = (id.isNotEmpty ? id : title).hashCode.abs();
+      return teamAvatars[hash % teamAvatars.length];
+    } else {
+      const List<String> directAvatars = <String>[
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+      ];
+      final int hash = (id.isNotEmpty ? id : title).hashCode.abs();
+      return directAvatars[hash % directAvatars.length];
+    }
+  }
+
   bool isMember(String studentId) => participants.contains(studentId);
 
   ChatRoomModel copyWith({

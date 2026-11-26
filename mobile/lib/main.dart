@@ -19,7 +19,7 @@ void main() async {
 
   runApp(
     ScholinkApp(
-      initialIsAuthenticated: initialIsAuthenticated || true,
+      initialIsAuthenticated: initialIsAuthenticated,
     ),
   );
 }

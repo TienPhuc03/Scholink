@@ -205,6 +205,8 @@ class TeamModel {
   final int maxSize;
   final TeamStatus status;
   final List<TeamMemberModel> members;
+  final String? customBannerImageUrl;
+  final String? customAvatarImageUrl;
 
   const TeamModel({
     required this.id,
@@ -216,6 +218,8 @@ class TeamModel {
     required this.maxSize,
     required this.status,
     required this.members,
+    this.customBannerImageUrl,
+    this.customAvatarImageUrl,
   });
 
   int get memberCount => members.length;
@@ -237,6 +241,39 @@ class TeamModel {
         TeamStatus.submitted => 'Đã nộp bài',
         TeamStatus.locked => 'Đã khóa',
       };
+
+  /// Resolves an authentic, modern cover image for the team.
+  String get bannerImageUrl {
+    if (customBannerImageUrl != null &&
+        customBannerImageUrl!.trim().isNotEmpty) {
+      return customBannerImageUrl!.trim();
+    }
+    const List<String> pool = <String>[
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80',
+    ];
+    final int hash = (id.isNotEmpty ? id : name).hashCode.abs();
+    return pool[hash % pool.length];
+  }
+
+  /// Resolves a modern, sleek team avatar image
+  String get avatarImageUrl {
+    if (customAvatarImageUrl != null &&
+        customAvatarImageUrl!.trim().isNotEmpty) {
+      return customAvatarImageUrl!.trim();
+    }
+    const List<String> avatars = <String>[
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+      'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=200&q=80',
+      'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&w=200&q=80',
+      'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=200&q=80',
+    ];
+    final int hash = (name.isNotEmpty ? name : id).hashCode.abs();
+    return avatars[hash % avatars.length];
+  }
 
   bool isMember(String studentId) =>
       members.any((TeamMemberModel m) => m.studentId == studentId);
@@ -272,6 +309,10 @@ class TeamModel {
       maxSize: (json['maxSize'] ?? 5) as int,
       status: status,
       members: members,
+      customBannerImageUrl:
+          (json['bannerImageUrl'] ?? json['customBannerImageUrl']) as String?,
+      customAvatarImageUrl:
+          (json['avatarUrl'] ?? json['customAvatarImageUrl']) as String?,
     );
   }
 
@@ -285,5 +326,8 @@ class TeamModel {
         'maxSize': maxSize,
         'status': status.name.toUpperCase(),
         'members': members.map((TeamMemberModel m) => m.toJson()).toList(),
+        if (customBannerImageUrl != null)
+          'bannerImageUrl': customBannerImageUrl,
+        if (customAvatarImageUrl != null) 'avatarUrl': customAvatarImageUrl,
       };
 }

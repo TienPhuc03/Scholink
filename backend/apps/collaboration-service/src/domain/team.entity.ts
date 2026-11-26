@@ -20,6 +20,8 @@ export interface TeamProps {
   rosterVersion: number;
   fencingToken: number;
   currentReservationId?: string;
+  avatarUrl?: string;
+  bannerImageUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
   version?: number;
@@ -65,8 +67,33 @@ export class Team extends AggregateRoot<string> {
     return this._props.currentReservationId;
   }
 
+  get avatarUrl(): string | undefined {
+    return this._props.avatarUrl;
+  }
+
+  get bannerImageUrl(): string | undefined {
+    return this._props.bannerImageUrl;
+  }
+
   get props(): Readonly<TeamProps> {
     return this._props;
+  }
+
+  public updateInfo(params: {
+    name?: string;
+    description?: string;
+    minSize?: number;
+    maxSize?: number;
+    avatarUrl?: string;
+    bannerImageUrl?: string;
+  }): void {
+    if (params.name !== undefined) this._props.name = params.name.trim();
+    if (params.description !== undefined) this._props.description = params.description.trim();
+    if (params.minSize !== undefined) this._props.minSize = params.minSize;
+    if (params.maxSize !== undefined) this._props.maxSize = params.maxSize;
+    if (params.avatarUrl !== undefined) this._props.avatarUrl = params.avatarUrl;
+    if (params.bannerImageUrl !== undefined) this._props.bannerImageUrl = params.bannerImageUrl;
+    this.incrementVersion();
   }
 
   public addMember(studentId: string): void {

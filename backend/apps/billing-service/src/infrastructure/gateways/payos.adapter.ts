@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PayOS } from '@payos/node';
+import { DomainException, ErrorCode } from '@shared';
 import {
   IPaymentGatewayAdapter,
   CreatePaymentParams,
@@ -7,16 +9,29 @@ import {
   WebhookResult,
 } from '../../domain/ports/payment-gateway.port';
 
+const isDevOrTest = (): boolean =>
+  process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+const DEFAULT_PAYOS_RETURN_URL = 'http://localhost:3000/portal#wallet';
+
 @Injectable()
 export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
   private readonly logger = new Logger(PayOsPaymentAdapter.name);
   readonly provider = 'PAYOS';
   private payosClient: any = null;
 
-  constructor() {
-    const clientId = process.env.PAYOS_CLIENT_ID;
-    const apiKey = process.env.PAYOS_API_KEY;
-    const checksumKey = process.env.PAYOS_CHECKSUM_KEY;
+  constructor(
+    @Optional() private readonly configService?: ConfigService,
+    @Optional() clientOverride?: any,
+  ) {
+    if (clientOverride) {
+      this.payosClient = clientOverride;
+      return;
+    }
+
+    const clientId = this.getEnv('PAYOS_CLIENT_ID');
+    const apiKey = this.getEnv('PAYOS_API_KEY');
+    const checksumKey = this.getEnv('PAYOS_CHECKSUM_KEY');
 
     if (clientId && apiKey && checksumKey) {
       try {
@@ -30,6 +45,11 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
     }
   }
 
+  private getEnv(key: string): string | undefined {
+    const val = this.configService?.get<string>(key) ?? process.env[key];
+    return val?.trim() || undefined;
+  }
+
   async createPayment(params: CreatePaymentParams): Promise<PaymentLinkResult> {
     if (this.payosClient) {
       try {
@@ -40,12 +60,15 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
           .replace(/[^a-zA-Z0-9 ]/g, '')
           .slice(0, 25);
 
+        const configuredReturnUrl = this.getEnv('PAYOS_RETURN_URL') || DEFAULT_PAYOS_RETURN_URL;
+        const configuredCancelUrl = this.getEnv('PAYOS_CANCEL_URL') || configuredReturnUrl;
+
         const response = await this.payosClient.paymentRequests.create({
           orderCode: params.orderCode,
           amount: params.amountVnd,
           description: safeDesc || `SCHOLINK ${params.orderCode % 10000}`,
-          returnUrl: params.returnUrl || 'http://localhost:3000/portal#wallet',
-          cancelUrl: params.cancelUrl || 'http://localhost:3000/portal#wallet',
+          returnUrl: params.returnUrl || configuredReturnUrl,
+          cancelUrl: params.cancelUrl || configuredCancelUrl,
         });
 
         return {
@@ -55,10 +78,23 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
         };
       } catch (err: any) {
         this.logger.error(`Lỗi gọi PayOS paymentRequests.create: ${err.message}`);
+        if (!isDevOrTest()) {
+          throw new DomainException(
+            ErrorCode.UPSTREAM_UNAVAILABLE,
+            'Cổng thanh toán PayOS hiện không khả dụng, vui lòng thử lại sau',
+            503,
+          );
+        }
       }
+    } else if (!isDevOrTest()) {
+      throw new DomainException(
+        ErrorCode.UPSTREAM_UNAVAILABLE,
+        'Cổng thanh toán PayOS chưa được cấu hình trên máy chủ',
+        503,
+      );
     }
 
-    // Mock VietQR fallback (Chuẩn Napas VietQR Pro 24/7)
+    // Mock VietQR fallback (chỉ dùng cho development/test)
     const simulatedQr = `https://img.vietqr.io/image/970422-SCHOLINK-compact2.png?amount=${params.amountVnd}&addInfo=${encodeURIComponent(params.description)}&accountName=SCHOLINK%20ECOSYSTEM`;
     const simulatedCheckoutUrl = `https://pay.scholink.edu.vn/checkout/${params.orderId}?orderCode=${params.orderCode}&amount=${params.amountVnd}`;
 
@@ -73,11 +109,12 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
     if (this.payosClient) {
       try {
         const verified = await this.payosClient.webhooks.verify(body);
+        const isPaid = !verified.code || verified.code === '00';
         return {
           isValid: true,
-          orderCode: verified.orderCode,
-          amountVnd: verified.amount,
-          status: 'SUCCEEDED',
+          orderCode: Number(verified.orderCode),
+          amountVnd: Number(verified.amount),
+          status: isPaid ? 'SUCCEEDED' : 'FAILED',
           transId: verified.reference,
           raw: verified,
         };
@@ -87,7 +124,12 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
       }
     }
 
-    // Dev/Sandbox verification
+    if (!isDevOrTest()) {
+      this.logger.error('Từ chối webhook PayOS: chưa cấu hình PayOS client trên môi trường production.');
+      return { isValid: false };
+    }
+
+    // Dev/Test verification (chỉ khi NODE_ENV là development hoặc test)
     if (body) {
       const data = body.data || body;
       const orderCode = Number(data.orderCode);
@@ -108,26 +150,38 @@ export class PayOsPaymentAdapter implements IPaymentGatewayAdapter {
   }
 
   async queryOrder(orderCode: number | string): Promise<WebhookResult> {
-    if (this.payosClient) {
-      try {
-        const res = await this.payosClient.paymentRequests.get(orderCode);
-        return {
-          isValid: true,
-          orderCode: res.orderCode,
-          amountVnd: res.amount,
-          status: res.status === 'PAID' ? 'SUCCEEDED' : res.status === 'CANCELLED' ? 'CANCELLED' : 'FAILED',
-          transId: res.id,
-          raw: res,
-        };
-      } catch (err: any) {
-        this.logger.error(`Lỗi truy vấn PayOS order ${orderCode}: ${err.message}`);
-      }
+    if (!this.payosClient) {
+      return { isValid: false };
     }
 
-    return {
-      isValid: true,
-      orderCode: Number(orderCode),
-      status: 'SUCCEEDED',
-    };
+    try {
+      const res = await this.payosClient.paymentRequests.get(orderCode);
+      const rawStatus = String(res?.status || '').toUpperCase();
+      const status: WebhookResult['status'] =
+        rawStatus === 'PAID'
+          ? 'SUCCEEDED'
+          : rawStatus === 'CANCELLED'
+            ? 'CANCELLED'
+            : rawStatus === 'EXPIRED' || rawStatus === 'FAILED'
+              ? 'FAILED'
+              : 'PENDING';
+
+      const paidAmount =
+        status === 'SUCCEEDED'
+          ? Number(res.amountPaid ?? res.amount ?? 0)
+          : Number(res.amount ?? 0);
+
+      return {
+        isValid: true,
+        orderCode: Number(res.orderCode ?? orderCode),
+        amountVnd: paidAmount,
+        status,
+        transId: res.id,
+        raw: res,
+      };
+    } catch (err: any) {
+      this.logger.error(`Lỗi truy vấn PayOS order ${orderCode}: ${err.message}`);
+      return { isValid: false };
+    }
   }
 }

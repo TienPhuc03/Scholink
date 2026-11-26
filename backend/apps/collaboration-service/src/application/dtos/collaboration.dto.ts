@@ -6,9 +6,22 @@ export const CreateTeamDtoSchema = z.object({
   description: z.string().max(500).optional(),
   minSize: z.number().int().min(2).default(2),
   maxSize: z.number().int().min(2).default(5),
+  avatarUrl: z.string().optional(),
+  bannerImageUrl: z.string().optional(),
 });
 
 export type CreateTeamDto = z.infer<typeof CreateTeamDtoSchema>;
+
+export const UpdateTeamDtoSchema = z.object({
+  name: z.string().min(3, 'Tên đội ít nhất 3 ký tự').max(50).optional(),
+  description: z.string().max(500).optional(),
+  minSize: z.number().int().min(2).optional(),
+  maxSize: z.number().int().min(2).optional(),
+  avatarUrl: z.string().optional(),
+  bannerImageUrl: z.string().optional(),
+});
+
+export type UpdateTeamDto = z.infer<typeof UpdateTeamDtoSchema>;
 
 export const CreateJoinRequestDtoSchema = z.object({
   message: z.string().max(300).optional(),

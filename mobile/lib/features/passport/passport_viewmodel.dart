@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
+import '../../core/services/user_avatar_service.dart';
 import '../../core/viewmodels/base_viewmodel.dart';
 import '../application/attachment_model.dart';
 import '../application/media_repository.dart';
@@ -13,7 +16,7 @@ import 'passport_repository.dart';
 enum PassportDocument {
   cv('CV', 'cvAssetId', 'CV (PDF)', <String>['pdf']),
   avatar('AVATAR', 'avatarAssetId', 'Ảnh đại diện',
-      <String>['jpg', 'jpeg', 'png', 'webp']);
+      <String>['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
 
   final String category;
   final String field;
@@ -31,14 +34,15 @@ enum PassportDocument {
         'jpg' || 'jpeg' => 'image/jpeg',
         'png' => 'image/png',
         'webp' => 'image/webp',
+        'heic' || 'heif' => 'image/jpeg',
         _ => null,
       };
 
   /// Same size/type/magic-byte checks the backend runs, so a bad file fails before upload.
   String? validate(String fileName, Uint8List bytes) {
+    final String ext = fileName.split('.').last.toLowerCase();
     final String? mime = mimeFor(fileName);
-    if (mime == null ||
-        !extensions.contains(fileName.split('.').last.toLowerCase())) {
+    if (mime == null || !extensions.contains(ext)) {
       return '$label chỉ nhận ${extensions.map((String e) => e.toUpperCase()).join(', ')}.';
     }
     if (bytes.isEmpty) return 'Tệp rỗng.';
@@ -50,7 +54,9 @@ enum PassportDocument {
     final bool ok = switch (mime) {
       'application/pdf' => starts(<int>[0x25, 0x50, 0x44, 0x46]),
       'image/png' => starts(<int>[0x89, 0x50, 0x4E, 0x47]),
-      'image/jpeg' => starts(<int>[0xFF, 0xD8, 0xFF]),
+      'image/jpeg' => starts(<int>[0xFF, 0xD8, 0xFF]) ||
+          (bytes.length >= 12 &&
+              String.fromCharCodes(bytes.sublist(4, 8)) == 'ftyp'),
       'image/webp' => starts(<int>[0x52, 0x49, 0x46, 0x46]) &&
           bytes.length >= 12 &&
           String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP',
@@ -58,7 +64,7 @@ enum PassportDocument {
     };
     return ok
         ? null
-        : 'Nội dung tệp không khớp định dạng ${fileName.split('.').last.toUpperCase()}.';
+        : 'Nội dung tệp không khớp định dạng ${ext.toUpperCase()}.';
   }
 }
 
@@ -99,6 +105,41 @@ class PassportViewModel extends BaseViewModel {
   /// True after a 409 VERSION_MISMATCH: the Passport was changed elsewhere and has been reloaded.
   bool _hadVersionConflict = false;
   bool get hadVersionConflict => _hadVersionConflict;
+
+  Uint8List? _localAvatarBytes;
+  Uint8List? get localAvatarBytes => _localAvatarBytes;
+
+  static const String _avatarStorageKey = 'scholink_user_avatar_b64';
+
+  Future<void> initLocalAvatar() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? b64 = prefs.getString(_avatarStorageKey);
+      if (b64 != null && b64.isNotEmpty) {
+        _localAvatarBytes = base64Decode(b64);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> saveLocalAvatar(Uint8List bytes) async {
+    _localAvatarBytes = bytes;
+    notifyListeners();
+    await UserAvatarService.instance.setAvatarBytes(bytes);
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_avatarStorageKey, base64Encode(bytes));
+    } catch (_) {}
+  }
+
+  Future<void> clearLocalAvatar() async {
+    _localAvatarBytes = null;
+    notifyListeners();
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_avatarStorageKey);
+    } catch (_) {}
+  }
 
   PassportViewModel(this._repository,
       {MediaRepository? media, PassportFilePicker? pick})
@@ -191,6 +232,10 @@ class PassportViewModel extends BaseViewModel {
     _uploading = doc;
     notifyListeners();
 
+    if (doc == PassportDocument.avatar) {
+      await saveLocalAvatar(bytes);
+    }
+
     final PickedAttachment attachment =
         PickedAttachment(name: fileName, bytes: bytes);
     final Result<String, Failure> uploaded = await media.upload(
@@ -257,6 +302,9 @@ class PassportViewModel extends BaseViewModel {
     result.fold<void>(
       onSuccess: (PassportModel data) {
         _passport = data;
+        if (data.avatarUrl != null && data.avatarUrl!.isNotEmpty) {
+          UserAvatarService.instance.setAvatarUrl(data.avatarUrl!);
+        }
         setSuccess();
       },
       onFailure: (Failure failure) {

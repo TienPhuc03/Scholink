@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+import 'user_avatar_view.dart';
 export 'app_animations.dart';
 
 /// Minimalist, refined status badge with consistent typography and padding
@@ -418,26 +419,12 @@ class AppTopSearchBar extends StatelessWidget implements PreferredSizeWidget {
       child: Row(
         children: <Widget>[
           // Left avatar
-          GestureDetector(
+          UserAvatarView(
+            size: 32,
+            borderRadius: 16,
+            fallbackInitials: avatarInitials ?? 'SL',
+            fallbackUrl: avatarUrl,
             onTap: onAvatarTap,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.1),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                avatarInitials ?? 'SL',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
           ),
           const SizedBox(width: 10),
 

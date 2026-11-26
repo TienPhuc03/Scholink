@@ -53,37 +53,37 @@ export class RateLimitGuard implements CanActivate {
       windowSeconds: this.defaultWindowSeconds,
     };
 
-    // Client identifier: Authenticated user ID, or client IP, or forwarded IP
+    return this.consumeRequest(request, response, options);
+  }
+
+  async consumeRequest(
+    request: Request,
+    response: Response,
+    options: RateLimitOptions = {
+      limit: this.defaultLimit,
+      windowSeconds: this.defaultWindowSeconds,
+    },
+  ): Promise<boolean> {
+    // Client identifier: Authenticated user ID, or verified request.ip (governed by Express trust proxy)
     const user = (request as any).user;
     const clientIp =
-      (request.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
       request.ip ||
-      request.socket.remoteAddress ||
+      request.socket?.remoteAddress ||
       'anonymous';
 
     const identifier = user?.userId ? `usr:${user.userId}` : `ip:${clientIp}`;
-    const endpoint = request.route?.path || request.path || 'all';
+    const rawEndpoint = request.route?.path || request.path || request.originalUrl?.split('?')[0] || 'all';
+    const endpoint = String(rawEndpoint).split('?')[0];
     const rateKey = `rate:${identifier}:${endpoint}`;
 
-    let currentCount = 0;
-    let ttlSeconds = options.windowSeconds;
+    let currentCount: number | null = null;
 
-    // 1. Try Redis rate limiting
+    // 1. Atomic Redis rate limiting
     if (this.redisService?.isAvailable) {
-      try {
-        const raw = await this.redisService.get(rateKey);
-        if (raw) {
-          currentCount = parseInt(raw, 10) + 1;
-          await this.redisService.set(rateKey, currentCount.toString(), options.windowSeconds);
-        } else {
-          currentCount = 1;
-          await this.redisService.set(rateKey, '1', options.windowSeconds);
-        }
-      } catch {
-        // Fallback to in-memory on redis error
-        currentCount = this.checkInMemory(rateKey, options);
-      }
-    } else {
+      currentCount = await this.redisService.incrWithTtl(rateKey, options.windowSeconds);
+    }
+
+    if (currentCount === null) {
       currentCount = this.checkInMemory(rateKey, options);
     }
 

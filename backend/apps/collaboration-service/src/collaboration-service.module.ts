@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
-import { SharedModule, DatabaseModule } from '@shared';
+import { SharedModule, DatabaseModule, validateEnv } from '@shared';
 import {
   TeamModel,
   TeamSchema,
@@ -45,6 +45,7 @@ import { CollaborationGrpcController } from './presentation/collaboration-grpc.c
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     DatabaseModule.forService('COLLABORATION_DB_NAME', 'scholink_collaboration'),
     SharedModule,

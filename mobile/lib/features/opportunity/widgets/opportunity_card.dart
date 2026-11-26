@@ -94,6 +94,41 @@ class OpportunityCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (item.isPromoted)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: <Color>[Color(0xFFF59E0B), Color(0xFFD97706)],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(
+                            color: Color(0x22F59E0B),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+                          SizedBox(width: 3),
+                          Text(
+                            'NỔI BẬT • ĐƯỢC GHIM TOP',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // 1. Header: Monogram Avatar + Organizer Info + Action Icons
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,

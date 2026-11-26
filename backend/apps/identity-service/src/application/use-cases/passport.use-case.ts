@@ -113,6 +113,16 @@ export class PassportUseCase {
     return Object.freeze({ ...view, ...(await this.fileLinks(passport, Boolean(view.cvAssetId))) });
   }
 
+  async getProfileViews(studentIds: readonly string[], audience: ProfileAudience) {
+    const uniqueIds = Array.from(new Set(studentIds.filter(Boolean)));
+    const settled = await Promise.allSettled(
+      uniqueIds.map((studentId) => this.getProfileView(studentId, audience)),
+    );
+    return settled
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<PassportUseCase['getProfileView']>>> => r.status === 'fulfilled')
+      .map((r) => r.value);
+  }
+
   /** Avatar (always visible) and, when [withCv], the CV with short-lived links. */
   private async fileLinks(passport: Passport, withCv: boolean) {
     const [avatar, cv] = await Promise.all([

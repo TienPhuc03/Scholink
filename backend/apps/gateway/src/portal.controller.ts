@@ -420,6 +420,8 @@ export class PortalController {
       <button class="nav-btn" onclick="switchTab('chat', this)">💬 Chat Monotonic Seq</button>
       <button class="nav-btn" onclick="switchTab('crawler', this)">🕷️ Crawler & Cảnh Báo (CRAWL-08)</button>
       <button class="nav-btn" onclick="switchTab('analytics', this)">📊 Thống Kê BO & Demo (ADM-03)</button>
+      <button class="nav-btn" onclick="switchTab('otp', this)">📧 Email OTP (SMTP)</button>
+      <button class="nav-btn" onclick="switchTab('wallet', this)">💳 Ví &amp; PayOS</button>
       <button class="nav-btn" onclick="switchTab('health', this)">🩺 Health & Topology</button>
     </nav>
   </header>
@@ -912,6 +914,150 @@ export class PortalController {
       </div>
     </div>
 
+    <!-- TAB 8: EMAIL OTP & PASSWORD RESET TEST CONSOLE -->
+    <div id="tab-otp" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">📧 Kiểm Thử Email OTP (SMTP / Dev Fallback)</h2>
+            <p class="card-desc">Gửi &amp; xác thực OTP trực tiếp qua API Gateway (<code>/api/v1/auth/*</code>), hiển thị kênh gửi thực tế (<code>SMTP</code> vs <code>DEV_PREVIEW</code>).</p>
+          </div>
+          <span id="otpChannelBadge" class="badge badge-blue">Chưa gửi</span>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">1️⃣ Gửi &amp; Xác Thực OTP</h3>
+            <div class="form-group">
+              <label>Email nhận OTP *</label>
+              <input type="email" id="otpEmailInput" placeholder="gatv3102006@gmail.com">
+            </div>
+            <div class="form-group">
+              <label>Mục đích (Purpose)</label>
+              <select id="otpPurposeSelect">
+                <option value="VERIFY_EMAIL">VERIFY_EMAIL (Xác thực email)</option>
+                <option value="RESET_PASSWORD">RESET_PASSWORD (Đặt lại mật khẩu)</option>
+              </select>
+            </div>
+            <button class="btn" onclick="portalSendOtp()">📨 Gửi Mã OTP</button>
+
+            <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 1.25rem 0;">
+
+            <div class="form-group">
+              <label>Nhập mã OTP 6 chữ số từ hộp thư</label>
+              <input type="text" id="otpVerifyCodeInput" maxlength="6" placeholder="Nhập 6 chữ số...">
+            </div>
+            <button class="btn btn-success" onclick="portalVerifyOtp()">✅ Xác Thực OTP</button>
+          </div>
+
+          <div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">2️⃣ Quên Mật Khẩu &amp; Đặt Lại (FR-AUTH-03)</h3>
+            <div class="form-group">
+              <label>Email tài khoản *</label>
+              <input type="email" id="forgotEmailInput" placeholder="student@scholink.edu.vn">
+            </div>
+            <button class="btn btn-secondary" onclick="portalForgotPassword()">🔑 Gửi OTP Đặt Lại Mật Khẩu</button>
+
+            <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 1.25rem 0;">
+
+            <div class="form-group">
+              <label>Mã OTP đặt lại</label>
+              <input type="text" id="resetOtpCodeInput" maxlength="6" placeholder="6 chữ số từ email">
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu mới</label>
+              <input type="password" id="resetNewPasswordInput" placeholder="Ít nhất 8 ký tự (chữ + số)">
+            </div>
+            <button class="btn" onclick="portalResetPassword()">🔒 Xác Nhận Đổi Mật Khẩu</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;">
+          <div id="otpDeliverySummary" style="margin-bottom: 0.75rem; font-size: 0.875rem; color: var(--text-muted);">
+            Nhấn <strong>Gửi Mã OTP</strong> để xem phản hồi kênh gửi (<code>SMTP</code> hoặc <code>DEV_PREVIEW</code>).
+          </div>
+          <div class="console-box" id="otpResultConsole">Chưa có thao tác OTP nào...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 9: WALLET & PAYOS TOPUP / RECONCILE / SKU -->
+    <div id="tab-wallet" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">💳 Kiểm Thử Ví VND, Nạp Tiền PayOS &amp; Mua SKU</h2>
+            <p class="card-desc">Tạo đơn nạp <code>PAYOS</code> (thật khi có key hoặc VietQR sandbox), mở <code>checkoutUrl</code>, đối soát <code>queryOrder</code> và mua gói SKU.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="portalLoadWallet()">🔄 Tải số dư</button>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 1.25rem;">
+          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Tổng số dư (Balance)</div>
+            <div id="portalWalletBalance" style="font-size: 1.4rem; font-weight: 800; color: #34d399; margin-top: 0.25rem;">-- đ</div>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Đang tạm giữ (Held)</div>
+            <div id="portalWalletHeld" style="font-size: 1.4rem; font-weight: 800; color: #fbbf24; margin-top: 0.25rem;">-- đ</div>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Khả dụng (Available)</div>
+            <div id="portalWalletAvailable" style="font-size: 1.4rem; font-weight: 800; color: #60a5fa; margin-top: 0.25rem;">-- đ</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">1️⃣ Xác thực &amp; Tạo đơn nạp PayOS</h3>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.9rem;">
+              <button class="btn btn-secondary btn-sm" onclick="portalWalletDemoLogin()">🔑 Đăng nhập nhanh Student Demo</button>
+              <span id="portalWalletUserBadge" class="badge badge-blue">Chưa đăng nhập</span>
+            </div>
+            <div class="form-group">
+              <label>Số tiền nạp (VND, từ 10.000 - 5.000.000)</label>
+              <input type="number" id="walletTopupAmount" value="50000" min="10000" max="5000000" step="10000">
+            </div>
+            <div class="form-group">
+              <label>Cổng thanh toán (Provider)</label>
+              <select id="walletTopupProvider">
+                <option value="PAYOS">PAYOS (VietQR Thật nếu có key / Dev Mock)</option>
+                <option value="SANDBOX">SANDBOX (Mô phỏng nội bộ)</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <button class="btn" onclick="portalCreateTopup()">⚡ Tạo Đơn Nạp &amp; QR</button>
+              <button class="btn btn-secondary" onclick="portalCheckOrderStatus()">🔄 Kiểm tra Status</button>
+              <button class="btn btn-success" onclick="portalReconcileOrder()">🔍 Đối soát PayOS</button>
+              <button class="btn btn-danger" onclick="portalSimulateTopup()">🧪 Giả lập Thành công (Dev)</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 1.25rem 0;">
+
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">2️⃣ Mua Gói Dịch Vụ (SKU)</h3>
+            <div class="form-group">
+              <label>Chọn gói SKU</label>
+              <select id="walletSkuSelect">
+                <option value="VERIFICATION_BADGE">VERIFICATION_BADGE (29.000 đ)</option>
+                <option value="PLUS_1_MONTH">PLUS_1_MONTH (49.000 đ)</option>
+                <option value="OPPORTUNITY_BOOST">OPPORTUNITY_BOOST (99.000 đ)</option>
+                <option value="PLUS_1_YEAR">PLUS_1_YEAR (499.000 đ)</option>
+              </select>
+            </div>
+            <button class="btn" onclick="portalPurchaseSku()">🛒 Mua Gói Ngay</button>
+          </div>
+
+          <div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">3️⃣ Thông tin QR / Checkout PayOS</h3>
+            <div id="walletOrderPreview" style="background: rgba(15, 23, 42, 0.55); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; min-height: 220px; margin-bottom: 1rem;">
+              Chưa tạo đơn nạp nào. Hãy bấm <strong>Tạo Đơn Nạp &amp; QR</strong>.
+            </div>
+            <div class="console-box" id="walletConsole">Log Billing / PayOS sẽ hiện tại đây...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -932,6 +1078,7 @@ export class PortalController {
       if (tabId === 'chat') loadChatRooms();
       if (tabId === 'crawler') loadCrawlerDashboard();
       if (tabId === 'analytics') loadBoDashboard();
+      if (tabId === 'wallet') portalLoadWallet();
       if (tabId === 'health') checkHealth();
     }
 
@@ -1744,8 +1891,266 @@ export class PortalController {
     }
 
     // ==========================================
-    // 5. HEALTH CHECK (F06)
+    // 5. HEALTH CHECK (F06) & EMAIL OTP CONSOLE
     // ==========================================
+    function renderOtpResult(ok, title, data) {
+      const consoleEl = document.getElementById('otpResultConsole');
+      const badgeEl = document.getElementById('otpChannelBadge');
+      const summaryEl = document.getElementById('otpDeliverySummary');
+      consoleEl.innerText = title + '\\n' + JSON.stringify(data, null, 2);
+
+      if (data && data.deliveryChannel) {
+        if (data.deliveryChannel === 'SMTP') {
+          badgeEl.className = 'badge badge-green';
+          badgeEl.innerText = 'SMTP (Email thật)';
+          summaryEl.innerText = '✅ Đã gửi email thật qua SMTP tới ' + (data.email || '') + ' (hết hạn sau ' + (data.expiresInSeconds || 300) + 's).';
+        } else {
+          badgeEl.className = 'badge badge-purple';
+          badgeEl.innerText = data.deliveryChannel;
+          summaryEl.innerText = 'ℹ️ Chế độ ' + data.deliveryChannel + (data.devOtpPreview ? ' — devOtpPreview: ' + data.devOtpPreview : '');
+        }
+      } else if (!ok) {
+        badgeEl.className = 'badge badge-purple';
+        badgeEl.innerText = 'Lỗi';
+        summaryEl.innerText = '❌ ' + (data?.message || data?.error?.message || 'Thao tác thất bại');
+      } else {
+        summaryEl.innerText = '✅ ' + title;
+      }
+    }
+
+    async function postAuthJson(url, payload, title) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        renderOtpResult(res.ok, title + ' (HTTP ' + res.status + ')', data);
+      } catch (err) {
+        renderOtpResult(false, title, { message: err.message });
+      }
+    }
+
+    function portalSendOtp() {
+      const email = document.getElementById('otpEmailInput').value.trim();
+      const purpose = document.getElementById('otpPurposeSelect').value;
+      if (!email) { alert('Vui lòng nhập email'); return; }
+      postAuthJson('/api/v1/auth/send-otp', { email, purpose }, 'POST /api/v1/auth/send-otp');
+    }
+
+    function portalVerifyOtp() {
+      const email = document.getElementById('otpEmailInput').value.trim();
+      const purpose = document.getElementById('otpPurposeSelect').value;
+      const otpCode = document.getElementById('otpVerifyCodeInput').value.trim();
+      if (!email || !otpCode) { alert('Vui lòng nhập email và mã OTP'); return; }
+      postAuthJson('/api/v1/auth/verify-otp', { email, otpCode, purpose }, 'POST /api/v1/auth/verify-otp');
+    }
+
+    function portalForgotPassword() {
+      const email = document.getElementById('forgotEmailInput').value.trim();
+      if (!email) { alert('Vui lòng nhập email tài khoản'); return; }
+      postAuthJson('/api/v1/auth/forgot-password', { email }, 'POST /api/v1/auth/forgot-password');
+    }
+
+    function portalResetPassword() {
+      const email = document.getElementById('forgotEmailInput').value.trim();
+      const otpCode = document.getElementById('resetOtpCodeInput').value.trim();
+      const newPassword = document.getElementById('resetNewPasswordInput').value;
+      if (!email || !otpCode || !newPassword) { alert('Vui lòng nhập đủ email, OTP và mật khẩu mới'); return; }
+      postAuthJson('/api/v1/auth/reset-password', { email, otpCode, newPassword }, 'POST /api/v1/auth/reset-password');
+    }
+
+    // ==========================================
+    // 8. WALLET & PAYOS TEST CONSOLE
+    // ==========================================
+    let currentTopupOrderId = '';
+
+    function formatVnd(n) {
+      return Number(n || 0).toLocaleString('vi-VN') + ' đ';
+    }
+
+    function setWalletLog(title, data) {
+      document.getElementById('walletConsole').innerText = title + '\\n' + JSON.stringify(data, null, 2);
+    }
+
+    function renderOrderPreview(order) {
+      const box = document.getElementById('walletOrderPreview');
+      box.replaceChildren();
+      if (!order || !order.orderId) {
+        box.textContent = 'Chưa có thông tin đơn.';
+        return;
+      }
+      currentTopupOrderId = order.orderId;
+
+      const header = document.createElement('div');
+      header.style.marginBottom = '0.6rem';
+      header.textContent = 'Đơn #' + (order.orderCode || '') + ' (' + order.orderId + ') — Trạng thái: ' + order.status + ' — ' + formatVnd(order.amountVnd);
+      box.appendChild(header);
+
+      if (order.qrCode) {
+        if (/^https?:\/\//i.test(order.qrCode)) {
+          const img = document.createElement('img');
+          img.src = order.qrCode;
+          img.alt = 'VietQR';
+          img.style.width = '180px';
+          img.style.height = '180px';
+          img.style.borderRadius = '8px';
+          img.style.background = '#fff';
+          img.style.display = 'block';
+          img.style.marginBottom = '0.6rem';
+          box.appendChild(img);
+        } else {
+          const qrText = document.createElement('div');
+          qrText.style.fontFamily = 'var(--mono)';
+          qrText.style.fontSize = '0.72rem';
+          qrText.style.wordBreak = 'break-all';
+          qrText.style.padding = '0.5rem';
+          qrText.style.background = 'rgba(0,0,0,0.35)';
+          qrText.style.borderRadius = '6px';
+          qrText.style.marginBottom = '0.6rem';
+          qrText.textContent = 'Chuỗi QR PayOS (EMVCo): ' + order.qrCode;
+          box.appendChild(qrText);
+        }
+      }
+
+      if (order.checkoutUrl) {
+        const link = document.createElement('a');
+        link.href = order.checkoutUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = 'btn btn-sm';
+        link.textContent = '🔗 Mở Checkout URL PayOS';
+        box.appendChild(link);
+      }
+    }
+
+    async function portalWalletDemoLogin() {
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'student@scholink.edu.vn', password: 'Student@2026' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || data?.error?.message || 'Đăng nhập thất bại');
+        currentAuthToken = data.accessToken;
+        localStorage.setItem('token', currentAuthToken);
+        const badge = document.getElementById('portalWalletUserBadge');
+        badge.className = 'badge badge-green';
+        badge.innerText = data.user?.email || 'Đã đăng nhập';
+        setWalletLog('Đăng nhập Student Demo OK', { user: data.user });
+        portalLoadWallet();
+      } catch (err) {
+        setWalletLog('Lỗi đăng nhập', { message: err.message });
+      }
+    }
+
+    function getWalletToken() {
+      return currentAuthToken || localStorage.getItem('token') || '';
+    }
+
+    async function portalLoadWallet() {
+      const token = getWalletToken();
+      if (!token) {
+        document.getElementById('portalWalletUserBadge').innerText = 'Chưa đăng nhập';
+        return;
+      }
+      try {
+        const res = await fetch('/api/v1/wallet', { headers: { Authorization: 'Bearer ' + token } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || data?.error?.message || 'Không thể tải ví');
+        document.getElementById('portalWalletBalance').innerText = formatVnd(data.balanceVnd);
+        document.getElementById('portalWalletHeld').innerText = formatVnd(data.heldVnd);
+        document.getElementById('portalWalletAvailable').innerText = formatVnd(data.availableVnd);
+      } catch (err) {
+        setWalletLog('GET /api/v1/wallet lỗi', { message: err.message });
+      }
+    }
+
+    async function portalCreateTopup() {
+      const token = getWalletToken();
+      if (!token) { alert('Hãy bấm "Đăng nhập nhanh Student Demo" trước.'); return; }
+      const amountVnd = Number(document.getElementById('walletTopupAmount').value || 50000);
+      const provider = document.getElementById('walletTopupProvider').value;
+      const idemKey = 'portal_topup_' + Date.now();
+      try {
+        const res = await fetch('/api/v1/payments/topups', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'Idempotency-Key': idemKey
+          },
+          body: JSON.stringify({ amountVnd, provider })
+        });
+        const data = await res.json();
+        setWalletLog('POST /api/v1/payments/topups (' + res.status + ')', data);
+        if (res.ok) renderOrderPreview(data);
+      } catch (err) {
+        setWalletLog('Tạo đơn nạp lỗi', { message: err.message });
+      }
+    }
+
+    async function portalCheckOrderStatus() {
+      const token = getWalletToken();
+      if (!token || !currentTopupOrderId) { alert('Cần đăng nhập và có orderId trước.'); return; }
+      const res = await fetch('/api/v1/payments/orders/' + encodeURIComponent(currentTopupOrderId) + '/status', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      setWalletLog('GET .../status (' + res.status + ')', data);
+      if (res.ok) {
+        renderOrderPreview(data);
+        if (data.status === 'SUCCEEDED') portalLoadWallet();
+      }
+    }
+
+    async function portalReconcileOrder() {
+      const token = getWalletToken();
+      if (!token || !currentTopupOrderId) { alert('Cần đăng nhập và có orderId trước.'); return; }
+      const res = await fetch('/api/v1/payments/orders/' + encodeURIComponent(currentTopupOrderId) + '/reconcile', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      setWalletLog('POST .../reconcile (' + res.status + ')', data);
+      if (res.ok) {
+        renderOrderPreview(data);
+        if (data.status === 'SUCCEEDED') portalLoadWallet();
+      }
+    }
+
+    async function portalSimulateTopup() {
+      const token = getWalletToken();
+      if (!token || !currentTopupOrderId) { alert('Cần đăng nhập và có orderId trước.'); return; }
+      const res = await fetch('/api/v1/payments/orders/' + encodeURIComponent(currentTopupOrderId) + '/simulate-success', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      setWalletLog('POST .../simulate-success (' + res.status + ')', data);
+      if (res.ok) portalLoadWallet();
+    }
+
+    async function portalPurchaseSku() {
+      const token = getWalletToken();
+      if (!token) { alert('Hãy đăng nhập trước.'); return; }
+      const skuCode = document.getElementById('walletSkuSelect').value;
+      const res = await fetch('/api/v1/wallet/purchases', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+          'Idempotency-Key': 'portal_pur_' + Date.now()
+        },
+        body: JSON.stringify({ skuCode })
+      });
+      const data = await res.json();
+      setWalletLog('POST /api/v1/wallet/purchases (' + res.status + ')', data);
+      if (res.ok) portalLoadWallet();
+    }
+
     async function checkHealth() {
       try {
         const res = await fetch('/health');
@@ -1757,7 +2162,15 @@ export class PortalController {
     }
 
     // Init
-    loadOrganizations();
+    const initialHash = (window.location.hash || '').replace('#', '');
+    if (initialHash && document.getElementById('tab-' + initialHash)) {
+      const matchingBtn = Array.from(document.querySelectorAll('.nav-btn')).find((b) =>
+        (b.getAttribute('onclick') || '').includes("'" + initialHash + "'")
+      );
+      switchTab(initialHash, matchingBtn || null);
+    } else {
+      loadOrganizations();
+    }
   </script>
 </body>
 </html>`;

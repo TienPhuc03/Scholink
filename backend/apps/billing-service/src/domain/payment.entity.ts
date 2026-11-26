@@ -53,4 +53,14 @@ export class PaymentOrder extends AggregateRoot<string> {
     this._props.status = 'FAILED';
     this.incrementVersion();
   }
+
+  public markCancelled(): void {
+    this._props.status = 'CANCELLED';
+    this.incrementVersion();
+  }
+
+  public markExpired(): void {
+    this._props.status = 'EXPIRED';
+    this.incrementVersion();
+  }
 }

@@ -46,6 +46,15 @@ export class ProfileController {
     return this.passportUseCase.getProfileView(data.studentId, data.audience as 'PUBLIC' | 'TEAMMATES');
   }
 
+  @GrpcMethod('IdentityGrpcService', 'GetProfileViews')
+  async getProfileViews(data: { studentIds?: string[]; audience: string }) {
+    const profiles = await this.passportUseCase.getProfileViews(
+      data.studentIds ?? [],
+      (data.audience || 'TEAMMATES') as 'PUBLIC' | 'TEAMMATES',
+    );
+    return { profiles };
+  }
+
   @GrpcMethod('IdentityGrpcService', 'SuggestProfileValues')
   suggestProfileValues(data: { field: SuggestionField; query?: string; institution?: string; limit?: number }) {
     return {

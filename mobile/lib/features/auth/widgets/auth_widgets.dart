@@ -681,13 +681,14 @@ class OtpResendRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool canResend = secondsLeft <= 0 && !isSending;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         const Text(
           'Chưa nhận được mã? ',
           style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               color: AppColors.textSecondary),
         ),
         TextButton(
@@ -704,13 +705,165 @@ class OtpResendRow extends StatelessWidget {
                     ? 'Gửi lại sau ${secondsLeft}s'
                     : 'Gửi lại mã',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w600,
               color: canResend ? AppColors.primary : AppColors.textMuted,
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Delivery info & live expiration countdown card for Email OTP flows.
+class OtpDeliveryStatusCard extends StatelessWidget {
+  final String email;
+  final bool isEmailDelivered;
+  final String formattedExpiresLeft;
+  final bool isExpired;
+  final bool hasActiveTicket;
+
+  const OtpDeliveryStatusCard({
+    super.key,
+    required this.email,
+    required this.isEmailDelivered,
+    required this.formattedExpiresLeft,
+    required this.isExpired,
+    this.hasActiveTicket = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent = isExpired ? AppColors.error : AppColors.primary;
+    final Color bg = isExpired
+        ? AppColors.error.withValues(alpha: 0.06)
+        : AppColors.cardInfoBackground;
+    final Color border = isExpired
+        ? AppColors.error.withValues(alpha: 0.25)
+        : AppColors.primary.withValues(alpha: 0.18);
+
+    return Container(
+      key: const Key('otp_delivery_status_card'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                isEmailDelivered
+                    ? Icons.mark_email_read_outlined
+                    : Icons.schedule_rounded,
+                size: 18,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isEmailDelivered
+                      ? 'Đã gửi mã xác thực qua Email'
+                      : 'Mã OTP có hiệu lực tạm thời',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                ),
+              ),
+              if (hasActiveTicket)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: accent.withValues(alpha: 0.25)),
+                  ),
+                  child: Text(
+                    isExpired ? 'Đã hết hạn' : 'Còn $formattedExpiresLeft',
+                    key: const Key('otp_expiry_timer'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isExpired
+                ? 'Mã OTP đã hết hạn. Hãy bấm "Gửi lại mã" để nhận mã mới tại $email.'
+                : isEmailDelivered
+                    ? 'Vui lòng mở hộp thư $email (kiểm tra cả mục Spam / Quảng cáo) để lấy mã 6 chữ số.'
+                    : 'Nhập mã 6 chữ số được cấp cho $email (tối đa 5 lần nhập sai).',
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One-tap clipboard paste button that extracts a 6-digit OTP code.
+class OtpPasteButton extends StatelessWidget {
+  final bool enabled;
+  final ValueChanged<String> onPasted;
+
+  const OtpPasteButton({
+    super.key,
+    required this.enabled,
+    required this.onPasted,
+  });
+
+  Future<void> _pasteFromClipboard(BuildContext context) async {
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    final String raw = data?.text ?? '';
+    final RegExpMatch? match = RegExp(r'\d{6}').firstMatch(raw);
+    if (!context.mounted) return;
+    if (match == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Chưa tìm thấy mã OTP 6 chữ số trong bộ nhớ tạm.'),
+          ),
+        );
+      return;
+    }
+    onPasted(match.group(0)!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        key: const Key('otp_paste_button'),
+        onPressed: enabled ? () => _pasteFromClipboard(context) : null,
+        icon: const Icon(Icons.content_paste_rounded, size: 16),
+        label: const Text(
+          'Dán mã OTP',
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          minimumSize: const Size(0, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
     );
   }
 }

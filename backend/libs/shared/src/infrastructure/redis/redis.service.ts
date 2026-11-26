@@ -97,6 +97,23 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  async incrWithTtl(key: string, ttlSeconds: number): Promise<number | null> {
+    if (!this.isAvailable || !this.client) return null;
+    try {
+      const script = `
+        local c = redis.call('INCR', KEYS[1])
+        if c == 1 or redis.call('TTL', KEYS[1]) == -1 then
+          redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+        end
+        return c
+      `;
+      const count = await this.client.eval(script, 1, key, String(ttlSeconds));
+      return Number(count);
+    } catch {
+      return null;
+    }
+  }
+
   async del(key: string): Promise<boolean> {
     if (!this.isAvailable || !this.client) return false;
     try {

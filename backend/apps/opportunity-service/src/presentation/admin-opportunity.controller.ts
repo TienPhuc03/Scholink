@@ -6,12 +6,16 @@ import {
   Body,
   Param,
   Query,
+  Req,
+  UseGuards,
   NotFoundException,
   BadRequestException,
   ConflictException,
   Logger,
   Optional,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard, RolesGuard, Roles, AuthenticatedUser } from '@shared';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -30,6 +34,9 @@ import {
 } from '../infrastructure/persistence/application.schema';
 import { OpportunityType } from '../domain/opportunity.entity';
 
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
 @Controller('api/v1/admin/opportunities')
 export class AdminOpportunityController {
   private readonly logger = new Logger(AdminOpportunityController.name);
@@ -129,7 +136,8 @@ export class AdminOpportunityController {
     const query: Record<string, any> = { status: 'PENDING_REVIEW' };
     if (type) query.type = type;
     if (search && search.trim()) {
-      query.title = { $regex: search.trim(), $options: 'i' };
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.title = { $regex: escaped, $options: 'i' };
     }
     if (fuzzyOnly === 'true') {
       query.candidateMergeIds = { $exists: true, $not: { $size: 0 } };
@@ -262,6 +270,7 @@ export class AdminOpportunityController {
       expectedVersion?: number;
       updateFields?: Partial<OpportunityModel>;
     },
+    @Req() req?: { user?: AuthenticatedUser },
   ) {
     const opp = await this.opportunityModel.findOne({ id });
     if (!opp) throw new NotFoundException(`Không tìm thấy cơ hội ID: ${id}`);
@@ -322,7 +331,7 @@ export class AdminOpportunityController {
     }
 
     // 3. Tạo OpportunityRevision ghi nhận audit trước/sau, actor, lý do
-    const actorId = body?.actorId || 'usr_admin_system';
+    const actorId = req?.user?.userId || 'usr_admin_system';
     const reason = body?.reason || 'Admin duyệt công bố cơ hội từ hàng chờ kiểm duyệt';
     const snapshotBefore = opp.toObject();
 
@@ -371,6 +380,7 @@ export class AdminOpportunityController {
   async rejectOpportunity(
     @Param('id') id: string,
     @Body() body: { actorId?: string; reason: string },
+    @Req() req?: { user?: AuthenticatedUser },
   ) {
     if (!body?.reason?.trim()) {
       throw new BadRequestException('Vui lòng cung cấp lý do từ chối cơ hội');
@@ -379,7 +389,7 @@ export class AdminOpportunityController {
     const opp = await this.opportunityModel.findOne({ id });
     if (!opp) throw new NotFoundException(`Không tìm thấy cơ hội ID: ${id}`);
 
-    const actorId = body.actorId || 'usr_admin_system';
+    const actorId = req?.user?.userId || 'usr_admin_system';
     const snapshotBefore = opp.toObject();
 
     opp.status = 'REJECTED';
@@ -420,6 +430,7 @@ export class AdminOpportunityController {
   async mergeOpportunity(
     @Param('id') id: string,
     @Body() body: { targetOpportunityId: string; actorId?: string; reason: string },
+    @Req() req?: { user?: AuthenticatedUser },
   ) {
     if (!body?.targetOpportunityId) {
       throw new BadRequestException('Vui lòng cung cấp targetOpportunityId cần gộp vào');
@@ -433,7 +444,7 @@ export class AdminOpportunityController {
     if (!sourceOpp) throw new NotFoundException(`Không tìm thấy cơ hội nguồn ID: ${id}`);
     if (!targetOpp) throw new NotFoundException(`Không tìm thấy cơ hội đích ID: ${body.targetOpportunityId}`);
 
-    const actorId = body.actorId || 'usr_admin_system';
+    const actorId = req?.user?.userId || 'usr_admin_system';
     const reason = body.reason || `Gộp vào cơ hội chuẩn ${targetOpp.id} theo BR14`;
 
     // 1. Gộp bổ sung tags từ nguồn vào đích (nếu chưa có)
@@ -489,6 +500,7 @@ export class AdminOpportunityController {
   async extendDeadline(
     @Param('id') id: string,
     @Body() body: { newDeadline: string | Date; timezone?: string; reason?: string; actorId?: string },
+    @Req() req?: { user?: AuthenticatedUser },
   ) {
     const opp = await this.opportunityModel.findOne({ id });
     if (!opp) throw new NotFoundException(`Không tìm thấy cơ hội ID: ${id}`);
@@ -501,7 +513,7 @@ export class AdminOpportunityController {
       throw new BadRequestException('Hạn đăng ký mới phải hợp lệ và sau hạn đăng ký hiện tại');
     }
 
-    const actorId = body.actorId || 'usr_admin_system';
+    const actorId = req?.user?.userId || 'usr_admin_system';
     const reason = body.reason || 'Admin gia hạn cơ hội';
     const oldDeadline = opp.registerDeadline;
 

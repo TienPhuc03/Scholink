@@ -1,8 +1,9 @@
-import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
+import { Injectable, NestMiddleware, Logger, Optional } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import { DomainException, RateLimitGuard } from '@shared';
 
 export interface MicroserviceRoute {
   prefix: string;
@@ -70,13 +71,23 @@ const INTERNAL_ONLY_PREFIXES = [
 ];
 
 export function isInternalOnlyPath(originalUrl: string): boolean {
-  let path = originalUrl.split('?')[0];
+  let path = originalUrl;
+  try {
+    path = new URL(originalUrl, 'http://localhost').pathname;
+  } catch {
+    path = originalUrl.split('?')[0];
+  }
   try {
     path = decodeURIComponent(path);
   } catch {
     // Malformed escapes: match on the raw path.
   }
-  path = path.toLowerCase().replace(/\/{2,}/g, '/');
+  try {
+    path = new URL(path.replace(/\/{2,}/g, '/'), 'http://localhost').pathname;
+  } catch {
+    path = path.replace(/\/{2,}/g, '/');
+  }
+  path = path.toLowerCase();
   return INTERNAL_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
@@ -84,16 +95,25 @@ export function isInternalOnlyPath(originalUrl: string): boolean {
 export class ReverseProxyMiddleware implements NestMiddleware {
   private readonly logger = new Logger('ReverseProxy');
 
-  use(req: Request, res: Response, next: NextFunction) {
+  constructor(@Optional() private readonly rateLimitGuard?: RateLimitGuard) {}
+
+  async use(req: Request, res: Response, next: NextFunction) {
     const originalUrl = req.originalUrl || req.url;
 
+    let normalizedPath = originalUrl.split('?')[0];
+    try {
+      normalizedPath = new URL(originalUrl, 'http://localhost').pathname;
+    } catch {
+      // keep raw path
+    }
+
     // SCHOL-14: Admin organizations endpoint is explicitly managed by GatewayAdminOrgController
-    if (originalUrl.startsWith('/api/v1/admin/organizations')) {
+    if (normalizedPath.startsWith('/api/v1/admin/organizations')) {
       return next();
     }
 
     // F32: Admin opportunities and crawler review endpoint is managed by GatewayAdminOpportunityController
-    if (originalUrl.startsWith('/api/v1/admin/opportunities')) {
+    if (normalizedPath.startsWith('/api/v1/admin/opportunities')) {
       return next();
     }
 
@@ -113,11 +133,34 @@ export class ReverseProxyMiddleware implements NestMiddleware {
 
     // Check if request matches any downstream microservice route
     const matchedRoute = MICROSERVICE_ROUTES.find((route) =>
-      originalUrl.startsWith(route.prefix),
+      normalizedPath.startsWith(route.prefix),
     );
 
     if (!matchedRoute) {
       return next();
+    }
+
+    if (this.rateLimitGuard) {
+      const shouldPauseStream =
+        !req.readableEnded && (!req.body || Object.keys(req.body).length === 0);
+      if (shouldPauseStream) req.pause();
+      try {
+        await this.rateLimitGuard.consumeRequest(req, res);
+      } catch (err: any) {
+        if (shouldPauseStream && !req.readableEnded) req.resume();
+        if (err instanceof DomainException) {
+          res.status(err.statusCode).json({
+            error: {
+              code: err.code,
+              message: err.message,
+              correlationId: (req.headers['x-correlation-id'] as string) || undefined,
+            },
+          });
+          return;
+        }
+        throw err;
+      }
+      if (shouldPauseStream && !req.readableEnded) req.resume();
     }
 
     const targetBase = matchedRoute.getTargetUrl();

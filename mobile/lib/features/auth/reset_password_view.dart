@@ -73,6 +73,14 @@ class _ResetPasswordViewState extends State<ResetPasswordView> {
               title: 'Đặt lại mật khẩu',
               subtitle: 'Nhập mã OTP gửi tới ${vm.email} và tạo mật khẩu mới.',
             ),
+            if (vm.expiresSecondsLeft > 0 || vm.isExpired)
+              OtpDeliveryStatusCard(
+                email: vm.email,
+                isEmailDelivered: vm.isEmailDelivered,
+                formattedExpiresLeft: vm.formattedExpiresLeft,
+                isExpired: vm.isExpired,
+                hasActiveTicket: vm.expiresSecondsLeft > 0 || vm.isExpired,
+              ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
@@ -80,6 +88,14 @@ class _ResetPasswordViewState extends State<ResetPasswordView> {
                   controller: _code,
                   enabled: !locked && !busy,
                   hasError: vm.codeRejected || errors.otp != null,
+                ),
+                const SizedBox(height: 6),
+                OtpPasteButton(
+                  enabled: !locked && !busy,
+                  onPasted: (String digits) {
+                    _code.text = digits;
+                    widget.viewModel.clearFieldError('otp');
+                  },
                 ),
                 if (errors.otp != null) ...<Widget>[
                   const SizedBox(height: 6),

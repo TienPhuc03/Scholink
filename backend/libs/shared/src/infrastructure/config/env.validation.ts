@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const EXAMPLE_SECRETS = new Set([
+  'scholink-super-secret-jwt-key-minimum-32-chars-long!',
+  'scholink-pii-secret-encryption-key-32ch!',
+]);
+
 const secretStringSchema = (name: string) =>
   z
     .string({ required_error: `Biến môi trường ${name} là bắt buộc (không được để trống)` })
@@ -7,6 +12,10 @@ const secretStringSchema = (name: string) =>
     .refine(
       (val) => !val.startsWith('<REPLACE_') && !val.toLowerCase().startsWith('replace_with_'),
       `Biến môi trường ${name} đang chứa giá trị mẫu (placeholder) chưa được cấu hình thực tế`,
+    )
+    .refine(
+      (val) => !EXAMPLE_SECRETS.has(val.trim()),
+      `Biến môi trường ${name} đang dùng giá trị mẫu từ .env.example, vui lòng thay bằng secret riêng`,
     );
 
 export const EnvSchema = z.object({

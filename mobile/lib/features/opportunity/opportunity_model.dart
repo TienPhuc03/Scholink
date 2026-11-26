@@ -85,6 +85,7 @@ class OpportunityModel {
   final int? version;
   final bool isBookmarked;
   final bool isExternalMarked;
+  final bool isPromoted;
 
   const OpportunityModel({
     required this.id,
@@ -107,6 +108,7 @@ class OpportunityModel {
     this.version,
     this.isBookmarked = false,
     this.isExternalMarked = false,
+    this.isPromoted = false,
   });
 
   bool get isCompetition => type == OpportunityType.competition;
@@ -429,6 +431,7 @@ class OpportunityModel {
       version: version ?? this.version,
       isBookmarked: isBookmarked ?? this.isBookmarked,
       isExternalMarked: isExternalMarked ?? this.isExternalMarked,
+      isPromoted: isPromoted ?? this.isPromoted,
     );
   }
 
@@ -530,6 +533,7 @@ class OpportunityModel {
       version: int.tryParse('${json['version'] ?? ''}'),
       isBookmarked: json['isBookmarked'] == true,
       isExternalMarked: json['isExternalMarked'] == true,
+      isPromoted: json['isPromoted'] == true,
     );
   }
 
@@ -554,6 +558,7 @@ class OpportunityModel {
         'version': version,
         'isBookmarked': isBookmarked,
         'isExternalMarked': isExternalMarked,
+        'isPromoted': isPromoted,
       };
 }
 

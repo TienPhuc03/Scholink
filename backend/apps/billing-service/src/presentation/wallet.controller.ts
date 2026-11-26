@@ -7,7 +7,26 @@ import {
   PurchaseSkuDto,
   PurchaseSkuDtoSchema,
 } from '../application/dtos/billing.dto';
-import { ZodValidationPipe, JwtAuthGuard, IdempotencyGuard, Idempotent, AuthenticatedUser, Public } from '@shared';
+import {
+  ZodValidationPipe,
+  JwtAuthGuard,
+  IdempotencyGuard,
+  Idempotent,
+  AuthenticatedUser,
+  Public,
+  DomainException,
+  ErrorCode,
+} from '@shared';
+
+const assertSandboxAllowed = () => {
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+    throw new DomainException(
+      ErrorCode.FORBIDDEN_RESOURCE,
+      'Chức năng thanh toán sandbox đã bị tắt trên môi trường này',
+      403,
+    );
+  }
+};
 
 @ApiTags('Wallet & Billing (Billing Microservice)')
 @Controller('api/v1')
@@ -46,11 +65,13 @@ export class WalletController {
     return this.walletUseCase.handleWebhook('PAYOS', body);
   }
 
-  @Public()
   @Post('payments/webhook/sandbox')
-  @ApiOperation({ summary: 'Webhook mô phỏng thanh toán sandbox' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Webhook mô phỏng thanh toán sandbox (chỉ bật ở dev/test)' })
   @ApiResponse({ status: 200, description: 'Xử lý webhook thành công' })
   async sandboxWebhook(@Body() body: any) {
+    assertSandboxAllowed();
     return this.walletUseCase.handleWebhook('SANDBOX', body);
   }
 
@@ -59,16 +80,54 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Kiểm tra trạng thái đơn nạp tiền' })
   @ApiResponse({ status: 200, description: 'Trạng thái đơn nạp' })
-  async getOrderStatus(@Param('id') orderId: string) {
-    return this.walletUseCase.getOrderStatus(orderId);
+  async getOrderStatus(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') orderId: string,
+  ) {
+    return this.walletUseCase.getOrderStatus(orderId, req.user.userId);
   }
 
-  @Public()
+  @Post('payments/orders/:id/reconcile')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Đối soát trạng thái đơn nạp trực tiếp với PayOS (khôi phục khi webhook chậm/mất)' })
+  @ApiResponse({ status: 200, description: 'Kết quả đối soát đơn nạp' })
+  async reconcileOrder(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') orderId: string,
+  ) {
+    return this.walletUseCase.reconcileOrder(orderId, req.user.userId);
+  }
+
   @Post('payments/orders/:id/simulate-success')
-  @ApiOperation({ summary: 'Mô phỏng thanh toán sandbox thành công (Demo environment)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mô phỏng thanh toán sandbox thành công (chỉ bật ở dev/test)' })
   @ApiResponse({ status: 200, description: 'Cộng tiền vào ví thành công' })
-  async simulateSuccess(@Param('id') orderId: string) {
-    return this.walletUseCase.completeTopupSandbox(orderId);
+  async simulateSuccess(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id') orderId: string,
+  ) {
+    assertSandboxAllowed();
+    return this.walletUseCase.completeTopupSandbox(orderId, req.user.userId);
+  }
+
+  @Get('wallet/entitlements')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy danh sách các đặc quyền / gói dịch vụ đang hoạt động của người dùng' })
+  @ApiResponse({ status: 200, description: 'Danh sách đặc quyền hoạt động' })
+  async getMyEntitlements(@Req() req: { user: AuthenticatedUser }) {
+    return this.walletUseCase.getMyEntitlements(req.user.userId);
+  }
+
+  @Get('wallet/purchases')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy lịch sử mua gói dịch vụ của người dùng' })
+  @ApiResponse({ status: 200, description: 'Lịch sử mua gói' })
+  async getMyPurchases(@Req() req: { user: AuthenticatedUser }) {
+    return this.walletUseCase.getMyEntitlements(req.user.userId);
   }
 
   @Post('wallet/purchases')

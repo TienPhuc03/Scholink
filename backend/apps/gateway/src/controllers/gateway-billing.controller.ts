@@ -6,16 +6,33 @@ import {
   Param,
   UseGuards,
   Headers,
+  HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { JwtAuthGuard, Public } from '@shared';
+import { JwtAuthGuard, Public, DomainException, ErrorCode } from '@shared';
 
 const BILLING_URL = () => process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
+
+const assertSandboxAllowed = () => {
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+    throw new DomainException(
+      ErrorCode.FORBIDDEN_RESOURCE,
+      'Chức năng thanh toán sandbox đã bị tắt trên môi trường này',
+      403,
+    );
+  }
+};
 
 async function forwardBilling(path: string, options: RequestInit = {}) {
   const url = `${BILLING_URL()}${path}`;
   const res = await fetch(url, options);
   const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new HttpException(
+      data ?? { error: { code: 'UPSTREAM_ERROR', message: res.statusText } },
+      res.status,
+    );
+  }
   return data;
 }
 
@@ -67,14 +84,16 @@ export class GatewayBillingController {
     });
   }
 
-  @Public()
   @Post('payments/webhook/sandbox')
-  @ApiOperation({ summary: 'Webhook mô phỏng thanh toán sandbox' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Webhook mô phỏng thanh toán sandbox (chỉ bật ở dev/test)' })
   @ApiResponse({ status: 200, description: 'Xử lý webhook thành công' })
-  async sandboxWebhook(@Body() body: any) {
+  async sandboxWebhook(@Headers('authorization') auth: string, @Body() body: any) {
+    assertSandboxAllowed();
     return forwardBilling('/api/v1/payments/webhook/sandbox', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
       body: JSON.stringify(body),
     });
   }
@@ -91,11 +110,37 @@ export class GatewayBillingController {
   }
 
   @Post('payments/orders/:id/simulate-success')
-  @ApiOperation({ summary: 'Mô phỏng thanh toán sandbox thành công (Demo environment)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mô phỏng thanh toán sandbox thành công (chỉ bật ở dev/test)' })
   @ApiResponse({ status: 200, description: 'Cộng tiền vào ví thành công' })
-  async simulateSuccess(@Param('id') orderId: string) {
+  async simulateSuccess(@Headers('authorization') auth: string, @Param('id') orderId: string) {
+    assertSandboxAllowed();
     return forwardBilling(`/api/v1/payments/orders/${orderId}/simulate-success`, {
       method: 'POST',
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Get('wallet/entitlements')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy danh sách đặc quyền đang có hiệu lực của người dùng' })
+  @ApiResponse({ status: 200, description: 'Danh sách đặc quyền' })
+  async getMyEntitlements(@Headers('authorization') auth: string) {
+    return forwardBilling('/api/v1/wallet/entitlements', {
+      headers: { Authorization: auth },
+    });
+  }
+
+  @Get('wallet/purchases')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy lịch sử mua gói dịch vụ' })
+  @ApiResponse({ status: 200, description: 'Danh sách mua' })
+  async getMyPurchases(@Headers('authorization') auth: string) {
+    return forwardBilling('/api/v1/wallet/purchases', {
+      headers: { Authorization: auth },
     });
   }
 

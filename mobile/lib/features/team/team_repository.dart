@@ -75,6 +75,8 @@ class TeamRepository {
     String? description,
     int minSize = 2,
     int maxSize = 5,
+    String? avatarUrl,
+    String? bannerImageUrl,
   }) async {
     final String trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -92,6 +94,10 @@ class TeamRepository {
           'description': description?.trim(),
           'minSize': minSize,
           'maxSize': maxSize,
+          if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+            'avatarUrl': avatarUrl.trim(),
+          if (bannerImageUrl != null && bannerImageUrl.trim().isNotEmpty)
+            'bannerImageUrl': bannerImageUrl.trim(),
         },
       );
 
@@ -106,6 +112,48 @@ class TeamRepository {
 
       return const FailureResult<TeamModel, Failure>(
         ServerFailure(message: 'Phản hồi tạo đội từ máy chủ không hợp lệ.'),
+      );
+    } on Failure catch (failure) {
+      return FailureResult<TeamModel, Failure>(failure);
+    } catch (e) {
+      return FailureResult<TeamModel, Failure>(
+          ServerFailure(message: e.toString()));
+    }
+  }
+
+  Future<Result<TeamModel, Failure>> updateTeam(
+    String teamId, {
+    String? name,
+    String? description,
+    int? minSize,
+    int? maxSize,
+    String? avatarUrl,
+    String? bannerImageUrl,
+  }) async {
+    try {
+      final Response<dynamic> response = await _apiClient.patch<dynamic>(
+        ApiEndpoints.teamDetail(teamId),
+        data: <String, dynamic>{
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (description != null) 'description': description.trim(),
+          if (minSize != null) 'minSize': minSize,
+          if (maxSize != null) 'maxSize': maxSize,
+          if (avatarUrl != null) 'avatarUrl': avatarUrl.trim(),
+          if (bannerImageUrl != null) 'bannerImageUrl': bannerImageUrl.trim(),
+        },
+      );
+
+      final dynamic resData = response.data;
+      final dynamic payload = (resData is Map<String, dynamic>)
+          ? (resData['data'] ?? resData)
+          : resData;
+
+      if (payload is Map<String, dynamic>) {
+        return SuccessResult<TeamModel, Failure>(TeamModel.fromJson(payload));
+      }
+
+      return const FailureResult<TeamModel, Failure>(
+        ServerFailure(message: 'Phản hồi cập nhật đội từ máy chủ không hợp lệ.'),
       );
     } on Failure catch (failure) {
       return FailureResult<TeamModel, Failure>(failure);

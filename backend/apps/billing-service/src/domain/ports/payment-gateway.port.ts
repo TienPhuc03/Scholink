@@ -18,7 +18,7 @@ export interface WebhookResult {
   orderCode?: number;
   orderId?: string;
   amountVnd?: number;
-  status?: 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  status?: 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'PENDING';
   transId?: string;
   raw?: any;
 }

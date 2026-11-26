@@ -118,5 +118,8 @@ abstract final class ApiEndpoints {
   static const String wallet = '/api/v1/wallet';
   static const String topups = '/api/v1/payments/topups';
   static String orderStatus(String id) => '/api/v1/payments/orders/$id/status';
+  static String reconcileOrder(String id) => '/api/v1/payments/orders/$id/reconcile';
   static const String walletPurchases = '/api/v1/wallet/purchases';
+  static const String walletEntitlements = '/api/v1/wallet/entitlements';
+  static String boostOpportunity(String id) => '/api/v1/opportunities/$id/boost';
 }

@@ -4,7 +4,7 @@ import { MongooseModule, getModelToken } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { BullModule } from "@nestjs/bullmq"; // <-- Cần có để tạo Queue cho BookmarkListener
 import { EventEmitterModule } from "@nestjs/event-emitter";
-import { SharedModule, DatabaseModule } from "@shared";
+import { SharedModule, DatabaseModule, validateEnv } from "@shared";
 
 import {
   NotificationModel,
@@ -38,6 +38,7 @@ import { DeviceTokenController } from "./presentation/device-token.controller";
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
+      validate: validateEnv,
     }),
     EventEmitterModule.forRoot(),
     DatabaseModule.forService("NOTIFICATION_DB_NAME", "scholink_notification"),

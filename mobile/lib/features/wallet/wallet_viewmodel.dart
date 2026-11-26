@@ -9,12 +9,29 @@ class WalletViewModel extends BaseViewModel {
   final WalletRepository _repository;
 
   WalletModel? _wallet;
+  EntitlementModel _entitlements = const EntitlementModel();
   TopupOrderModel? _activeOrder;
   bool _isPolling = false;
   Timer? _pollingTimer;
   String? _actionMessage;
 
   WalletModel? get wallet => _wallet;
+  EntitlementModel get entitlements => _entitlements;
+  bool get hasPlus => _entitlements.hasPlus;
+  bool get hasVerificationBadge => _entitlements.hasVerificationBadge;
+  bool get hasOpportunityBoost => _entitlements.hasOpportunityBoost;
+  bool isSkuActive(String skuCode) => _entitlements.activeSkus.contains(skuCode);
+
+  DateTime? getSkuExpiry(String skuCode) {
+    if (skuCode == 'PLUS_1_MONTH' || skuCode == 'PLUS_1_YEAR') {
+      return _entitlements.plusExpiresAt;
+    }
+    if (skuCode == 'OPPORTUNITY_BOOST') {
+      return _entitlements.boostExpiresAt;
+    }
+    return null;
+  }
+
   TopupOrderModel? get activeOrder => _activeOrder;
   bool get isPolling => _isPolling;
   String? get actionMessage => _actionMessage;
@@ -55,6 +72,15 @@ class WalletViewModel extends BaseViewModel {
   Future<void> loadWallet() async {
     setLoading();
     final Result<WalletModel, Failure> result = await _repository.getMyWallet();
+    final Result<EntitlementModel, Failure> entResult = await _repository.getEntitlements();
+
+    entResult.fold(
+      onSuccess: (EntitlementModel data) {
+        _entitlements = data;
+      },
+      onFailure: (_) {},
+    );
+
     result.fold(
       onSuccess: (WalletModel data) {
         _wallet = data;
@@ -127,6 +153,31 @@ class WalletViewModel extends BaseViewModel {
     _pollingTimer = null;
     _isPolling = false;
     notifyListeners();
+  }
+
+  Future<bool> reconcileActiveOrder(String orderId) async {
+    final Result<TopupOrderModel, Failure> result = await _repository.reconcileOrder(orderId);
+    return result.fold(
+      onSuccess: (TopupOrderModel order) {
+        _activeOrder = order;
+        if (order.isSucceeded) {
+          stopPolling();
+          _actionMessage = 'Nạp thành công ${order.amountVnd} VND vào ví!';
+          loadWallet();
+          return true;
+        }
+        if (order.isFailed) {
+          stopPolling();
+          setError('Đơn thanh toán đã bị hủy hoặc hết hạn.');
+        }
+        notifyListeners();
+        return false;
+      },
+      onFailure: (Failure failure) {
+        setError(failure.message);
+        return false;
+      },
+    );
   }
 
   Future<bool> purchaseSku(String skuCode) async {

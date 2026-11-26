@@ -2,6 +2,25 @@ import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
+export function canonicalizeJson(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return '[' + obj.map((item) => canonicalizeJson(item)).join(',') + ']';
+  }
+
+  const record = obj as Record<string, unknown>;
+  const sortedKeys = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort();
+  const keyValues = sortedKeys.map(
+    (key) => `${JSON.stringify(key)}:${canonicalizeJson(record[key])}`,
+  );
+  return '{' + keyValues.join(',') + '}';
+}
+
 @Injectable()
 export class CryptoService {
   private readonly algorithm = 'aes-256-gcm';
@@ -10,28 +29,21 @@ export class CryptoService {
   constructor(@Optional() private readonly configService?: ConfigService) {
     const rawKey =
       this.configService?.get<string>('ENCRYPTION_KEY') ||
-      process.env.ENCRYPTION_KEY ||
-      'scholink-pii-secret-encryption-key-32ch!';
+      process.env.ENCRYPTION_KEY;
+    if (!rawKey || rawKey.trim().length < 32) {
+      if (process.env.NODE_ENV === 'test') {
+        this.secretKey = crypto.randomBytes(32);
+        return;
+      }
+      throw new Error(
+        'Khởi động thất bại: ENCRYPTION_KEY là bắt buộc (tối thiểu 32 ký tự, không có giá trị mặc định)',
+      );
+    }
     this.secretKey = crypto.createHash('sha256').update(rawKey).digest();
   }
 
   public canonicalizeJson(obj: unknown): string {
-    if (obj === null || typeof obj !== 'object') {
-      return JSON.stringify(obj);
-    }
-
-    if (Array.isArray(obj)) {
-      return '[' + obj.map((item) => this.canonicalizeJson(item)).join(',') + ']';
-    }
-
-    const record = obj as Record<string, unknown>;
-    const sortedKeys = Object.keys(record)
-      .filter((key) => record[key] !== undefined)
-      .sort();
-    const keyValues = sortedKeys.map(
-      (key) => `${JSON.stringify(key)}:${this.canonicalizeJson(record[key])}`,
-    );
-    return '{' + keyValues.join(',') + '}';
+    return canonicalizeJson(obj);
   }
 
   public generatePayloadHash(payload: Record<string, unknown>): string {

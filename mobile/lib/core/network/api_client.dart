@@ -28,6 +28,12 @@ abstract interface class ApiClient {
     Options? options,
   });
 
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Options? options,
+  });
+
   Future<Response<T>> delete<T>(
     String path, {
     dynamic data,
@@ -127,6 +133,25 @@ class DioApiClient implements ApiClient {
   }) async {
     try {
       return await _dio.put<T>(
+        path,
+        data: data,
+        options: options,
+      );
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (e) {
+      throw ServerFailure(message: e.toString());
+    }
+  }
+
+  @override
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Options? options,
+  }) async {
+    try {
+      return await _dio.patch<T>(
         path,
         data: data,
         options: options,

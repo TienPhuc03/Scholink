@@ -74,19 +74,28 @@ class OtpTicket {
   /// Raw OTP the backend echoes outside production, so the demo works without a mail server.
   final String? devOtpPreview;
 
+  /// Delivery channel reported by backend: `SMTP`, `DEV_PREVIEW`, or `NONE`.
+  final String deliveryChannel;
+
   const OtpTicket({
     required this.email,
     this.expiresInSeconds = 300,
     this.cooldownSeconds = 60,
     this.message = '',
     this.devOtpPreview,
+    this.deliveryChannel = 'DEV_PREVIEW',
   });
+
+  bool get isEmailDelivered => deliveryChannel.toUpperCase() == 'SMTP';
 
   factory OtpTicket.fromJson(Map<String, dynamic> json,
       {required String fallbackEmail}) {
     final String preview = (json['devOtpPreview'] as String?) ?? '';
     final int expires = (json['expiresInSeconds'] as num?)?.toInt() ?? 0;
     final int cooldown = (json['cooldownSeconds'] as num?)?.toInt() ?? 0;
+    final String rawChannel = (json['deliveryChannel'] as String?) ?? '';
+    final String resolvedChannel =
+        rawChannel.isNotEmpty ? rawChannel : (preview.isEmpty ? 'SMTP' : 'DEV_PREVIEW');
     return OtpTicket(
       email: (json['email'] as String?)?.isNotEmpty == true
           ? json['email'] as String
@@ -95,6 +104,7 @@ class OtpTicket {
       cooldownSeconds: cooldown > 0 ? cooldown : 60,
       message: (json['message'] as String?) ?? '',
       devOtpPreview: preview.isEmpty ? null : preview,
+      deliveryChannel: resolvedChannel,
     );
   }
 }

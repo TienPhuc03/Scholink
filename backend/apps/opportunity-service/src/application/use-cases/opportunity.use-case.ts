@@ -256,4 +256,21 @@ export class OpportunityUseCase {
       sourceUrl: opp.props.sourceUrl,
     };
   }
+
+  async boostOpportunity(
+    opportunityId: string,
+    _actorId: string,
+  ): Promise<{ success: boolean; opportunityId: string; isPromoted: boolean }> {
+    const opp = await this.opportunityRepo.findById(opportunityId);
+    if (!opp) {
+      throw DomainException.notFound('Cơ hội');
+    }
+    const promoted = opp.promote();
+    await this.opportunityRepo.update(promoted);
+    return {
+      success: true,
+      opportunityId,
+      isPromoted: true,
+    };
+  }
 }

@@ -104,6 +104,9 @@ export class OutboxModel {
   nextRetryAt?: Date;
 
   @Prop()
+  lockedUntil?: Date;
+
+  @Prop()
   error?: string;
 
   @Prop()

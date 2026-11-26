@@ -64,4 +64,26 @@ export class IdentityGrpcClient implements IIdentityClientPort, OnModuleInit {
     }
     return firstValueFrom(this.grpcService.getProfileView({ studentId, audience })) as Promise<Record<string, unknown>>;
   }
+
+  async getProfileViews(
+    studentIds: readonly string[],
+    audience: 'PUBLIC' | 'TEAMMATES',
+  ): Promise<Array<Record<string, unknown>>> {
+    if (studentIds.length === 0) return [];
+    if (this.grpcService && typeof this.grpcService.getProfileViews === 'function') {
+      const res: any = await firstValueFrom(
+        this.grpcService.getProfileViews({ studentIds: [...studentIds], audience }),
+      );
+      return Array.isArray(res?.profiles) ? res.profiles : [];
+    }
+    if (this.grpcService && typeof this.grpcService.getProfileView === 'function') {
+      const settled = await Promise.allSettled(
+        studentIds.map((id) => this.getProfileView(id, audience)),
+      );
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === 'fulfilled')
+        .map((r) => r.value);
+    }
+    return [];
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import 'wallet_model.dart';
@@ -74,7 +75,8 @@ class _WalletViewState extends State<WalletView> {
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Container(
@@ -89,12 +91,15 @@ class _WalletViewState extends State<WalletView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
-                      const Text(
-                        'Quét VietQR Napas 24/7',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                      const Expanded(
+                        child: Text(
+                          'Quét VietQR Napas 24/7',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -140,24 +145,41 @@ class _WalletViewState extends State<WalletView> {
                       ),
                       child: Column(
                         children: <Widget>[
-                          if (order.qrCodeUrl != null && order.qrCodeUrl!.isNotEmpty)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                order.qrCodeUrl!,
-                                width: 220,
-                                height: 220,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Container(
+                          if (order.qrCodeUrl != null && order.qrCodeUrl!.isNotEmpty) ...<Widget>[
+                            if (_isHttpUrl(order.qrCodeUrl!))
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  order.qrCodeUrl!,
                                   width: 220,
                                   height: 220,
-                                  color: AppColors.borderLight,
-                                  child: const Center(
-                                    child: Icon(Icons.qr_code_2_rounded, size: 80, color: AppColors.primary),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 220,
+                                    height: 220,
+                                    color: AppColors.borderLight,
+                                    child: const Center(
+                                      child: Icon(Icons.qr_code_2_rounded, size: 80, color: AppColors.primary),
+                                    ),
                                   ),
                                 ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: QrImageView(
+                                  key: const Key('payos_qr_matrix'),
+                                  data: order.qrCodeUrl!,
+                                  version: QrVersions.auto,
+                                  size: 200,
+                                  backgroundColor: Colors.white,
+                                ),
                               ),
-                            )
+                          ]
                           else
                             const SizedBox(
                               height: 180,
@@ -209,13 +231,26 @@ class _WalletViewState extends State<WalletView> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                         ),
                         SizedBox(width: 8),
-                        Text(
-                          'Đang tự động lắng nghe giao dịch chuyển khoản...',
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        Flexible(
+                          child: Text(
+                            'Đang tự động lắng nghe giao dịch chuyển khoản...',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      key: const Key('reconcile_payment_button'),
+                      onPressed: () async {
+                        await widget.viewModel.reconcileActiveOrder(order.orderId);
+                      },
+                      icon: const Icon(Icons.sync_rounded, size: 18, color: AppColors.primary),
+                      label: const Text(
+                        'Đã chuyển khoản? Kiểm tra ngay',
+                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                     if (order.checkoutUrl != null && order.checkoutUrl!.isNotEmpty)
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -238,13 +273,19 @@ class _WalletViewState extends State<WalletView> {
                   ],
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },
     ).whenComplete(() {
       widget.viewModel.stopPolling();
     });
+  }
+
+  static bool _isHttpUrl(String value) {
+    final Uri? uri = Uri.tryParse(value.trim());
+    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
   Future<void> _handlePurchaseSku(SkuItem sku) async {
@@ -388,16 +429,22 @@ class _WalletViewState extends State<WalletView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
-              const Row(
-                children: <Widget>[
-                  Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Số dư ví Scholink',
-                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                ],
+              const Expanded(
+                child: Row(
+                  children: <Widget>[
+                    Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Số dư ví Scholink',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -492,13 +539,19 @@ class _WalletViewState extends State<WalletView> {
   }
 
   Widget _buildSkuCard(SkuItem sku) {
+    final bool isActive = widget.viewModel.isSkuActive(sku.skuCode);
+    final DateTime? expiry = widget.viewModel.getSkuExpiry(sku.skuCode);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isActive ? const Color(0xFFF0FDF4) : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isActive ? const Color(0xFF10B981) : AppColors.border,
+          width: isActive ? 1.5 : 1.0,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,10 +559,14 @@ class _WalletViewState extends State<WalletView> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: isActive ? const Color(0xFFDCFCE7) : AppColors.primaryLight,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.star_rounded, color: AppColors.primary, size: 24),
+            child: Icon(
+              isActive ? Icons.verified_rounded : Icons.star_rounded,
+              color: isActive ? const Color(0xFF10B981) : AppColors.primary,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -527,12 +584,16 @@ class _WalletViewState extends State<WalletView> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
+                        color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        sku.badge,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                        isActive ? 'ĐÃ KÍCH HOẠT' : sku.badge,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                        ),
                       ),
                     ),
                   ],
@@ -542,25 +603,76 @@ class _WalletViewState extends State<WalletView> {
                   sku.description,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
+                if (isActive) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.check_circle_outline_rounded, size: 13, color: Color(0xFF16A34A)),
+                      const SizedBox(width: 4),
+                      Text(
+                        expiry != null
+                            ? 'Hạn sử dụng: ${DateFormat('dd/MM/yyyy').format(expiry)}'
+                            : 'Đã sở hữu trọn đời',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
-                    Text(
-                      _currencyFormat.format(sku.priceVnd),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryLight,
-                        foregroundColor: AppColors.primary,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Flexible(
+                      child: Text(
+                        _currencyFormat.format(sku.priceVnd),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isActive ? const Color(0xFF16A34A) : AppColors.primary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      onPressed: () => _handlePurchaseSku(sku),
-                      child: const Text('Mua ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
+                    const SizedBox(width: 8),
+                    if (isActive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(Icons.check_rounded, color: Color(0xFF15803D), size: 13),
+                            SizedBox(width: 3),
+                            Text(
+                              'Đang dùng',
+                              style: TextStyle(
+                                color: Color(0xFF15803D),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryLight,
+                          foregroundColor: AppColors.primary,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _handlePurchaseSku(sku),
+                        child: const Text('Mua ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
                   ],
                 ),
               ],

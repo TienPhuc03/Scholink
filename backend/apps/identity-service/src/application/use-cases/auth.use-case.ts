@@ -14,6 +14,7 @@ import {
   ISocialIdentityVerifier,
   SOCIAL_IDENTITY_VERIFIER,
 } from '../../domain/ports/social-identity-verifier.port';
+import { EMAIL_SENDER, IEmailSender } from '../../domain/ports/email-sender.port';
 import {
   OrganizationMembershipModel,
   OrganizationMembershipDocument,
@@ -57,6 +58,9 @@ export class AuthUseCase {
     @Optional()
     @Inject(SOCIAL_IDENTITY_VERIFIER)
     private readonly socialVerifier?: ISocialIdentityVerifier,
+    @Optional()
+    @Inject(EMAIL_SENDER)
+    private readonly emailSender?: IEmailSender,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -250,11 +254,13 @@ export class AuthUseCase {
   async sendOtp(dto: SendOtpDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const rawOtp = await this.issueOtp(normalizedEmail, dto.purpose);
+    const deliveryChannel = await this.dispatchOtpEmail(normalizedEmail, dto.purpose, rawOtp);
     return this.otpSentResponse(
       normalizedEmail,
       dto.purpose,
       rawOtp,
       'Mã OTP đã được phát hành và gửi tới email của bạn',
+      deliveryChannel,
     );
   }
 
@@ -302,11 +308,19 @@ export class AuthUseCase {
       this.logger.warn(`[ForgotPassword] Yêu cầu từ email không tồn tại hoặc đã xóa: ${normalizedEmail}`);
     }
 
+    const deliverableOtp = canReceiveOtp ? rawOtp : null;
+    const deliveryChannel = await this.dispatchOtpEmail(
+      normalizedEmail,
+      'RESET_PASSWORD',
+      deliverableOtp,
+    );
+
     return this.otpSentResponse(
       normalizedEmail,
       'RESET_PASSWORD',
-      canReceiveOtp ? rawOtp : null,
+      deliverableOtp,
       'Nếu email tồn tại trong hệ thống, mã OTP đặt lại mật khẩu đã được gửi',
+      deliveryChannel,
     );
   }
 
@@ -595,15 +609,55 @@ export class AuthUseCase {
     return rawOtp;
   }
 
+  private async dispatchOtpEmail(
+    normalizedEmail: string,
+    purpose: 'VERIFY_EMAIL' | 'RESET_PASSWORD',
+    rawOtp: string | null,
+  ): Promise<'SMTP' | 'DEV_PREVIEW' | 'NONE'> {
+    const isDevOrTest =
+      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    const hasConfiguredSender = Boolean(this.emailSender?.isConfigured);
+
+    if (this.emailSender && !hasConfiguredSender && !isDevOrTest) {
+      await this.userRepo.deleteOtpRecord(normalizedEmail, purpose).catch(() => {});
+      throw new DomainException(
+        ErrorCode.UPSTREAM_UNAVAILABLE,
+        'Dịch vụ gửi email OTP chưa được cấu hình trên máy chủ',
+        503,
+      );
+    }
+
+    if (this.emailSender && hasConfiguredSender) {
+      if (rawOtp) {
+        try {
+          await this.emailSender.sendOtpEmail({
+            to: normalizedEmail,
+            otpCode: rawOtp,
+            purpose,
+            expiresInMinutes: Math.floor(OTP_TTL_MS / 60000),
+          });
+        } catch (err) {
+          await this.userRepo.deleteOtpRecord(normalizedEmail, purpose).catch(() => {});
+          throw err;
+        }
+      }
+      return 'SMTP';
+    }
+
+    return isDevOrTest ? 'DEV_PREVIEW' : 'NONE';
+  }
+
   /** [rawOtp] là null khi không có ai nhận mã, nên không hiện gợi ý ở môi trường dev. */
   private otpSentResponse(
     normalizedEmail: string,
     purpose: SendOtpDto['purpose'],
     rawOtp: string | null,
     message: string,
+    deliveryChannel: 'SMTP' | 'DEV_PREVIEW' | 'NONE' = 'NONE',
   ) {
-    const isDevOrTest = process.env.NODE_ENV !== 'production';
-    if (isDevOrTest && rawOtp) {
+    const isDevOrTest =
+      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    if (isDevOrTest && rawOtp && deliveryChannel !== 'SMTP') {
       this.logger.log(`[OTP-${purpose}] Email=${normalizedEmail} OTP=${rawOtp} (TTL=300s)`);
     }
 
@@ -615,6 +669,7 @@ export class AuthUseCase {
       cooldownSeconds: Math.floor(OTP_COOLDOWN_MS / 1000),
       message,
       devOtpPreview: isDevOrTest && rawOtp ? rawOtp : '',
+      deliveryChannel,
     });
   }
 
@@ -623,6 +678,75 @@ export class AuthUseCase {
     purpose: 'VERIFY_EMAIL' | 'RESET_PASSWORD',
     otpCode: string,
   ): Promise<void> {
+    const now = new Date();
+    const candidateHash = this.cryptoService.sha256(
+      `${normalizedEmail}:${purpose}:${otpCode.trim()}`,
+    );
+
+    if (this.userRepo.claimOtpAttempt) {
+      const claimed = await this.userRepo.claimOtpAttempt(normalizedEmail, purpose, now);
+      if (!claimed) {
+        const existing = await this.userRepo.findOtpRecord(normalizedEmail, purpose);
+        if (!existing) {
+          throw new DomainException(
+            ErrorCode.OTP_INVALID,
+            'Mã OTP không tồn tại hoặc đã được sử dụng',
+            400,
+          );
+        }
+        if (existing.lockedUntil && now < existing.lockedUntil) {
+          throw new DomainException(
+            ErrorCode.OTP_LOCKED,
+            'Mã OTP đã bị khóa 15 phút do nhập sai quá 5 lần',
+            429,
+          );
+        }
+        if (now > existing.expiresAt) {
+          throw new DomainException(
+            ErrorCode.OTP_EXPIRED,
+            'Mã OTP đã hết hạn (quá 5 phút), vui lòng yêu cầu mã mới',
+            400,
+          );
+        }
+        throw new DomainException(
+          ErrorCode.OTP_LOCKED,
+          'Bạn đã nhập sai OTP 5 lần liên tiếp. Chức năng OTP bị khóa trong 15 phút',
+          429,
+        );
+      }
+
+      const expectedBuf = Buffer.from(claimed.otpHash, 'utf8');
+      const actualBuf = Buffer.from(candidateHash, 'utf8');
+      const matched =
+        expectedBuf.length === actualBuf.length &&
+        crypto.timingSafeEqual(expectedBuf, actualBuf);
+
+      if (!matched) {
+        if (claimed.lockedUntil && now < claimed.lockedUntil) {
+          throw new DomainException(
+            ErrorCode.OTP_LOCKED,
+            'Bạn đã nhập sai OTP 5 lần liên tiếp. Chức năng OTP bị khóa trong 15 phút',
+            429,
+          );
+        }
+        throw new DomainException(
+          ErrorCode.OTP_INVALID,
+          `Mã OTP không chính xác (đã thử ${claimed.attempts}/5 lần)`,
+          400,
+        );
+      }
+
+      const deleted = await this.userRepo.deleteOtpRecord(normalizedEmail, purpose);
+      if (deleted === false) {
+        throw new DomainException(
+          ErrorCode.OTP_INVALID,
+          'Mã OTP không tồn tại hoặc đã được sử dụng',
+          400,
+        );
+      }
+      return;
+    }
+
     const record = await this.userRepo.findOtpRecord(normalizedEmail, purpose);
     if (!record) {
       throw new DomainException(
@@ -632,10 +756,7 @@ export class AuthUseCase {
       );
     }
 
-    const candidateHash = this.cryptoService.sha256(
-      `${normalizedEmail}:${purpose}:${otpCode.trim()}`,
-    );
-    const { matched, updatedRecord } = record.verifyAttempt(candidateHash, new Date());
+    const { matched, updatedRecord } = record.verifyAttempt(candidateHash, now);
 
     if (!matched) {
       await this.userRepo.saveOtpRecord(updatedRecord);
@@ -682,8 +803,10 @@ export class AuthUseCase {
     }
 
     // FR-AUTH-04: JwtAuthGuard chỉ nhận typ=access, nên refresh token không gọi được API
-    const accessToken = this.jwtService.sign({ ...payload, typ: 'access' }, { expiresIn: '15m' } as any);
-    const refreshToken = this.jwtService.sign({ ...payload, typ: 'refresh' }, { expiresIn: '7d' } as any);
+    const accessExpiresIn = process.env.JWT_EXPIRES_IN || '15m';
+    const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+    const accessToken = this.jwtService.sign({ ...payload, typ: 'access' }, { expiresIn: accessExpiresIn } as any);
+    const refreshToken = this.jwtService.sign({ ...payload, typ: 'refresh' }, { expiresIn: refreshExpiresIn } as any);
     const tokenHash = this.cryptoService.sha256(refreshToken);
 
     await this.userRepo.saveSession({

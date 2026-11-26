@@ -318,9 +318,23 @@ export class MongooseChatRepository implements IChatRepository {
     const now = new Date();
     const docs = await this.outboxModel
       .find({
-        $or: [
-          { status: 'PENDING' },
-          { status: 'FAILED', retryCount: { $lt: 5 }, nextRetryAt: { $lte: now } },
+        status: 'PENDING',
+        retryCount: { $lt: 5 },
+        $and: [
+          {
+            $or: [
+              { nextRetryAt: { $exists: false } },
+              { nextRetryAt: null },
+              { nextRetryAt: { $lte: now } },
+            ],
+          },
+          {
+            $or: [
+              { lockedUntil: { $exists: false } },
+              { lockedUntil: null },
+              { lockedUntil: { $lte: now } },
+            ],
+          },
         ],
       })
       .sort({ createdAt: 1 })
@@ -342,6 +356,61 @@ export class MongooseChatRepository implements IChatRepository {
     }));
   }
 
+  async claimPendingOutboxEvents(
+    limit: number = 20,
+    leaseMs: number = 30_000,
+  ): Promise<OutboxRecord[]> {
+    const claimed: OutboxRecord[] = [];
+    const now = new Date();
+    const lockedUntil = new Date(now.getTime() + leaseMs);
+
+    for (let i = 0; i < limit; i++) {
+      const d = await this.outboxModel
+        .findOneAndUpdate(
+          {
+            status: 'PENDING',
+            retryCount: { $lt: 5 },
+            $and: [
+              {
+                $or: [
+                  { nextRetryAt: { $exists: false } },
+                  { nextRetryAt: null },
+                  { nextRetryAt: { $lte: now } },
+                ],
+              },
+              {
+                $or: [
+                  { lockedUntil: { $exists: false } },
+                  { lockedUntil: null },
+                  { lockedUntil: { $lte: now } },
+                ],
+              },
+            ],
+          },
+          { $set: { lockedUntil } },
+          { sort: { createdAt: 1 }, new: true },
+        )
+        .exec();
+
+      if (!d) break;
+      claimed.push({
+        id: d.id,
+        aggregateType: d.aggregateType,
+        aggregateId: d.aggregateId,
+        eventType: d.eventType,
+        payload: d.payload,
+        status: d.status,
+        retryCount: d.retryCount,
+        nextRetryAt: d.nextRetryAt,
+        error: d.error,
+        sentAt: d.sentAt,
+        createdAt: d.createdAt,
+      });
+    }
+
+    return claimed;
+  }
+
   async markOutboxPublished(id: string): Promise<void> {
     await this.outboxModel.updateOne(
       { id },
@@ -349,7 +418,10 @@ export class MongooseChatRepository implements IChatRepository {
         $set: {
           status: 'PUBLISHED',
           sentAt: new Date(),
-          error: undefined,
+        },
+        $unset: {
+          error: 1,
+          lockedUntil: 1,
         },
       },
     );
@@ -364,6 +436,9 @@ export class MongooseChatRepository implements IChatRepository {
           error,
           nextRetryAt,
           retryCount,
+        },
+        $unset: {
+          lockedUntil: 1,
         },
       },
     );

@@ -44,6 +44,12 @@ export class TeamModel {
   @Prop()
   currentReservationId?: string;
 
+  @Prop()
+  avatarUrl?: string;
+
+  @Prop()
+  bannerImageUrl?: string;
+
   @Prop({ default: 1 })
   version: number;
 }

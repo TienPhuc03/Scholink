@@ -132,6 +132,9 @@ export class PurchaseModel {
     default: 'PENDING',
   })
   status: string;
+
+  @Prop({ type: Date, default: null, index: true })
+  expiresAt?: Date | null;
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(PurchaseModel);

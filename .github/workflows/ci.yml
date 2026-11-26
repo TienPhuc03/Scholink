@@ -2,9 +2,9 @@ name: Scholink CI / CD Quality Gate
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, dev ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, dev ]
 
 jobs:
   backend-lint-and-test:
@@ -45,11 +45,35 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck & Build Microservices
-        run: pnpm run build
+      - name: Typecheck & Build All Microservices
+        run: pnpm run lint && pnpm run build:all
 
       - name: Run Unit & Integration Tests
         run: pnpm test
+
+  mobile-analyze-and-test:
+    name: Mobile App (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install Packages
+        run: flutter pub get
+
+      - name: Analyze Dart Code
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Flutter Tests
+        run: flutter test
 
   security-and-secrets:
     name: Secrets & Environment Leak Check

@@ -64,6 +64,10 @@ class ScriptedApiClient implements ApiClient {
       _answer<T>('PUT', path, data, options: options);
 
   @override
+  Future<Response<T>> patch<T>(String path, {dynamic data, Options? options}) =>
+      _answer<T>('PATCH', path, data, options: options);
+
+  @override
   Future<Response<T>> delete<T>(String path,
           {dynamic data, Options? options}) =>
       _answer<T>('DELETE', path, data, options: options);

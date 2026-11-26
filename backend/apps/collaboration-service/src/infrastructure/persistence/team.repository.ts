@@ -77,8 +77,20 @@ export class MongooseTeamRepository implements ITeamRepository {
     return this.toDomain(doc);
   }
 
-  async findManyByCompetition(competitionId: string): Promise<Team[]> {
-    const docs = await this.teamModel.find({ competitionId }).exec();
+  async findManyByCompetition(
+    competitionId: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<Team[]> {
+    const query: Record<string, unknown> = { competitionId };
+    if (options?.cursor) {
+      query.id = { $gt: String(options.cursor) };
+    }
+    const safeLimit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+    const docs = await this.teamModel
+      .find(query)
+      .sort({ id: 1 })
+      .limit(safeLimit)
+      .exec();
     return docs.map((d) => this.toDomain(d));
   }
 
@@ -96,6 +108,8 @@ export class MongooseTeamRepository implements ITeamRepository {
       rosterVersion: team.rosterVersion,
       fencingToken: team.fencingToken,
       currentReservationId: team.currentReservationId,
+      avatarUrl: team.props.avatarUrl,
+      bannerImageUrl: team.props.bannerImageUrl,
       version: team.version,
     });
   }
@@ -109,11 +123,15 @@ export class MongooseTeamRepository implements ITeamRepository {
           $set: {
             name: team.props.name,
             description: team.props.description,
+            minSize: team.props.minSize,
+            maxSize: team.props.maxSize,
             status: team.status,
             members: team.members as any,
             rosterVersion: team.rosterVersion,
             fencingToken: team.fencingToken,
             currentReservationId: team.currentReservationId,
+            avatarUrl: team.props.avatarUrl,
+            bannerImageUrl: team.props.bannerImageUrl,
             version: team.version,
           },
         },
@@ -523,6 +541,8 @@ export class MongooseTeamRepository implements ITeamRepository {
       rosterVersion: doc.rosterVersion || 1,
       fencingToken: doc.fencingToken || 0,
       currentReservationId: doc.currentReservationId,
+      avatarUrl: doc.avatarUrl,
+      bannerImageUrl: doc.bannerImageUrl,
       version: doc.version,
     });
   }

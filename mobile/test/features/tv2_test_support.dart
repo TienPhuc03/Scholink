@@ -63,6 +63,10 @@ class DelayedApiClient implements ApiClient {
       throw UnimplementedError();
 
   @override
+  Future<Response<T>> patch<T>(String path, {dynamic data, Options? options}) =>
+      throw UnimplementedError();
+
+  @override
   Future<Response<T>> delete<T>(String path,
           {dynamic data, Options? options}) =>
       throw UnimplementedError();

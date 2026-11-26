@@ -31,10 +31,10 @@ abstract final class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 16.5,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
+          color: Color(0xFF0F172A),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
         ),
         iconTheme: IconThemeData(
           color: AppColors.textPrimary,

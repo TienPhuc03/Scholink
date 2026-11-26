@@ -7,6 +7,18 @@ import {
 } from '../../../scripts/crawl-competitions';
 
 describe('Real-World Competitions Crawler Suite', () => {
+  let dateNowSpy: jest.SpyInstance<number, []>;
+
+  beforeAll(() => {
+    dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-11-01T00:00:00.000Z').getTime());
+  });
+
+  afterAll(() => {
+    dateNowSpy.mockRestore();
+  });
+
   describe('1. Data Integrity and Source Quality Checks', () => {
     it('phải có ít nhất 10 nguồn crawler chính thức uy tín', () => {
       expect(REAL_WORLD_CRAWLER_SOURCES.length).toBeGreaterThanOrEqual(10);

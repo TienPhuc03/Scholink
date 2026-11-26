@@ -52,8 +52,10 @@ export interface IUserRepository {
   revokeSessionFamily(familyId: string, reason: string): Promise<void>;
   revokeAllUserSessions(userId: string, reason: string): Promise<void>;
   findOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<OtpRecord | null>;
+  /** Atomic claim that increments `attempts` (and locks at 5) before checking the OTP hash. */
+  claimOtpAttempt?(normalizedEmail: string, purpose: OtpPurpose, now: Date): Promise<OtpRecord | null>;
   saveOtpRecord(record: OtpRecord): Promise<void>;
-  deleteOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<void>;
+  deleteOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<boolean | void>;
   saveDeletionTracking?(record: DataDeletionTrackingRecord): Promise<void>;
   findDeletionTrackingById?(trackingId: string): Promise<DataDeletionTrackingRecord | null>;
   findDeletionTrackingsByUser?(userId: string): Promise<DataDeletionTrackingRecord[]>;

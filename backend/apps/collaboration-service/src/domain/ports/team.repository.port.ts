@@ -14,7 +14,10 @@ export interface ActiveMembershipRecord {
 export interface ITeamRepository {
   findById(id: string): Promise<Team | null>;
   findByCompetitionAndStudent(competitionId: string, studentId: string): Promise<Team | null>;
-  findManyByCompetition(competitionId: string): Promise<Team[]>;
+  findManyByCompetition(
+    competitionId: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<Team[]>;
   save(team: Team): Promise<void>;
   update(team: Team): Promise<void>;
 

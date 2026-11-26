@@ -24,6 +24,8 @@ class WalletRepository {
       return FailureResult<WalletModel, Failure>(
         ServerFailure(message: 'Không thể lấy thông tin ví (Mã: ${response.statusCode})'),
       );
+    } on Failure catch (failure) {
+      return FailureResult<WalletModel, Failure>(failure);
     } on DioException catch (e) {
       final dynamic data = e.response?.data;
       final String msg = data is Map && data['message'] != null
@@ -32,6 +34,32 @@ class WalletRepository {
       return FailureResult<WalletModel, Failure>(ServerFailure(message: msg));
     } catch (e) {
       return FailureResult<WalletModel, Failure>(ServerFailure(message: 'Lỗi không xác định: $e'));
+    }
+  }
+
+  Future<Result<EntitlementModel, Failure>> getEntitlements() async {
+    try {
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.walletEntitlements);
+      if (response.statusCode == 200 && response.data != null) {
+        final Map<String, dynamic> map = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : Map<String, dynamic>.from(response.data as Map);
+        return SuccessResult<EntitlementModel, Failure>(EntitlementModel.fromJson(map));
+      }
+      return FailureResult<EntitlementModel, Failure>(
+        ServerFailure(message: 'Không thể lấy thông tin đặc quyền (Mã: ${response.statusCode})'),
+      );
+    } on Failure catch (failure) {
+      return FailureResult<EntitlementModel, Failure>(failure);
+    } on DioException catch (e) {
+      final dynamic data = e.response?.data;
+      final String msg = data is Map && data['message'] != null
+          ? data['message'].toString()
+          : (e.message ?? 'Lỗi kết nối khi tải danh sách quyền lợi');
+      return FailureResult<EntitlementModel, Failure>(ServerFailure(message: msg));
+    } catch (e) {
+      return FailureResult<EntitlementModel, Failure>(ServerFailure(message: 'Lỗi không xác định: $e'));
     }
   }
 
@@ -63,6 +91,8 @@ class WalletRepository {
       return FailureResult<TopupOrderModel, Failure>(
         ServerFailure(message: 'Không thể khởi tạo đơn nạp (Mã: ${response.statusCode})'),
       );
+    } on Failure catch (failure) {
+      return FailureResult<TopupOrderModel, Failure>(failure);
     } on DioException catch (e) {
       final dynamic data = e.response?.data;
       final String msg = data is Map && data['message'] != null
@@ -89,9 +119,37 @@ class WalletRepository {
       return FailureResult<TopupOrderModel, Failure>(
         ServerFailure(message: 'Không thể tra cứu trạng thái đơn (Mã: ${response.statusCode})'),
       );
+    } on Failure catch (failure) {
+      return FailureResult<TopupOrderModel, Failure>(failure);
     } on DioException catch (e) {
       return FailureResult<TopupOrderModel, Failure>(
         ServerFailure(message: e.message ?? 'Lỗi kiểm tra trạng thái thanh toán'),
+      );
+    } catch (e) {
+      return FailureResult<TopupOrderModel, Failure>(ServerFailure(message: 'Lỗi hệ thống: $e'));
+    }
+  }
+
+  Future<Result<TopupOrderModel, Failure>> reconcileOrder(String orderId) async {
+    try {
+      final Response<dynamic> response = await _apiClient.post<dynamic>(
+        ApiEndpoints.reconcileOrder(orderId),
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) && response.data != null) {
+        final Map<String, dynamic> map = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : Map<String, dynamic>.from(response.data as Map);
+        return SuccessResult<TopupOrderModel, Failure>(TopupOrderModel.fromJson(map));
+      }
+      return FailureResult<TopupOrderModel, Failure>(
+        ServerFailure(message: 'Không thể đối soát trạng thái thanh toán (Mã: ${response.statusCode})'),
+      );
+    } on Failure catch (failure) {
+      return FailureResult<TopupOrderModel, Failure>(failure);
+    } on DioException catch (e) {
+      return FailureResult<TopupOrderModel, Failure>(
+        ServerFailure(message: e.message ?? 'Lỗi đối soát giao dịch PayOS'),
       );
     } catch (e) {
       return FailureResult<TopupOrderModel, Failure>(ServerFailure(message: 'Lỗi hệ thống: $e'));
@@ -122,6 +180,8 @@ class WalletRepository {
       return FailureResult<Map<String, dynamic>, Failure>(
         ServerFailure(message: 'Không thể hoàn tất mua gói (Mã: ${response.statusCode})'),
       );
+    } on Failure catch (failure) {
+      return FailureResult<Map<String, dynamic>, Failure>(failure);
     } on DioException catch (e) {
       final dynamic data = e.response?.data;
       final String msg = data is Map && data['message'] != null

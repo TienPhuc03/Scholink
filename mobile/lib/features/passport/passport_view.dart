@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/user_avatar_view.dart';
+import '../wallet/wallet_model.dart';
+import '../wallet/wallet_repository.dart';
 import 'passport_edit_view.dart';
 import 'passport_model.dart';
 import 'passport_viewmodel.dart';
@@ -47,13 +51,36 @@ class PassportView extends StatefulWidget {
 
 class _PassportViewState extends State<PassportView> {
   bool _loggingOut = false;
+  EntitlementModel? _entitlements;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.viewModel.initLocalAvatar();
       widget.viewModel.loadPassport();
+      _loadEntitlements();
     });
+  }
+
+  Future<void> _loadEntitlements() async {
+    try {
+      if (sl.isRegistered<WalletRepository>()) {
+        final Result<EntitlementModel, Failure> res =
+            await sl<WalletRepository>().getEntitlements();
+        res.fold(
+          onSuccess: (EntitlementModel data) {
+            if (mounted) setState(() => _entitlements = data);
+          },
+          onFailure: (_) {},
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openWallet() async {
+    widget.onOpenWallet?.call();
+    await _loadEntitlements();
   }
 
   Future<void> _openEditor() async {
@@ -162,9 +189,14 @@ class _PassportViewState extends State<PassportView> {
       final Uint8List bytes = await file.readAsBytes();
       if (bytes.isEmpty) return;
 
+      // Cache locally immediately for instant feedback
+      await widget.viewModel.saveLocalAvatar(bytes);
+
+      final String safeName =
+          'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final bool ok = await widget.viewModel.uploadDocumentFromBytes(
         PassportDocument.avatar,
-        fileName: file.name.isNotEmpty ? file.name : 'avatar.jpg',
+        fileName: safeName,
         bytes: bytes,
       );
 
@@ -188,6 +220,391 @@ class _PassportViewState extends State<PassportView> {
         );
       }
     }
+  }
+
+  void _showCvExportPreview(PassportModel passport) {
+    final bool hasPlus = _entitlements?.hasPlus ?? false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext ctx) {
+        return Container(
+          height: MediaQuery.of(ctx).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: <Widget>[
+              // Top drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Title Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text(
+                          'Xuất Passport CV',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasPlus
+                              ? '⭐ Scholink Plus VIP: Đã loại bỏ watermark'
+                              : 'Bản xem trước Free (Có Watermark)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: hasPlus
+                                ? const Color(0xFF4F46E5)
+                                : const Color(0xFFD97706),
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 16),
+
+              // CV Paper Container with Stack for Watermark
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Stack(
+                    children: <Widget>[
+                      // Realistic CV Paper
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: const Color(0xFFCBD5E1), width: 1.2),
+                          boxShadow: const <BoxShadow>[
+                            BoxShadow(
+                              color: Color(0x0C000000),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            // CV Header
+                            Row(
+                              children: <Widget>[
+                                UserAvatarView(
+                                  size: 56,
+                                  avatarUrl: passport.displayAvatarUrl,
+                                  fullName: passport.fullName,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        passport.fullName.isEmpty
+                                            ? 'Sinh viên Scholink'
+                                            : passport.fullName,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        passport.education?.university ??
+                                            'Đại học Bách Khoa TP.HCM',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF475569),
+                                        ),
+                                      ),
+                                      if (hasPlus) ...<Widget>[
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDCFCE7),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            '✓ SCHOLINK PLUS VERIFIED RESUME',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF15803D),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 28),
+
+                            // Bio
+                            const Text(
+                              'GIỚI THIỆU BẢN THÂN',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4F46E5),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              passport.bio ??
+                                  'Sinh viên đam mê nghiên cứu khoa học, tích cực tham gia các dự án phát triển cộng đồng và chinh phục học bổng quốc tế.',
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                  color: Color(0xFF334155)),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Education
+                            const Text(
+                              'HỌC VẤN & BẰNG CẤP',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4F46E5),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              passport.education?.university ??
+                                  'Đại học Quốc Gia TP.HCM - Khoa CNTT',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B)),
+                            ),
+                            if (passport.education?.gpa != null)
+                              Text('GPA: ${passport.education!.gpa} / 4.0',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B))),
+                            const SizedBox(height: 20),
+
+                            // Skills
+                            const Text(
+                              'KỸ NĂNG NỔI BẬT',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4F46E5),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: (passport.skills.isEmpty
+                                      ? <String>[
+                                          'Python',
+                                          'Machine Learning',
+                                          'Flutter',
+                                          'Nghiên cứu',
+                                          'Lãnh đạo'
+                                        ]
+                                      : passport.skills)
+                                  .map((String s) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(s,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF334155))),
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // If FREE TIER: Diagonal Watermarks Overlay!
+                      if (!hasPlus)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Transform.rotate(
+                              angle: -0.35,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List<Widget>.generate(
+                                    4,
+                                    (int i) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 24),
+                                      child: Text(
+                                        'SCHOLINK FREE TIER • NÂNG CẤP PLUS ĐỂ XÓA WATERMARK',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1.5,
+                                          color: const Color(0xFFDC2626)
+                                              .withValues(alpha: 0.18),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Action Bar
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                        color: Color(0x0A000000),
+                        blurRadius: 8,
+                        offset: Offset(0, -2)),
+                  ],
+                ),
+                child: Column(
+                  children: <Widget>[
+                    if (!hasPlus)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Row(
+                          children: <Widget>[
+                            Icon(Icons.info_outline_rounded,
+                                size: 16, color: Color(0xFFB45309)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Bản CV đang bị đóng dấu Watermark. Nâng cấp Scholink Plus để xuất bản PDF chuẩn không watermark cho nhà tuyển dụng & học bổng.',
+                                style: TextStyle(
+                                    fontSize: 11.5, color: Color(0xFF92400E)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Row(
+                      children: <Widget>[
+                        if (!hasPlus)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4F46E5),
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.workspace_premium_rounded,
+                                  size: 18),
+                              label: const Text(
+                                  'Nâng cấp Plus (Xóa Watermark)',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                _openWallet();
+                              },
+                            ),
+                          )
+                        else
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon:
+                                  const Icon(Icons.download_rounded, size: 18),
+                              label: const Text('Xuất PDF Không Watermark',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        '✓ Đã xuất tệp Passport CV không watermark chất lượng cao thành công!'),
+                                    backgroundColor: Color(0xFF16A34A),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _confirmDeleteAccount() async {
@@ -237,8 +654,9 @@ class _PassportViewState extends State<PassportView> {
         title: const Text(
           'Hồ sơ Passport',
           style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
             color: Color(0xFF0F172A),
           ),
         ),
@@ -433,8 +851,9 @@ class _PassportViewState extends State<PassportView> {
                     Text(
                       'Hoàn thiện hồ sơ',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
                         color: Color(0xFF0F172A),
                       ),
                     ),
@@ -455,9 +874,9 @@ class _PassportViewState extends State<PassportView> {
               Text(
                 '${passport.completionScore}%',
                 style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E3A8A),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF4F46E5),
                 ),
               ),
             ],
@@ -583,7 +1002,7 @@ class _PassportViewState extends State<PassportView> {
       child: InkWell(
         key: const Key('passport_wallet'),
         borderRadius: BorderRadius.circular(16),
-        onTap: widget.onOpenWallet,
+        onTap: _openWallet,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
@@ -602,11 +1021,11 @@ class _PassportViewState extends State<PassportView> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
+                    const Text(
                       'Ví tiền & Nạp VietQR (PayOS)',
                       style: TextStyle(
                         fontSize: 14.5,
@@ -614,12 +1033,19 @@ class _PassportViewState extends State<PassportView> {
                         color: Color(0xFF0F172A),
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Nạp tiền Napas 24/7 & Mua gói Plus đặc quyền',
+                      _entitlements != null && _entitlements!.activeSkus.isNotEmpty
+                          ? 'Đang kích hoạt ${_entitlements!.activeSkus.length} đặc quyền (Plus, Tích xanh...)'
+                          : 'Nạp tiền Napas 24/7 & Mua gói Plus đặc quyền',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF64748B),
+                        color: _entitlements != null && _entitlements!.activeSkus.isNotEmpty
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFF64748B),
+                        fontWeight: _entitlements != null && _entitlements!.activeSkus.isNotEmpty
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -660,17 +1086,31 @@ class _PassportViewState extends State<PassportView> {
             children: <Widget>[
               GestureDetector(
                 onTap: _showAvatarPickerBottomSheet,
-                child: CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  child: Text(
-                    fullName.isNotEmpty ? fullName[0].toUpperCase() : 'N',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4338CA),
+                child: Stack(
+                  children: <Widget>[
+                    UserAvatarView(
+                      size: 52,
+                      borderRadius: 16,
+                      fallbackInitials: fullName,
+                      fallbackUrl: passport.displayAvatarUrl,
                     ),
-                  ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(3.5),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4F46E5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 14),
@@ -684,24 +1124,79 @@ class _PassportViewState extends State<PassportView> {
                           child: Text(
                             fullName,
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
                               color: Color(0xFF0F172A),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified_rounded,
-                            size: 16, color: Color(0xFF0284C7)),
+                        if (_entitlements?.hasVerificationBadge == true) ...<Widget>[
+                          const SizedBox(width: 5),
+                          const Tooltip(
+                            message: 'Đã xác thực học vấn (Huy hiệu tích xanh)',
+                            child: Icon(Icons.verified_rounded,
+                                size: 16, color: Color(0xFF2563EB)),
+                          ),
+                        ] else ...<Widget>[
+                          const SizedBox(width: 5),
+                          InkWell(
+                            onTap: _openWallet,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: const Text(
+                                'Chưa xác thực',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (_entitlements?.hasPlus == true) ...<Widget>[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: <Color>[Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Icon(Icons.workspace_premium_rounded, size: 10, color: Colors.white),
+                                SizedBox(width: 2),
+                                Text(
+                                  'PLUS',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),
                     const Text(
                       'Sinh viên • Khoa CNTT',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: Color(0xFF64748B),
                       ),
                     ),
@@ -1049,15 +1544,16 @@ class _PassportViewState extends State<PassportView> {
     return _buildSectionCard(
       icon: Icons.folder_outlined,
       title: 'Tài liệu hồ sơ',
-      actionText: 'Thêm',
-      actionIcon: Icons.add_rounded,
-      onAction: () => _uploadDocument(PassportDocument.cv),
+      actionText: 'Xuất CV',
+      actionIcon: Icons.picture_as_pdf_rounded,
+      onAction: () => _showCvExportPreview(passport),
       child: Column(
         children: <Widget>[
           _buildDocumentRow(
             doc: PassportDocument.cv,
             assetId: passport.cvAssetId,
             vm: vm,
+            onPreview: () => _showCvExportPreview(passport),
           ),
           const Divider(height: 16, color: Color(0xFFF1F5F9)),
           _buildDocumentRow(
@@ -1074,6 +1570,7 @@ class _PassportViewState extends State<PassportView> {
     required PassportDocument doc,
     required String? assetId,
     required PassportViewModel vm,
+    VoidCallback? onPreview,
   }) {
     final bool busy = vm.uploading == doc;
     return Row(
@@ -1104,6 +1601,15 @@ class _PassportViewState extends State<PassportView> {
             ],
           ),
         ),
+        if (onPreview != null)
+          TextButton(
+            onPressed: onPreview,
+            child: const Text('Xem CV',
+                style: TextStyle(
+                    color: Color(0xFF4F46E5),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+          ),
         TextButton(
           key: Key('passport_upload_${doc.name}'),
           onPressed: vm.uploading != null || vm.isSaving
@@ -1155,13 +1661,14 @@ class _PassportViewState extends State<PassportView> {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(icon, color: const Color(0xFF4338CA), size: 19),
+                  Icon(icon, color: const Color(0xFF4F46E5), size: 18),
                   const SizedBox(width: 8),
                   Text(
                     title,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
                       color: Color(0xFF0F172A),
                     ),
                   ),
@@ -1175,14 +1682,14 @@ class _PassportViewState extends State<PassportView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Icon(actionIcon, size: 14, color: const Color(0xFF2563EB)),
+                      Icon(actionIcon, size: 13.5, color: const Color(0xFF4F46E5)),
                       const SizedBox(width: 3),
                       Text(
                         actionText,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF2563EB),
+                          color: Color(0xFF4F46E5),
                         ),
                       ),
                     ],

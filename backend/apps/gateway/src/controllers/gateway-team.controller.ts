@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -56,6 +57,25 @@ export class GatewayTeamController {
         'Content-Type': 'application/json',
         Authorization: auth,
         'Idempotency-Key': idem,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  @Patch(':id')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Chỉnh sửa thông tin đội thi (Chỉ Trưởng đội)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật đội thành công' })
+  async updateTeam(
+    @Param('id') teamId: string,
+    @Headers('authorization') auth: string,
+    @Body() body: any,
+  ) {
+    return forwardCollab(`/api/v1/teams/${teamId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
       },
       body: JSON.stringify(body),
     });

@@ -18,7 +18,7 @@ import {
   SessionRecord,
 } from '../../domain/ports/user.repository.port';
 import { User, UserRole, UserStatus } from '../../domain/user.entity';
-import { OtpRecord } from '../../domain/otp-record.entity';
+import { OtpRecord, OTP_MAX_ATTEMPTS, OTP_LOCK_MS } from '../../domain/otp-record.entity';
 import {
   UserModel,
   UserDocument,
@@ -207,6 +207,53 @@ export class MongooseUserRepository implements IUserRepository {
     });
   }
 
+  async claimOtpAttempt(
+    normalizedEmail: string,
+    purpose: OtpPurpose,
+    now: Date,
+  ): Promise<OtpRecord | null> {
+    const safeEmail = String(normalizedEmail).trim().toLowerCase();
+    const safePurpose = String(purpose) as OtpPurpose;
+    const lockUntil = new Date(now.getTime() + OTP_LOCK_MS);
+    const doc = await this.otpRecordModel
+      .findOneAndUpdate(
+        {
+          normalizedEmail: { $eq: safeEmail },
+          purpose: { $eq: safePurpose },
+          attempts: { $lt: OTP_MAX_ATTEMPTS },
+          expiresAt: { $gt: now },
+          $or: [{ lockedUntil: null }, { lockedUntil: { $exists: false } }, { lockedUntil: { $lte: now } }],
+        },
+        [
+          {
+            $set: {
+              attempts: { $add: [{ $ifNull: ['$attempts', 0] }, 1] },
+              lockedUntil: {
+                $cond: [
+                  { $gte: [{ $add: [{ $ifNull: ['$attempts', 0] }, 1] }, OTP_MAX_ATTEMPTS] },
+                  lockUntil,
+                  '$lockedUntil',
+                ],
+              },
+            },
+          },
+        ],
+        { new: true },
+      )
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return new OtpRecord({
+      normalizedEmail: doc.normalizedEmail,
+      purpose: doc.purpose as OtpPurpose,
+      otpHash: doc.otpHash,
+      attempts: doc.attempts ?? 0,
+      lockedUntil: doc.lockedUntil ? new Date(doc.lockedUntil) : undefined,
+      lastSentAt: new Date(doc.lastSentAt),
+      expiresAt: new Date(doc.expiresAt),
+    });
+  }
+
   async saveOtpRecord(record: OtpRecord): Promise<void> {
     await this.otpRecordModel
       .updateOne(
@@ -230,13 +277,14 @@ export class MongooseUserRepository implements IUserRepository {
       .exec();
   }
 
-  async deleteOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<void> {
-    await this.otpRecordModel
+  async deleteOtpRecord(normalizedEmail: string, purpose: OtpPurpose): Promise<boolean> {
+    const res = await this.otpRecordModel
       .deleteOne({
         normalizedEmail: { $eq: String(normalizedEmail).trim().toLowerCase() },
         purpose: { $eq: String(purpose) },
       })
       .exec();
+    return (res.deletedCount ?? 0) > 0;
   }
 
   async saveDeletionTracking(record: DataDeletionTrackingRecord): Promise<void> {

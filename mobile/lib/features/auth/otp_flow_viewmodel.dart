@@ -21,6 +21,16 @@ abstract class OtpFlowViewModel extends BaseViewModel {
   int _resendSecondsLeft = 0;
   int get resendSecondsLeft => _resendSecondsLeft;
 
+  int _expiresSecondsLeft = 0;
+  int get expiresSecondsLeft => _expiresSecondsLeft;
+
+  String get formattedExpiresLeft {
+    final int safe = _expiresSecondsLeft < 0 ? 0 : _expiresSecondsLeft;
+    final int mins = safe ~/ 60;
+    final int secs = safe % 60;
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
   DateTime? _lockedUntil;
   bool get isLocked => _lockedUntil != null && _clock().isBefore(_lockedUntil!);
   int get lockMinutesLeft =>
@@ -38,6 +48,10 @@ abstract class OtpFlowViewModel extends BaseViewModel {
 
   String? _notice;
   String? get notice => _notice;
+
+  String _deliveryChannel = 'DEV_PREVIEW';
+  String get deliveryChannel => _deliveryChannel;
+  bool get isEmailDelivered => _deliveryChannel.toUpperCase() == 'SMTP';
 
   String? _devOtpPreview;
 
@@ -68,20 +82,41 @@ abstract class OtpFlowViewModel extends BaseViewModel {
   void _applyTicket(OtpTicket ticket) {
     _email = ticket.email;
     _devOtpPreview = ticket.devOtpPreview;
+    _deliveryChannel = ticket.deliveryChannel;
     _isExpired = false;
     _codeRejected = false;
-    _notice =
-        'Mã gồm 6 chữ số, có hiệu lực ${(ticket.expiresInSeconds / 60).round()} phút.';
-    _startCooldown(ticket.cooldownSeconds);
+    _expiresSecondsLeft = ticket.expiresInSeconds;
+    _notice = null;
+    _startTimers(
+      cooldownSeconds: ticket.cooldownSeconds,
+      expiresSeconds: ticket.expiresInSeconds,
+    );
   }
 
   void _startCooldown(int seconds) {
+    _startTimers(
+      cooldownSeconds: seconds,
+      expiresSeconds: _expiresSecondsLeft,
+    );
+  }
+
+  void _startTimers({
+    required int cooldownSeconds,
+    required int expiresSeconds,
+  }) {
     _ticker?.cancel();
-    _resendSecondsLeft = seconds;
-    if (seconds <= 0) return;
+    _resendSecondsLeft = cooldownSeconds;
+    _expiresSecondsLeft = expiresSeconds;
+    if (_resendSecondsLeft <= 0 && _expiresSecondsLeft <= 0) return;
     _ticker = Timer.periodic(const Duration(seconds: 1), (Timer t) {
-      _resendSecondsLeft = _resendSecondsLeft > 0 ? _resendSecondsLeft - 1 : 0;
-      if (_resendSecondsLeft == 0) t.cancel();
+      if (_resendSecondsLeft > 0) _resendSecondsLeft--;
+      if (_expiresSecondsLeft > 0) {
+        _expiresSecondsLeft--;
+        if (_expiresSecondsLeft == 0) _isExpired = true;
+      }
+      if (_resendSecondsLeft <= 0 && _expiresSecondsLeft <= 0) {
+        t.cancel();
+      }
       notifyListeners();
     });
   }
@@ -97,7 +132,11 @@ abstract class OtpFlowViewModel extends BaseViewModel {
     final ({OtpTicket? ticket, Failure? failure}) result = await requestOtp();
     _isResending = false;
     if (result.ticket != null) {
-      _applyTicket(result.ticket!);
+      final OtpTicket ticket = result.ticket!;
+      _applyTicket(ticket);
+      _notice = ticket.isEmailDelivered
+          ? 'Đã gửi lại mã OTP mới qua Email tới ${ticket.email}.'
+          : 'Đã cấp lại mã OTP mới cho ${ticket.email}.';
       setIdle();
     } else if (result.failure != null) {
       handleOtpFailure(result.failure!);
