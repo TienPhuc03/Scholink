@@ -11,6 +11,7 @@ import '../network/performance_interceptor.dart';
 import '../database/local_cache_manager.dart';
 import '../database/room_database.dart';
 import '../device/device_services.dart';
+import '../device/ios_notifications.dart';
 import '../network/session_events.dart';
 import '../network/api_client.dart';
 import '../realtime/mqtt_manager.dart';
@@ -62,6 +63,10 @@ final GetIt sl = GetIt.instance;
 Future<void> setupServiceLocator({bool firebase = false}) async {
   final SecureStorageHelper secureStorage = SecureStorageHelperImpl();
   final SessionEvents sessionEvents = SessionEvents();
+  // The native device channel is Android-only; iOS gets notifications from a plugin.
+  final IosLocalNotifications? ios = defaultTargetPlatform == TargetPlatform.iOS
+      ? IosLocalNotifications()
+      : null;
   registerDependencies(
     secureStorage: secureStorage,
     localCache: await SharedPreferencesCacheManager.create(),
@@ -76,6 +81,9 @@ Future<void> setupServiceLocator({bool firebase = false}) async {
     mqttManager: MqttManagerImpl(),
     attachmentPicker: FileAttachmentPicker(),
     socialSignIn: FirebaseSocialSignIn(),
+    notificationPermission:
+        ios ?? const MethodChannelDeviceServices() as NotificationPermission,
+    localNotifier: ios ?? const MethodChannelDeviceServices() as LocalNotifier,
   );
   if (!firebase) return;
   sl.registerSingleton<FirebaseAnalytics>(FirebaseAnalytics.instance);
