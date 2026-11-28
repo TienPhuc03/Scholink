@@ -182,6 +182,7 @@ message MediaAssetResponse {
   string status = 9;
   int32 version = 10;
   string downloadUrl = 11;
+  string viewUrl = 12; // inline (opens in the viewer), same lifetime as downloadUrl
 }
 
 message GetMyPassportRequest {
