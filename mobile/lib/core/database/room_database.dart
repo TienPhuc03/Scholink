@@ -1,4 +1,5 @@
 import 'local_cache_manager.dart';
+import '../utils/text_search.dart';
 
 /// Room Database abstraction for Flutter, following the Android Room DB architecture.
 /// Provides structured table schemas, DAOs (Data Access Objects), and indexed local querying.
@@ -198,16 +199,11 @@ class _OpportunityDaoImpl implements OpportunityDao {
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      final String queryNorm = searchQuery.trim().toLowerCase();
+      final String query = searchQuery.trim();
       results = results.where((Map<String, dynamic> item) {
-        final String title = (item['title'] ?? '').toString().toLowerCase();
-        final String desc =
-            (item['description'] ?? '').toString().toLowerCase();
-        final String org =
-            (item['organizerName'] ?? '').toString().toLowerCase();
-        return title.contains(queryNorm) ||
-            desc.contains(queryNorm) ||
-            org.contains(queryNorm);
+        return matchesSearch((item['title'] ?? '').toString(), query) ||
+            matchesSearch((item['description'] ?? '').toString(), query) ||
+            matchesSearch((item['organizerName'] ?? '').toString(), query);
       }).toList();
     }
 

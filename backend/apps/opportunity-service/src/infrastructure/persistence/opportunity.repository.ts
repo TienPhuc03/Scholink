@@ -20,6 +20,32 @@ function escapeRegex(raw: string): string {
   return raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Vietnamese letters by base letter, so "dai hoc" finds "Đại học" and "đại học" finds "Dai hoc".
+const VI_VARIANTS: Record<string, string> = {
+  a: 'aàáạảãâầấậẩẫăằắặẳẵ',
+  e: 'eèéẹẻẽêềếệểễ',
+  i: 'iìíịỉĩ',
+  o: 'oòóọỏõôồốộổỗơờớợởỡ',
+  u: 'uùúụủũưừứựửữ',
+  y: 'yỳýỵỷỹ',
+  d: 'dđ',
+};
+
+/** Case- and accent-insensitive regex source for a user keyword (special characters escaped). */
+export function accentInsensitivePattern(keyword: string): string {
+  const folded = keyword
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase();
+  return Array.from(escapeRegex(folded))
+    .map((ch) => {
+      const v = VI_VARIANTS[ch];
+      return v ? `[${v}${v.toUpperCase()}]` : ch;
+    })
+    .join('');
+}
+
 @Injectable()
 export class MongooseOpportunityRepository implements IOpportunityRepository {
   constructor(
@@ -41,7 +67,7 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     if (filter.fundingLevel) and.push({ fundingLevel: { $eq: String(filter.fundingLevel) } });
     if (filter.organizationId) and.push({ organizationId: { $eq: String(filter.organizationId) } });
     if (filter.keyword && filter.keyword.trim()) {
-      const re = { $regex: escapeRegex(filter.keyword.trim()), $options: 'i' };
+      const re = { $regex: accentInsensitivePattern(filter.keyword.trim()), $options: 'i' };
       and.push({ $or: [{ title: re }, { organizerName: re }, { tags: re }] });
     }
     // BR11: closed at the deadline instant, so "open" means strictly after now.

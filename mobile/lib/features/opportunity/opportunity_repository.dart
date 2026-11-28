@@ -6,6 +6,7 @@ import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
 import '../../core/network/api_client.dart';
 import 'opportunity_model.dart';
+import '../../core/utils/text_search.dart';
 
 /// Filters of the catalog screen. `bookmarkedOnly` is the "Đã lưu" chip; it is resolved on the
 /// device (server bookmark list + cached opportunities), never sent to the catalog API.
@@ -24,12 +25,12 @@ class OpportunityQuery {
     if (applyMode != null && o.applyMode.toUpperCase() != applyMode) {
       return false;
     }
-    final String q = (keyword ?? '').trim().toLowerCase();
+    final String q = (keyword ?? '').trim();
     if (q.isEmpty) return true;
-    return o.title.toLowerCase().contains(q) ||
-        o.description.toLowerCase().contains(q) ||
-        o.organizerName.toLowerCase().contains(q) ||
-        o.tags.any((String t) => t.toLowerCase().contains(q));
+    return matchesSearch(o.title, q) ||
+        matchesSearch(o.description, q) ||
+        matchesSearch(o.organizerName, q) ||
+        o.tags.any((String t) => matchesSearch(t, q));
   }
 }
 
