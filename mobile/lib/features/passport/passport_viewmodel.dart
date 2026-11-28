@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/result.dart';
 import '../../core/services/user_avatar_service.dart';
@@ -106,41 +104,6 @@ class PassportViewModel extends BaseViewModel {
   bool _hadVersionConflict = false;
   bool get hadVersionConflict => _hadVersionConflict;
 
-  Uint8List? _localAvatarBytes;
-  Uint8List? get localAvatarBytes => _localAvatarBytes;
-
-  static const String _avatarStorageKey = 'scholink_user_avatar_b64';
-
-  Future<void> initLocalAvatar() async {
-    try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String? b64 = prefs.getString(_avatarStorageKey);
-      if (b64 != null && b64.isNotEmpty) {
-        _localAvatarBytes = base64Decode(b64);
-        notifyListeners();
-      }
-    } catch (_) {}
-  }
-
-  Future<void> saveLocalAvatar(Uint8List bytes) async {
-    _localAvatarBytes = bytes;
-    notifyListeners();
-    await UserAvatarService.instance.setAvatarBytes(bytes);
-    try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_avatarStorageKey, base64Encode(bytes));
-    } catch (_) {}
-  }
-
-  Future<void> clearLocalAvatar() async {
-    _localAvatarBytes = null;
-    notifyListeners();
-    try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_avatarStorageKey);
-    } catch (_) {}
-  }
-
   PassportViewModel(this._repository,
       {MediaRepository? media, PassportFilePicker? pick})
       : _media = media,
@@ -233,7 +196,7 @@ class PassportViewModel extends BaseViewModel {
     notifyListeners();
 
     if (doc == PassportDocument.avatar) {
-      await saveLocalAvatar(bytes);
+      UserAvatarService.instance.setAvatarBytes(bytes);
     }
 
     final PickedAttachment attachment =
@@ -248,6 +211,10 @@ class PassportViewModel extends BaseViewModel {
     if (assetId == null) {
       _uploading = null;
       _documentError = uploaded.errorOrNull?.message ?? 'Tải tệp thất bại.';
+      // The preview must not outlive a failed upload.
+      if (doc == PassportDocument.avatar) {
+        UserAvatarService.instance.setFromServer(current.avatarUrl);
+      }
       notifyListeners();
       return false;
     }
@@ -262,8 +229,16 @@ class PassportViewModel extends BaseViewModel {
     final Failure? failure = saved.errorOrNull;
     if (failure == null) {
       _passport = saved.dataOrNull;
+      // Keep the local preview when the server sends no link (no object storage).
+      if (doc == PassportDocument.avatar &&
+          (_passport?.avatarUrl ?? '').isNotEmpty) {
+        UserAvatarService.instance.setFromServer(_passport!.avatarUrl);
+      }
       notifyListeners();
       return true;
+    }
+    if (doc == PassportDocument.avatar) {
+      UserAvatarService.instance.setFromServer(current.avatarUrl);
     }
     _documentError = failure.code == 'VERSION_MISMATCH'
         ? 'Hồ sơ vừa được cập nhật ở nơi khác. Đã tải lại, hãy tải tệp lên lần nữa.'
@@ -302,9 +277,7 @@ class PassportViewModel extends BaseViewModel {
     result.fold<void>(
       onSuccess: (PassportModel data) {
         _passport = data;
-        if (data.avatarUrl != null && data.avatarUrl!.isNotEmpty) {
-          UserAvatarService.instance.setAvatarUrl(data.avatarUrl!);
-        }
+        UserAvatarService.instance.setFromServer(data.avatarUrl);
         setSuccess();
       },
       onFailure: (Failure failure) {
