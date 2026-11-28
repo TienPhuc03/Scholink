@@ -198,6 +198,30 @@ class TeamRepository {
     }
   }
 
+  /// My PENDING JoinRequests across teams, so "Đã gửi yêu cầu" survives a reload.
+  Future<Result<List<JoinRequestModel>, Failure>> getMyJoinRequests() async {
+    try {
+      final Response<dynamic> response =
+          await _apiClient.get<dynamic>(ApiEndpoints.myJoinRequests);
+      final dynamic resData = response.data;
+      final dynamic payload = (resData is Map<String, dynamic>)
+          ? (resData['data'] ?? resData)
+          : resData;
+      final List<JoinRequestModel> requests = (payload is List
+              ? payload
+              : <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(JoinRequestModel.fromJson)
+          .toList();
+      return SuccessResult<List<JoinRequestModel>, Failure>(requests);
+    } on Failure catch (failure) {
+      return FailureResult<List<JoinRequestModel>, Failure>(failure);
+    } catch (e) {
+      return FailureResult<List<JoinRequestModel>, Failure>(
+          ServerFailure(message: e.toString()));
+    }
+  }
+
   /// Fetches pending JoinRequests for a team (Leader only).
   Future<Result<List<JoinRequestModel>, Failure>> getJoinRequests(
       String teamId) async {

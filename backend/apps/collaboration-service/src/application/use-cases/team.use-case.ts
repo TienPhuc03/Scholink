@@ -193,6 +193,12 @@ export class TeamUseCase {
     };
   }
 
+  /** Pending requests the student sent, so the app can show "Đã gửi yêu cầu" after a reload. */
+  async getMyPendingJoinRequests(applicantId: string) {
+    const requests = await this.teamRepo.findPendingJoinRequestsByApplicant(applicantId);
+    return requests.map((r) => ({ ...r.props, id: r.id }));
+  }
+
   async getJoinRequests(teamId: string, leaderId: string) {
     const team = await this.teamRepo.findById(teamId);
     if (!team) {

@@ -134,6 +134,12 @@ class InMemoryTeamRepository implements ITeamRepository {
     return null;
   }
 
+  async findPendingJoinRequestsByApplicant(applicantId: string): Promise<JoinRequest[]> {
+    return Array.from(this.joinRequests.values()).filter(
+      (r) => r.props.applicantId === applicantId && r.props.status === 'PENDING',
+    );
+  }
+
   async findJoinRequestsByTeam(teamId: string): Promise<JoinRequest[]> {
     const list: JoinRequest[] = [];
     for (const req of this.joinRequests.values()) {

@@ -85,6 +85,14 @@ export class TeamController {
     return this.teamUseCase.sendJoinRequest(teamId, req.user.userId, dto);
   }
 
+  @Get('join-requests/me')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Các yêu cầu gia nhập đang chờ duyệt của tôi' })
+  @ApiResponse({ status: 200, description: 'Danh sách yêu cầu PENDING' })
+  async getMyJoinRequests(@Req() req: { user: AuthenticatedUser }) {
+    return this.teamUseCase.getMyPendingJoinRequests(req.user.userId);
+  }
+
   @Get(':id/join-requests')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Lấy danh sách các yêu cầu gia nhập của đội (Trưởng đội)' })
