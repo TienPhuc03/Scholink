@@ -27,9 +27,13 @@ Map<String, dynamic> newAccountPassport({int version = 1}) => <String, dynamic>{
     };
 
 void main() {
-  test('only an incomplete Passport needs onboarding', () {
+  test('onboarding is needed until education with a GPA is filled in', () {
     expect(PassportModel.fromJson(newAccountPassport()).needsOnboarding, isTrue);
-    expect(PassportModel.fromJson(grpcPassport()).needsOnboarding, isFalse);
+    // grpcPassport has education but GPA 0 (unset over gRPC).
+    expect(PassportModel.fromJson(grpcPassport()).needsOnboarding, isTrue);
+    final Map<String, dynamic> withGpa = grpcPassport();
+    (withGpa['education'] as Map<String, dynamic>)['gpa'] = 3.4;
+    expect(PassportModel.fromJson(withGpa).needsOnboarding, isFalse);
   });
 
   test('search ignores Vietnamese accents and case', () {
@@ -40,7 +44,7 @@ void main() {
   });
 
   testWidgets(
-      'onboarding requires education and a skill, one step at a time, then saves',
+      'onboarding requires education with GPA, lets bio and skills stay empty, then saves',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -53,34 +57,27 @@ void main() {
         home: PassportEditView(viewModel: vm, onboarding: true)));
     await tester.pumpAndSettle();
 
+    // Step 1: education may not be skipped.
     expect(find.text('Hoàn thiện hồ sơ (1/3)'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('passport_save')));
-    await tester.pumpAndSettle();
-
-    // Step 2: education may not be skipped.
-    expect(find.text('Hoàn thiện hồ sơ (2/3)'), findsOneWidget);
+    expect(find.byKey(const Key('onboarding_skip')), findsOneWidget);
     await tester.tap(find.byKey(const Key('passport_save')));
     await tester.pumpAndSettle();
     expect(find.text('Nhập tên trường.'), findsOneWidget);
-    expect(find.text('Hoàn thiện hồ sơ (2/3)'), findsOneWidget);
+    expect(find.text('Nhập GPA.'), findsOneWidget);
+    expect(find.text('Hoàn thiện hồ sơ (1/3)'), findsOneWidget);
 
     await tester.enterText(fieldIn(const Key('passport_institution')), 'UIT');
     await tester.enterText(fieldIn(const Key('passport_major')), 'KHMT');
     await tester.enterText(field('Năm bắt đầu'), '2024');
+    await tester.enterText(fieldIn(const Key('passport_gpa_4')), '3.5');
     await tester.tap(find.byKey(const Key('passport_save')));
     await tester.pumpAndSettle();
 
-    // Step 3: at least one skill.
+    // Steps 2 and 3 are optional.
+    expect(find.text('Hoàn thiện hồ sơ (2/3)'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('passport_save')));
+    await tester.pumpAndSettle();
     expect(find.text('Hoàn thiện hồ sơ (3/3)'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('passport_save')));
-    await tester.pumpAndSettle();
-    expect(find.text('Thêm ít nhất 1 kỹ năng.'), findsOneWidget);
-    expect(api.calls.where((RecordedCall c) => c.method == 'PUT'), isEmpty);
-
-    await tester.enterText(
-        find.widgetWithText(TextField, 'VD: Python, Thuyết trình'), 'Python');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
     api.reply(ApiEndpoints.passport, grpcPassport(version: 2));
     await tester.tap(find.byKey(const Key('passport_save')));
     await tester.pumpAndSettle();
@@ -88,6 +85,33 @@ void main() {
     final RecordedCall save =
         api.calls.lastWhere((RecordedCall c) => c.method == 'PUT');
     expect(save.data['education']['institution'], 'UIT');
-    expect(save.data['skills'], <String>['Python']);
+    expect(save.data['education']['gpa'], 3.5);
+    expect(save.data['skills'], isEmpty);
+  });
+
+  testWidgets('"Bỏ qua" closes onboarding without saving',
+      (WidgetTester tester) async {
+    final ScriptedApiClient api = ScriptedApiClient();
+    api.reply(ApiEndpoints.passport, newAccountPassport());
+    final PassportViewModel vm = PassportViewModel(PassportRepository(api));
+    await vm.loadPassport();
+    bool? result;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (BuildContext context) => TextButton(
+          onPressed: () async => result = await Navigator.of(context).push<bool>(
+              MaterialPageRoute<bool>(
+                  builder: (_) =>
+                      PassportEditView(viewModel: vm, onboarding: true))),
+          child: const Text('open'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboarding_skip')));
+    await tester.pumpAndSettle();
+    expect(result, isFalse);
+    expect(api.calls.where((RecordedCall c) => c.method == 'PUT'), isEmpty);
   });
 }
