@@ -54,6 +54,7 @@ import 'features/opportunity/opportunity_model.dart';
 import 'features/opportunity/opportunity_repository.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
 import 'features/passport/passport_edit_view.dart';
+import 'features/passport/passport_model.dart';
 import 'features/passport/passport_repository.dart';
 import 'features/passport/passport_view.dart';
 import 'features/passport/passport_viewmodel.dart';
@@ -146,6 +147,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_startPush());
         unawaited(_openLaunchTarget());
+        unawaited(_ensurePassportComplete());
       });
     }
   }
@@ -245,14 +247,36 @@ class _ScholinkAppState extends State<ScholinkApp> {
     if (resumeBookmark != null) {
       unawaited(_completePendingBookmark(resumeBookmark));
     }
-    if (resumeApply != null) {
-      // Wait for the main shell to replace the login screen before pushing on top of it.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _openOpportunityDetail(resumeApply);
-        _startApply(resumeApply);
-      });
+    // Wait for the main shell to replace the login screen before pushing on top of it.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _ensurePassportComplete();
+      if (!mounted || resumeApply == null || !_isAuthenticated) return;
+      _openOpportunityDetail(resumeApply);
+      _startApply(resumeApply);
+    });
+  }
+
+  /// A new account has an empty Passport: ask for name, education and skills before anything
+  /// else, instead of showing placeholder data. A failed load is skipped (retried next launch).
+  Future<void> _ensurePassportComplete() async {
+    if (!_isAuthenticated || _isGuest) return;
+    final PassportViewModel passportVm = _tabs.passport;
+    if (passportVm.passport == null) await passportVm.loadPassport();
+    final PassportModel? p = passportVm.passport;
+    if (!mounted || !_isAuthenticated || p == null || !p.needsOnboarding) {
+      return;
     }
+    await _nav.push<bool>(
+      MaterialPageRoute<bool>(
+        settings: const RouteSettings(name: AppRoutes.passportEdit),
+        fullscreenDialog: true,
+        builder: (_) => PassportEditView(
+          viewModel: passportVm,
+          onboarding: true,
+          onLogout: () => unawaited(_handleLogout()),
+        ),
+      ),
+    );
   }
 
   void _onEnterGuestMode() {

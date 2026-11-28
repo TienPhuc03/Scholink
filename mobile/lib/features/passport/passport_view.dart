@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/errors/failures.dart';
+import '../../core/errors/result.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/refresh_error_banner.dart';
 import '../../core/widgets/skeleton_loader.dart';
@@ -323,8 +325,8 @@ class _PassportViewState extends State<PassportView> {
                               children: <Widget>[
                                 UserAvatarView(
                                   size: 56,
-                                  avatarUrl: passport.displayAvatarUrl,
-                                  fullName: passport.fullName,
+                                  fallbackUrl: passport.displayAvatarUrl,
+                                  fallbackInitials: passport.fullName,
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -334,7 +336,7 @@ class _PassportViewState extends State<PassportView> {
                                     children: <Widget>[
                                       Text(
                                         passport.fullName.isEmpty
-                                            ? 'Sinh viên Scholink'
+                                            ? 'Chưa cập nhật họ tên'
                                             : passport.fullName,
                                         style: const TextStyle(
                                           fontSize: 18,
@@ -344,8 +346,8 @@ class _PassportViewState extends State<PassportView> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        passport.education?.university ??
-                                            'Đại học Bách Khoa TP.HCM',
+                                        passport.education?.institution ??
+                                            'Chưa cập nhật trường',
                                         style: const TextStyle(
                                           fontSize: 13,
                                           color: Color(0xFF475569),
@@ -390,8 +392,7 @@ class _PassportViewState extends State<PassportView> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              passport.bio ??
-                                  'Sinh viên đam mê nghiên cứu khoa học, tích cực tham gia các dự án phát triển cộng đồng và chinh phục học bổng quốc tế.',
+                              passport.bio ?? 'Chưa cập nhật.',
                               style: const TextStyle(
                                   fontSize: 12.5,
                                   height: 1.4,
@@ -411,8 +412,12 @@ class _PassportViewState extends State<PassportView> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              passport.education?.university ??
-                                  'Đại học Quốc Gia TP.HCM - Khoa CNTT',
+                              passport.education == null
+                                  ? 'Chưa cập nhật.'
+                                  : <String>[
+                                      passport.education!.institution,
+                                      passport.education!.major,
+                                    ].where((String v) => v.isNotEmpty).join(' - '),
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -440,13 +445,7 @@ class _PassportViewState extends State<PassportView> {
                               spacing: 6,
                               runSpacing: 6,
                               children: (passport.skills.isEmpty
-                                      ? <String>[
-                                          'Python',
-                                          'Machine Learning',
-                                          'Flutter',
-                                          'Nghiên cứu',
-                                          'Lãnh đạo'
-                                        ]
+                                      ? <String>['Chưa cập nhật']
                                       : passport.skills)
                                   .map((String s) => Container(
                                         padding: const EdgeInsets.symmetric(
@@ -1065,12 +1064,17 @@ class _PassportViewState extends State<PassportView> {
   // =========================================================================
   Widget _buildIdentityCard(PassportModel passport) {
     final String fullName =
-        passport.fullName.isNotEmpty ? passport.fullName : 'Nguyễn Văn Sinh Viên';
-    final String email = passport.email ?? 'student@huit.edu.vn';
+        passport.fullName.isNotEmpty ? passport.fullName : 'Chưa cập nhật họ tên';
+    final String email = passport.email ?? 'Chưa cập nhật email';
     final String phone = passport.phone ?? 'Chưa cập nhật';
     final String bio = passport.bio?.isNotEmpty == true
         ? passport.bio!
-        : 'Sinh viên năm 3 chuyên ngành Trí tuệ Nhân tạo – ĐH Công Thương TP.HCM (HUIT).';
+        : 'Chưa có giới thiệu. Nhấn "Sửa" để thêm.';
+    final String subtitle = <String>[
+      'Sinh viên',
+      if (passport.education?.major.isNotEmpty == true)
+        passport.education!.major,
+    ].join(' • ');
 
     return _buildSectionCard(
       icon: Icons.person_outline_rounded,
@@ -1193,9 +1197,9 @@ class _PassportViewState extends State<PassportView> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Sinh viên • Khoa CNTT',
-                      style: TextStyle(
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
                         fontSize: 12.5,
                         color: Color(0xFF64748B),
                       ),
@@ -1253,18 +1257,22 @@ class _PassportViewState extends State<PassportView> {
   // =========================================================================
   Widget _buildEducationCard(PassportModel passport) {
     final EducationModel? edu = passport.education;
-    final String institution = edu?.institution.isNotEmpty == true
-        ? edu!.institution
-        : 'Đại học Công Thương TP.HCM (HUIT)';
-    final String major = edu?.major.isNotEmpty == true
-        ? edu!.major
-        : 'Khoa Công nghệ Thông tin';
-    final String years = edu?.yearsDisplay.isNotEmpty == true
-        ? edu!.yearsDisplay
-        : '2023 – nay';
-    final String gpa = edu?.gpaDisplay.isNotEmpty == true
-        ? edu!.gpaDisplay
-        : '3.82 / 4.00';
+    if (edu == null) {
+      return _buildSectionCard(
+        icon: Icons.school_outlined,
+        title: 'Học vấn',
+        actionText: 'Thêm',
+        actionIcon: Icons.add_rounded,
+        onAction: _openEditor,
+        child: _emptyHint('Chưa cập nhật học vấn.'),
+      );
+    }
+    final String institution =
+        edu.institution.isNotEmpty ? edu.institution : 'Chưa cập nhật trường';
+    final String major =
+        edu.major.isNotEmpty ? edu.major : 'Chưa cập nhật ngành';
+    final String years = edu.yearsDisplay;
+    final String gpa = edu.gpaDisplay;
 
     return _buildSectionCard(
       icon: Icons.school_outlined,
@@ -1319,9 +1327,17 @@ class _PassportViewState extends State<PassportView> {
   // 5. KỸ NĂNG (1:1 VỚI HÌNH 2)
   // =========================================================================
   Widget _buildSkillsCard(PassportModel passport) {
-    final List<String> skills = passport.skills.isNotEmpty
-        ? passport.skills
-        : <String>['Python', 'PyTorch', 'TypeScript', 'Next.js', 'Docker', 'Git', 'gRPC'];
+    final List<String> skills = passport.skills;
+    if (skills.isEmpty) {
+      return _buildSectionCard(
+        icon: Icons.layers_outlined,
+        title: 'Kỹ năng',
+        actionText: 'Thêm',
+        actionIcon: Icons.add_rounded,
+        onAction: _openEditor,
+        child: _emptyHint('Chưa cập nhật kỹ năng.'),
+      );
+    }
 
     return _buildSectionCard(
       icon: Icons.layers_outlined,
@@ -1359,12 +1375,17 @@ class _PassportViewState extends State<PassportView> {
   // 6. THÀNH TÍCH (1:1 VỚI HÌNH 2)
   // =========================================================================
   Widget _buildAchievementsCard(PassportModel passport) {
-    final List<String> achievements = passport.achievements.isNotEmpty
-        ? passport.achievements
-        : <String>[
-            'Giải Nhất Nghiên cứu Khoa học Sinh viên Cấp Trường 2025',
-            'Học bổng Khuyến khích học tập Xuất sắc 2 kỳ liên tiếp',
-          ];
+    final List<String> achievements = passport.achievements;
+    if (achievements.isEmpty) {
+      return _buildSectionCard(
+        icon: Icons.emoji_events_outlined,
+        title: 'Thành tích',
+        actionText: 'Thêm',
+        actionIcon: Icons.add_rounded,
+        onAction: _openEditor,
+        child: _emptyHint('Chưa có thành tích.'),
+      );
+    }
 
     return _buildSectionCard(
       icon: Icons.emoji_events_outlined,
@@ -1423,65 +1444,17 @@ class _PassportViewState extends State<PassportView> {
           if (passport.certificates.isNotEmpty)
             ...passport.certificates.map(_buildCertificateRow)
           else
-            _buildCertificateItem(
-              name: 'IELTS Academic',
-              subtitle: 'Listening: 7.5 • Cấp: 15/06/2025',
-              isVerified: true,
-            ),
+            _emptyHint('Chưa có chứng chỉ.'),
         ],
       ),
     );
   }
 
-  Widget _buildCertificateItem({
-    required String name,
-    required String subtitle,
-    required bool isVerified,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Text(
-            'Đã xác thực',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFD97706),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _emptyHint(String text) => Align(
+        alignment: Alignment.centerLeft,
+        child: Text(text,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+      );
 
   Widget _buildCertificateRow(CertificateModel c) {
     final DateTime d = c.issuedDate.toLocal();

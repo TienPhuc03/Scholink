@@ -66,6 +66,13 @@ void main() {
         ..reply(ApiEndpoints.passport, <String, dynamic>{
           'studentId': 'stu_a',
           'fullName': 'Sinh viên A',
+          // Complete, so login does not stop at the onboarding steps.
+          'education': <String, dynamic>{
+            'institution': 'UIT',
+            'major': 'KHMT',
+            'startYear': 2024
+          },
+          'skills': <String>['Dart'],
           'completionScore': 80
         })
         ..reply(ApiEndpoints.myApplications, <dynamic>[

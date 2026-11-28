@@ -14,7 +14,16 @@ import 'suggest_field.dart';
 class PassportEditView extends StatefulWidget {
   final PassportViewModel viewModel;
 
-  const PassportEditView({super.key, required this.viewModel});
+  /// First login with an incomplete Passport: the form is shown as 3 required steps
+  /// (basic info, education, skills) and cannot be dismissed, only completed or logged out of.
+  final bool onboarding;
+  final VoidCallback? onLogout;
+
+  const PassportEditView(
+      {super.key,
+      required this.viewModel,
+      this.onboarding = false,
+      this.onLogout});
 
   @override
   State<PassportEditView> createState() => _PassportEditViewState();
@@ -46,6 +55,19 @@ class _PassportEditViewState extends State<PassportEditView> {
   TextEditingController get _gpa => _gpaScale == 4 ? _gpa4 : _gpa10;
 
   Map<String, String?> _errors = <String, String?>{};
+
+  /// Onboarding step: 0 basic info, 1 education, 2 skills.
+  int _step = 0;
+  static const List<String> _stepTitles = <String>[
+    'Thông tin cơ bản',
+    'Học vấn',
+    'Kỹ năng'
+  ];
+  static const List<List<String>> _stepErrorKeys = <List<String>>[
+    <String>['fullName', 'bio', 'region', 'phone'],
+    <String>['institution', 'major', 'startYear', 'endYear', 'gpa'],
+    <String>['skill'],
+  ];
 
   @override
   void initState() {
@@ -200,6 +222,33 @@ class _PassportEditViewState extends State<PassportEditView> {
     }
   }
 
+  /// Onboarding: validates only the current step; education and one skill are required here.
+  Future<void> _next() async {
+    FocusScope.of(context).unfocus();
+    _validate();
+    if (_step == 1 &&
+        _institution.text.trim().isEmpty &&
+        _major.text.trim().isEmpty) {
+      _errors['institution'] = 'Nhập tên trường.';
+      _errors['major'] = 'Nhập chuyên ngành.';
+      if (_startYear.text.trim().isEmpty) {
+        _errors['startYear'] = 'Nhập năm bắt đầu.';
+      }
+    }
+    if (_step == 2 && _draft.skills.isEmpty) {
+      _errors['skill'] = 'Thêm ít nhất 1 kỹ năng.';
+    }
+    if (_stepErrorKeys[_step].any((String k) => _errors[k] != null)) {
+      setState(() {});
+      return;
+    }
+    if (_step < _stepTitles.length - 1) {
+      setState(() => _step++);
+      return;
+    }
+    await _save();
+  }
+
   Future<bool> _confirmDiscard() async {
     if (!_isDirty) return true;
     final bool? discard = await showDialog<bool>(
@@ -287,6 +336,7 @@ class _PassportEditViewState extends State<PassportEditView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.onboarding) return _buildOnboarding();
     return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, bool? result) async {
@@ -338,6 +388,72 @@ class _PassportEditViewState extends State<PassportEditView> {
     );
   }
 
+  Widget _buildOnboarding() {
+    final int total = _stepTitles.length;
+    return PopScope<bool>(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, bool? result) {
+        if (!didPop && _step > 0) setState(() => _step--);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: _step > 0
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _step--),
+                )
+              : null,
+          title: Text('Hoàn thiện hồ sơ (${_step + 1}/$total)'),
+          actions: <Widget>[
+            if (widget.onLogout != null)
+              TextButton(
+                  onPressed: widget.onLogout, child: const Text('Đăng xuất')),
+          ],
+          shape: const Border(bottom: BorderSide(color: AppColors.borderLight)),
+        ),
+        body: ListenableBuilder(
+          listenable: widget.viewModel,
+          builder: (BuildContext context, Widget? child) {
+            return Column(
+              children: <Widget>[
+                LinearProgressIndicator(
+                  value: (_step + 1) / total,
+                  minHeight: 3,
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.borderLight,
+                ),
+                Expanded(
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    children: <Widget>[
+                      const Text(
+                        'Hãy khai thông tin của bạn để dùng Scholink. '
+                        'Thông tin này dùng cho hồ sơ ứng tuyển và tìm đội.',
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      <Widget>[
+                        _buildBasic(),
+                        _buildEducation(),
+                        _buildSkills(),
+                      ][_step],
+                    ],
+                  ),
+                ),
+                _buildSaveBar(widget.viewModel),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildSaveBar(PassportViewModel vm) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -357,10 +473,16 @@ class _PassportEditViewState extends State<PassportEditView> {
             ],
             AuthPrimaryButton(
               key: const Key('passport_save'),
-              label: 'Lưu hồ sơ',
-              icon: Icons.save_outlined,
+              label: !widget.onboarding
+                  ? 'Lưu hồ sơ'
+                  : _step < _stepTitles.length - 1
+                      ? 'Tiếp tục'
+                      : 'Hoàn tất',
+              icon: widget.onboarding && _step < _stepTitles.length - 1
+                  ? Icons.arrow_forward
+                  : Icons.save_outlined,
               isLoading: vm.isSaving,
-              onPressed: _save,
+              onPressed: widget.onboarding ? _next : _save,
             ),
           ],
         ),
@@ -421,8 +543,9 @@ class _PassportEditViewState extends State<PassportEditView> {
     return _Section(
       title: 'Học vấn',
       icon: Icons.school_outlined,
-      subtitle:
-          'Không bắt buộc. Đã nhập thì cần đủ trường, ngành và năm bắt đầu.',
+      subtitle: widget.onboarding
+          ? 'Bắt buộc: trường, ngành và năm bắt đầu.'
+          : 'Không bắt buộc. Đã nhập thì cần đủ trường, ngành và năm bắt đầu.',
       children: <Widget>[
         SuggestField(
           key: const Key('passport_institution'),
