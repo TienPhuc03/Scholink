@@ -251,6 +251,23 @@ export class MongooseTeamRepository implements ITeamRepository {
     });
   }
 
+  async findPendingJoinRequestsByApplicant(applicantId: string): Promise<JoinRequest[]> {
+    const docs = await this.joinRequestModel.find({ applicantId, status: 'PENDING' }).sort({ appliedAt: -1 }).exec();
+    return docs.map(
+      (doc) =>
+        new JoinRequest(doc.id, {
+          teamId: doc.teamId,
+          competitionId: doc.competitionId,
+          applicantId: doc.applicantId,
+          message: doc.message,
+          status: doc.status as JoinRequestStatus,
+          appliedAt: doc.appliedAt,
+          reviewedAt: doc.reviewedAt,
+          reviewedBy: doc.reviewedBy,
+        }),
+    );
+  }
+
   async findJoinRequestsByTeam(teamId: string): Promise<JoinRequest[]> {
     const docs = await this.joinRequestModel.find({ teamId }).sort({ appliedAt: -1 }).exec();
     return docs.map(

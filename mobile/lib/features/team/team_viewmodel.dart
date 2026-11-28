@@ -67,13 +67,13 @@ class TeamViewModel extends BaseViewModel {
   }
 
   Future<void> loadTeams(String competitionId) async {
+    // Feedback is not cleared here: actions call loadTeams right before the view reads it.
     setLoading();
-    _actionFeedback = null;
-    _actionError = null;
     await initUser();
 
     final Result<List<TeamModel>, Failure> result =
         await _repository.getTeamsByCompetition(competitionId);
+    if (_currentUserId != null) await _loadMyRequests();
 
     result.fold<void>(
       onSuccess: (List<TeamModel> data) {
@@ -91,6 +91,23 @@ class TeamViewModel extends BaseViewModel {
       onFailure: (Failure failure) {
         setError(_formatErrorMessage(failure.message));
       },
+    );
+  }
+
+  /// Server copy of my pending requests; replaces the local map (a request the leader
+  /// accepted or rejected meanwhile drops out). A failed load keeps what we had.
+  Future<void> _loadMyRequests() async {
+    final Result<List<JoinRequestModel>, Failure> result =
+        await _repository.getMyJoinRequests();
+    result.fold<void>(
+      onSuccess: (List<JoinRequestModel> mine) {
+        _mySentRequests
+          ..clear()
+          ..addAll(<String, JoinRequestModel>{
+            for (final JoinRequestModel r in mine) r.teamId: r,
+          });
+      },
+      onFailure: (_) {},
     );
   }
 
@@ -215,7 +232,8 @@ class TeamViewModel extends BaseViewModel {
       onFailure: (Failure failure) {
         final String msg = _formatErrorMessage(failure.message);
         _actionError = msg;
-        setError(msg);
+        // E.g. 409 "already pending": reload so the card shows the real request state.
+        loadTeams(competitionId);
         return false;
       },
     );

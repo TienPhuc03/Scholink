@@ -41,6 +41,7 @@ export interface ITeamRepository {
   findJoinRequestById(id: string): Promise<JoinRequest | null>;
   findPendingJoinRequest(teamId: string, applicantId: string): Promise<JoinRequest | null>;
   findJoinRequestsByTeam(teamId: string): Promise<JoinRequest[]>;
+  findPendingJoinRequestsByApplicant(applicantId: string): Promise<JoinRequest[]>;
   updateJoinRequest(request: JoinRequest): Promise<void>;
   cancelPendingJoinRequests(studentId: string, competitionId: string, exceptRequestId?: string): Promise<void>;
 

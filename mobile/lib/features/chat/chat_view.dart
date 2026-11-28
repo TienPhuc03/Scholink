@@ -9,6 +9,7 @@ import '../../core/widgets/user_avatar_view.dart';
 import 'chat_model.dart';
 import 'chat_viewmodel.dart';
 import 'video_call_view.dart';
+import '../../core/utils/text_search.dart';
 
 class ChatView extends StatefulWidget {
   final ChatViewModel viewModel;
@@ -386,58 +387,38 @@ class _ChatViewState extends State<ChatView> {
                 }
 
                 if (widget.viewModel.hasError && widget.viewModel.rooms.isEmpty) {
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    children: <Widget>[
-                      _buildChatRoomCard(
-                        ChatRoomModel(
-                          id: 'demo-bk-ai',
-                          type: ChatRoomType.team,
-                          name: 'BK AI Innovators Team',
-                          participants: const <String>[
-                            'me',
-                            'thanh-vien-1',
-                            'thanh-vien-2',
-                            'thanh-vien-3'
-                          ],
-                          lastMessageSnippet:
-                              'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu...',
-                          lastMessageAt: DateTime(2026, 11, 21, 7, 54),
-                          unreadCount: 1,
-                        ),
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            widget.viewModel.errorMessage ??
+                                'Không tải được danh sách phòng chat.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: widget.viewModel.loadRooms,
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   );
                 }
 
-                final String query = _searchController.text.trim().toLowerCase();
-                final List<ChatRoomModel> allRooms =
-                    widget.viewModel.rooms.isNotEmpty
-                        ? widget.viewModel.rooms
-                        : <ChatRoomModel>[
-                            ChatRoomModel(
-                              id: 'demo-bk-ai',
-                              type: ChatRoomType.team,
-                              name: 'BK AI Innovators Team',
-                              participants: const <String>[
-                                'me',
-                                'thanh-vien-1',
-                                'thanh-vien-2',
-                                'thanh-vien-3'
-                              ],
-                              lastMessageSnippet:
-                                  'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu...',
-                              lastMessageAt: DateTime(2026, 11, 21, 7, 54),
-                              unreadCount: 1,
-                            ),
-                          ];
+                final String query = _searchController.text.trim();
+                final List<ChatRoomModel> allRooms = widget.viewModel.rooms;
 
                 final List<ChatRoomModel> rooms = allRooms.where((ChatRoomModel r) {
                   if (_selectedFilter == 'UNREAD' && r.unreadCount == 0) return false;
                   if (query.isNotEmpty) {
-                    final bool matchTitle = r.title.toLowerCase().contains(query);
+                    final bool matchTitle = matchesSearch(r.title, query);
                     final bool matchSnippet =
-                        (r.lastMessageSnippet ?? '').toLowerCase().contains(query);
+                        matchesSearch(r.lastMessageSnippet ?? '', query);
                     if (!matchTitle && !matchSnippet) return false;
                   }
                   return true;
@@ -808,13 +789,13 @@ class _ChatViewState extends State<ChatView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Row(
+                  Row(
                     children: <Widget>[
-                      Icon(Icons.groups_rounded, size: 14, color: Color(0xFF64748B)),
-                      SizedBox(width: 4),
+                      const Icon(Icons.groups_rounded, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 4),
                       Text(
-                        '4 thành viên',
-                        style: TextStyle(
+                        '${room.participants.length} thành viên',
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF64748B),
                         ),
@@ -932,24 +913,15 @@ class _ChatViewState extends State<ChatView> {
                   ),
                 ),
 
-                // Pre-populated messages if empty (matching Image 1)
-                if (messages.isEmpty) ...<Widget>[
-                  _buildIncomingBubble(
-                    'Chào mừng các thành viên đã tham gia đội BK AI Innovators!',
-                    '07:54',
+                if (messages.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'Chưa có tin nhắn. Hãy gửi lời chào đầu tiên!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildIncomingBubble(
-                    'Chào các bạn! Chúng ta cùng chuẩn bị tài liệu nộp đề xuất dự án nhé.',
-                    '07:54',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildOutgoingBubble(
-                    'XXin cho',
-                    '17:32',
-                    true,
-                  ),
-                ],
 
                 // Dynamic messages from ViewModel
                 for (final ChatMessageModel msg in messages) ...<Widget>[
@@ -973,119 +945,6 @@ class _ChatViewState extends State<ChatView> {
   // =========================================================================
   // 3. MESSAGE BUBBLE BUILDERS (1:1 VỚI HÌNH 1)
   // =========================================================================
-  Widget _buildIncomingBubble(String text, String time) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        // Avatar BT with light lavender background
-        const CircleAvatar(
-          radius: 15,
-          backgroundColor: Color(0xFFF3E8FF),
-          child: Text(
-            'BT',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF6D28D9),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        // Bubble
-        Flexible(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  text,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF0F172A),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Text(
-                    time,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 40),
-      ],
-    );
-  }
-
-  Widget _buildOutgoingBubble(String text, String time, bool isDoubleCheck) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: <Widget>[
-        const SizedBox(width: 40),
-        Flexible(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
-            decoration: const BoxDecoration(
-              color: Color(0xFF4338CA),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(4),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Text(
-                  text,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.done_all_rounded,
-                      size: 14,
-                      color: Colors.white70,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   void _startDirectCall(
       BuildContext context, ChatRoomModel room, CallType type) {
     Navigator.push(
@@ -1496,6 +1355,15 @@ class _ChatViewState extends State<ChatView> {
                       const Icon(Icons.error_outline_rounded, size: 14, color: Colors.amber),
                   ],
                 ),
+                // Without the reason a red bubble looks like a network problem.
+                if (msg.isFailed && (msg.errorMessage ?? '').isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    msg.errorMessage!,
+                    style: TextStyle(
+                        fontSize: 11, color: Colors.white.withValues(alpha: 0.9)),
+                  ),
+                ],
               ],
             ),
           ),

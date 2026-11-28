@@ -14,6 +14,11 @@ abstract final class ApiEndpoints {
 
   static String get mqttBrokerUri {
     if (_envMqttBroker.isNotEmpty) return _envMqttBroker;
+    // A phone build only gets BACKEND_URL: EMQX runs on the same machine as the gateway.
+    if (_envBackendUrl.isNotEmpty) {
+      final String host = Uri.tryParse(_envBackendUrl)?.host ?? '';
+      if (host.isNotEmpty) return host;
+    }
     if (!kIsWeb && Platform.isAndroid) return '10.0.2.2';
     return 'localhost';
   }
@@ -93,6 +98,7 @@ abstract final class ApiEndpoints {
   static String competitionTeams(String compId) =>
       '/api/v1/teams/competitions/$compId';
   static String joinTeam(String id) => '/api/v1/teams/$id/join-requests';
+  static const String myJoinRequests = '/api/v1/teams/join-requests/me';
   static String leaveTeam(String id) => '/api/v1/teams/$id/leave';
   static String teamJoinRequests(String teamId) =>
       '/api/v1/teams/$teamId/join-requests';

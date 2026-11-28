@@ -30,8 +30,17 @@ void main() {
       })
       ..reply(ApiEndpoints.opportunityDetail('opp_a'),
           oppJson('opp_a', title: 'Học bổng A'))
-      ..reply(ApiEndpoints.passport,
-          <String, dynamic>{'studentId': 'stu_a', 'fullName': 'Sinh viên A'})
+      ..reply(ApiEndpoints.passport, <String, dynamic>{
+        'studentId': 'stu_a',
+        'fullName': 'Sinh viên A',
+        // Complete, so login does not stop at the onboarding steps.
+        'education': <String, dynamic>{
+          'institution': 'UIT',
+          'major': 'KHMT',
+          'startYear': 2024
+        },
+        'skills': <String>['Dart'],
+      })
       ..reply(ApiEndpoints.notificationPreferences,
           <String, dynamic>{'timezone': 'Asia/Ho_Chi_Minh'});
     storage = InMemorySecureStorage();

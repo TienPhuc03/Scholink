@@ -312,6 +312,10 @@ class PassportModel {
 
   bool get isHighQualityProfile => completionScore >= 80;
 
+  /// Shown the onboarding steps after login until name, education and one skill are filled in.
+  bool get needsOnboarding =>
+      fullName.trim().isEmpty || education == null || skills.isEmpty;
+
   FieldVisibility visibilityOf(String field) =>
       fieldPrivacy[field] ??
       privacyFields

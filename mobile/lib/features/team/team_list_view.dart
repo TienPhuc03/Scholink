@@ -8,6 +8,7 @@ import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/user_avatar_view.dart';
 import 'team_model.dart';
 import 'team_viewmodel.dart';
+import '../../core/utils/text_search.dart';
 
 const List<String> kTeamAvatarPresets = <String>[
   'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
@@ -1629,7 +1630,7 @@ class _TeamListViewState extends State<TeamListView> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              m.fullName ?? 'Thành viên ${m.studentId}',
+                              (m.fullName ?? '').isNotEmpty ? m.fullName! : (m.isLeader ? 'Trưởng đội' : 'Thành viên'),
                               style: const TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w500,
@@ -1844,7 +1845,7 @@ class _TeamListViewState extends State<TeamListView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Text(req.applicant?.fullName ?? req.applicantId,
+                              Text((req.applicant?.fullName ?? '').isNotEmpty ? req.applicant!.fullName : 'Sinh viên chưa cập nhật tên',
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14)),
@@ -2085,7 +2086,7 @@ class _TeamListViewState extends State<TeamListView> {
           }
 
           final String? currentUserId = widget.viewModel.currentUserId;
-          final String query = _searchController.text.trim().toLowerCase();
+          final String query = _searchController.text.trim();
 
           // Filtering
           final List<TeamModel> filteredTeams =
@@ -2100,14 +2101,18 @@ class _TeamListViewState extends State<TeamListView> {
             if (_statusFilter == 'FULL' && !t.isFull) return false;
 
             if (query.isNotEmpty) {
-              final bool matchName = t.name.toLowerCase().contains(query);
-              final bool matchDesc =
-                  (t.description ?? '').toLowerCase().contains(query);
+              final bool matchName = matchesSearch(t.name, query);
+              final bool matchDesc = matchesSearch(t.description ?? '', query);
               if (!matchName && !matchDesc) return false;
             }
 
             return true;
           }).toList();
+          // NEWEST keeps the server order; SLOTS puts teams with the most open places first.
+          if (_sortOrder == 'SLOTS') {
+            filteredTeams.sort((TeamModel a, TeamModel b) =>
+                b.remainingSlots.compareTo(a.remainingSlots));
+          }
 
           return Column(
             children: <Widget>[
@@ -2375,11 +2380,16 @@ class _TeamListViewState extends State<TeamListView> {
     final JoinRequestModel? myRequest =
         widget.viewModel.getMyRequestForTeam(team.id);
 
-    // Extract skills from description or provide default tags
-    String skillsDisplay = 'OpenCV • Thị giác máy tính';
-    if (team.description != null && team.description!.contains('Tuyển:')) {
-      final String extracted = team.description!.split('Tuyển:').last;
-      skillsDisplay = extracted.replaceAll(')', '').trim();
+    // Create/edit store the wanted skills inside the description as "... (Tuyển: a, b)".
+    final String rawDesc = (team.description ?? '').trim();
+    String skillsDisplay = 'Chưa nêu kỹ năng cần tuyển';
+    String descDisplay = rawDesc;
+    final int tagAt = rawDesc.indexOf('Tuyển:');
+    if (tagAt >= 0) {
+      final String extracted =
+          rawDesc.substring(tagAt + 'Tuyển:'.length).replaceAll(')', '').trim();
+      if (extracted.isNotEmpty) skillsDisplay = extracted;
+      descDisplay = rawDesc.substring(0, tagAt).replaceAll(RegExp(r'\(\s*$'), '').trim();
     }
 
     return FadeSlideTransition(
@@ -2643,9 +2653,7 @@ class _TeamListViewState extends State<TeamListView> {
             // Description
             const SizedBox(height: 10),
             Text(
-              team.description?.isNotEmpty == true
-                  ? team.description!
-                  : 'Tìm đồng đội có kinh nghiệm OpenCV, cùng giải quyết bài toán nhận diện hình ảnh.',
+              descDisplay.isNotEmpty ? descDisplay : 'Chưa có mô tả.',
               style: const TextStyle(
                 fontSize: 12.5,
                 color: Color(0xFF475569),
