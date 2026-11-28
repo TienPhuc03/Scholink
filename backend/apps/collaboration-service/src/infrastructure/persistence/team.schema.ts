@@ -50,6 +50,9 @@ export class TeamModel {
   @Prop()
   bannerImageUrl?: string;
 
+  @Prop()
+  competitionTitle?: string;
+
   @Prop({ default: 1 })
   version: number;
 }

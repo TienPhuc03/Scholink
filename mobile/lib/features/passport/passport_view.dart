@@ -59,7 +59,6 @@ class _PassportViewState extends State<PassportView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.viewModel.initLocalAvatar();
       widget.viewModel.loadPassport();
       _loadEntitlements();
     });
@@ -190,9 +189,6 @@ class _PassportViewState extends State<PassportView> {
 
       final Uint8List bytes = await file.readAsBytes();
       if (bytes.isEmpty) return;
-
-      // Cache locally immediately for instant feedback
-      await widget.viewModel.saveLocalAvatar(bytes);
 
       final String safeName =
           'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';

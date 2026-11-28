@@ -10,6 +10,7 @@ import {
   CreateOpportunityDto,
   QueryOpportunityDto,
   OpportunityDetailResponseDto,
+  SuggestCompetitionDto,
 } from '../dtos/opportunity.dto';
 import { DomainException, ErrorCode, PaginationHelper, PaginatedResult, AuthenticatedUser } from '@shared';
 import { InjectModel } from '@nestjs/mongoose';
@@ -78,6 +79,97 @@ export class OpportunityUseCase {
 
     await this.opportunityRepo.save(opportunity);
     return this.toResponse(opportunity);
+  }
+
+  /** Student suggestions a day per account: enough for real use, too few to flood the queue. */
+  static readonly SUGGESTIONS_PER_DAY = 3;
+  static readonly STUDENT_ORIGIN = 'STUDENT_SUGGESTION';
+
+  /**
+   * A student wants to form a team for a competition the catalog does not have yet. It goes to
+   * the admin review queue as PENDING_REVIEW (published only after an admin checks it). The
+   * same link suggested again returns the existing competition instead of a duplicate.
+   */
+  async suggestCompetition(studentId: string, dto: SuggestCompetitionDto) {
+    const sourceUrl = OpportunityUseCase.normalizeUrl(dto.sourceUrl);
+    const existing = (
+      await this.opportunityRepo.findMany({ type: 'COMPETITION', sourceUrl, limit: 10 })
+    ).find((o) => !['REJECTED', 'CANCELLED'].includes(o.props.status));
+    if (existing) return { ...this.toSuggestion(existing), existing: true };
+
+    const sinceYesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent = await this.opportunityRepo.findMany({
+      createdBy: studentId,
+      createdAfter: sinceYesterday,
+      limit: 20,
+    });
+    if (recent.filter((o) => OpportunityUseCase.isStudentSuggestion(o)).length >= OpportunityUseCase.SUGGESTIONS_PER_DAY) {
+      throw new DomainException(
+        ErrorCode.RATE_LIMITED,
+        `Mỗi ngày bạn chỉ gửi được ${OpportunityUseCase.SUGGESTIONS_PER_DAY} cuộc thi để duyệt. Hãy thử lại sau.`,
+        429,
+      );
+    }
+
+    const opportunity = new Opportunity(`opp_${crypto.randomUUID()}`, {
+      type: 'COMPETITION',
+      title: dto.title,
+      slug: this.generateSlug(dto.title),
+      // Admin replaces these with the real details while reviewing.
+      description: `Cuộc thi do sinh viên đề xuất, đang chờ admin xác minh. Nguồn: ${sourceUrl}`,
+      organizerName: dto.organizerName?.trim() || 'Chưa xác minh',
+      createdBy: studentId,
+      sourceUrl,
+      applyMode: 'EXTERNAL',
+      status: 'PENDING_REVIEW',
+      registerDeadline: dto.registerDeadline,
+      timezone: 'Asia/Ho_Chi_Minh',
+      competitionMode: 'TEAM',
+      minTeamSize: 1,
+      maxTeamSize: 5,
+      reviewReason: 'Sinh viên đề xuất từ ứng dụng',
+      rawPayload: { origin: OpportunityUseCase.STUDENT_ORIGIN, submittedBy: studentId, sourceUrl },
+      ruleVersion: 1,
+    });
+    await this.opportunityRepo.save(opportunity);
+    return { ...this.toSuggestion(opportunity), existing: false };
+  }
+
+  /** The competitions this student suggested, newest first, with the review outcome. */
+  async mySuggestions(studentId: string) {
+    const mine = await this.opportunityRepo.findMany({ createdBy: studentId, limit: 50 });
+    return mine
+      .filter((o) => OpportunityUseCase.isStudentSuggestion(o))
+      .map((o) => this.toSuggestion(o))
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  static isStudentSuggestion(o: Opportunity): boolean {
+    return (o.props.rawPayload as { origin?: string } | undefined)?.origin === OpportunityUseCase.STUDENT_ORIGIN;
+  }
+
+  /** Same page, different spelling: lower-case host, no fragment, no trailing slash. */
+  static normalizeUrl(raw: string): string {
+    try {
+      const url = new URL(raw.trim());
+      url.hash = '';
+      url.hostname = url.hostname.toLowerCase();
+      return url.toString().replace(/\/+$/, '');
+    } catch {
+      return raw.trim();
+    }
+  }
+
+  private toSuggestion(o: Opportunity) {
+    return {
+      id: o.id,
+      title: o.props.title,
+      sourceUrl: o.props.sourceUrl,
+      status: o.props.status,
+      registerDeadline: o.props.registerDeadline,
+      reviewReason: o.props.status === 'REJECTED' ? o.props.reviewReason : undefined,
+      createdAt: o.props.createdAt,
+    };
   }
 
   async list(query: QueryOpportunityDto): Promise<PaginatedResult<Record<string, unknown>>> {

@@ -53,6 +53,7 @@ abstract final class ApiEndpoints {
   static const String mediaUploadUrl = '/api/v1/media/upload-url';
   static String mediaComplete(String assetId) =>
       '/api/v1/media/$assetId/complete';
+  static String mediaAsset(String assetId) => '/api/v1/media/$assetId';
 
   // Applications (opportunity service, F19)
   static const String applicationPreviews = '/api/v1/applications/previews';
@@ -83,6 +84,11 @@ abstract final class ApiEndpoints {
 
   // Collaboration Service routes
   static const String teams = '/api/v1/teams';
+  static const String myTeams = '/api/v1/teams/me';
+  static const String competitionSuggestions =
+      '/api/v1/opportunities/suggestions';
+  static const String myCompetitionSuggestions =
+      '/api/v1/opportunities/suggestions/me';
   static String teamDetail(String id) => '/api/v1/teams/$id';
 
   // Team submission (APP-05, F37)

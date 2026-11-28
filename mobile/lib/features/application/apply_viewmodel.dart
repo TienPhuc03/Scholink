@@ -11,6 +11,7 @@ import 'application_repository.dart';
 import 'attachment_model.dart';
 import 'media_repository.dart';
 import 'submission_store.dart';
+import '../passport/passport_model.dart' show FileLink;
 
 /// Picks one file; abstracted so the view model can be tested without the plugin.
 abstract interface class AttachmentPicker {
@@ -47,6 +48,9 @@ class ApplyViewModel extends BaseViewModel {
 
   final String opportunityId;
   final String opportunityTitle;
+
+  /// Links to view or download an attached file in the preview step (fetched on each tap).
+  Future<FileLink?> attachmentLink(String assetId) => _media.fileLink(assetId);
 
   ApplyStep _step = ApplyStep.readiness;
   ApplyStep get step => _step;

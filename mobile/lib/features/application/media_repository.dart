@@ -8,6 +8,7 @@ import '../../core/errors/result.dart';
 import '../../core/network/api_client.dart';
 import 'application_model.dart';
 import 'attachment_model.dart';
+import '../passport/passport_model.dart' show FileLink;
 
 /// Uploads a file to the bucket at a presigned URL. Separate from [ApiClient] on purpose: the
 /// presigned URL carries its own signature and must not get the app's Bearer header.
@@ -38,6 +39,21 @@ class MediaRepository {
 
   static bool _isPlaceholder(String url) =>
       url.isEmpty || Uri.tryParse(url)?.host == 'storage.scholink.edu.vn';
+
+  /// Fresh short-lived view/download links of one of my files (`GET /media/:id`, owner only).
+  /// Links are null when the backend has no object storage.
+  Future<FileLink?> fileLink(String assetId) async {
+    try {
+      final Map<String, dynamic> a = unwrapData(
+          (await _api.get<dynamic>(ApiEndpoints.mediaAsset(assetId))).data);
+      return FileLink.fromJsonOrNull(<String, dynamic>{
+        ...a,
+        'assetId': a['id'] ?? assetId,
+      });
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Returns the READY asset id. A rejected scan comes back as a ServerFailure
   /// (code MALICIOUS_FILE_DETECTED or a validation error) with the backend's reason.

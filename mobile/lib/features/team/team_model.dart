@@ -208,6 +208,13 @@ class TeamModel {
   final String? customBannerImageUrl;
   final String? customAvatarImageUrl;
 
+  /// Name of the team's competition (stored on the team when it was created).
+  final String? competitionTitle;
+
+  /// From `GET /teams/me`: PUBLISHED, PENDING_REVIEW (a competition the leader suggested and
+  /// an admin has not checked yet), REJECTED... null in competition lists.
+  final String? competitionStatus;
+
   const TeamModel({
     required this.id,
     required this.competitionId,
@@ -220,7 +227,13 @@ class TeamModel {
     required this.members,
     this.customBannerImageUrl,
     this.customAvatarImageUrl,
+    this.competitionTitle,
+    this.competitionStatus,
   });
+
+  bool get isCompetitionPending => competitionStatus == 'PENDING_REVIEW';
+  bool get isCompetitionRejected =>
+      competitionStatus == 'REJECTED' || competitionStatus == 'MISSING';
 
   int get memberCount => members.length;
   bool get isFull => memberCount >= maxSize;
@@ -313,8 +326,13 @@ class TeamModel {
           (json['bannerImageUrl'] ?? json['customBannerImageUrl']) as String?,
       customAvatarImageUrl:
           (json['avatarUrl'] ?? json['customAvatarImageUrl']) as String?,
+      competitionTitle: _text(json['competitionTitle']),
+      competitionStatus: _text(json['competitionStatus']),
     );
   }
+
+  static String? _text(dynamic v) =>
+      (v is String && v.trim().isNotEmpty) ? v.trim() : null;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
@@ -330,4 +348,33 @@ class TeamModel {
           'bannerImageUrl': customBannerImageUrl,
         if (customAvatarImageUrl != null) 'avatarUrl': customAvatarImageUrl,
       };
+}
+
+/// A competition a team can be formed for: published ones from the catalog, plus the ones this
+/// student suggested that an admin has not reviewed yet ([isPending]).
+class CompetitionOption {
+  final String id;
+  final String title;
+  final String status;
+  final DateTime? registerDeadline;
+
+  const CompetitionOption({
+    required this.id,
+    required this.title,
+    this.status = 'PUBLISHED',
+    this.registerDeadline,
+  });
+
+  bool get isPending => status == 'PENDING_REVIEW';
+
+  static CompetitionOption? fromJson(Map<String, dynamic> json) {
+    final String id = (json['id'] ?? '').toString();
+    if (id.isEmpty) return null;
+    return CompetitionOption(
+      id: id,
+      title: (json['title'] ?? 'Cuộc thi').toString(),
+      status: (json['status'] ?? 'PUBLISHED').toString(),
+      registerDeadline: DateTime.tryParse((json['registerDeadline'] ?? '').toString()),
+    );
+  }
 }

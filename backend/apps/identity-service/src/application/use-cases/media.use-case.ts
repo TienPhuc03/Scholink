@@ -126,13 +126,14 @@ export class MediaUseCase {
       throw DomainException.forbidden('Bạn không có quyền truy cập tệp minh chứng của người khác');
     }
 
+    // Short-lived links for the owner only; empty until the file passed the scan.
+    const ready = this.storage?.enabled && asset.status === 'READY';
+    const link = (inline: boolean) =>
+      ready ? this.storage.presignDownload(asset.objectKey, DOWNLOAD_URL_TTL_SECONDS, asset.fileName, inline) : '';
     return Object.freeze({
       ...this.toResponse(asset),
-      // Short-lived link for the owner only; empty until the file passed the scan.
-      downloadUrl:
-        this.storage?.enabled && asset.status === 'READY'
-          ? this.storage.presignDownload(asset.objectKey, DOWNLOAD_URL_TTL_SECONDS, asset.fileName)
-          : '',
+      downloadUrl: link(false),
+      viewUrl: link(true),
     });
   }
 

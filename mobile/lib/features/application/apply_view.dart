@@ -5,6 +5,8 @@ import 'application_model.dart';
 import 'apply_viewmodel.dart';
 import 'attachment_model.dart';
 import 'widgets/application_widgets.dart';
+import '../passport/passport_model.dart' show FileLink;
+import '../passport/profile_view_screen.dart' show FileLinkTile;
 
 /// F19 apply screen: one screen, three steps (Q7). The readiness step follows Figma frame
 /// 162:915 ("Hoàn tất hồ sơ") and the success state frame 162:807 ("Nộp thành công!").
@@ -722,10 +724,18 @@ class _ApplyViewState extends State<ApplyView> {
                   final AttachmentItem? local = vm.attachments
                       .where((AttachmentItem a) => a.assetId == id)
                       .firstOrNull;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text('• ${local?.fileName ?? id}',
-                        style: const TextStyle(fontSize: 13)),
+                  final String name = local?.fileName ?? 'Tệp đính kèm';
+                  // Same tile as the Passport CV: each tap asks the server for fresh links.
+                  // viewUrl '' only enables the buttons; the real link comes from refresh.
+                  return FileLinkTile(
+                    file: FileLink(
+                      assetId: id,
+                      fileName: name,
+                      mimeType: AttachmentRules.mimeForExtension(name) ?? '',
+                      sizeBytes: local?.sizeBytes ?? 0,
+                      viewUrl: '',
+                    ),
+                    refresh: () => vm.attachmentLink(id),
                   );
                 }).toList(),
               ),

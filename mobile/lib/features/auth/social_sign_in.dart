@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -132,10 +136,20 @@ class FirebaseSocialSignIn implements SocialSignIn {
   }
 
   Future<AuthCredential?> _facebookCredential() async {
-    final LoginResult result = await FacebookAuth.instance.login();
+    // iOS uses Facebook Limited Login: the token is an OIDC JWT, not a Graph access token.
+    // Passing it as an access token made Firebase fail with {"code":190,"message":"Bad
+    // signature"}; Firebase wants it as an OIDC id token with the nonce it was issued for.
+    final String rawNonce = _randomNonce();
+    final LoginResult result = await FacebookAuth.instance.login(
+        nonce: sha256.convert(utf8.encode(rawNonce)).toString());
     switch (result.status) {
       case LoginStatus.success:
-        return FacebookAuthProvider.credential(result.accessToken!.tokenString);
+        final AccessToken token = result.accessToken!;
+        if (token.type == AccessTokenType.limited) {
+          return OAuthProvider('facebook.com')
+              .credential(idToken: token.tokenString, rawNonce: rawNonce);
+        }
+        return FacebookAuthProvider.credential(token.tokenString);
       case LoginStatus.cancelled:
         return null;
       case LoginStatus.failed:
@@ -144,6 +158,14 @@ class FirebaseSocialSignIn implements SocialSignIn {
             message:
                 'Đăng nhập Facebook thất bại: ${result.message ?? result.status.name}');
     }
+  }
+
+  static String _randomNonce([int length = 32]) {
+    const String chars =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final Random random = Random.secure();
+    return List<String>.generate(
+        length, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
   static String _firebaseMessage(FirebaseAuthException e) {

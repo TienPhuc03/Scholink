@@ -134,6 +134,10 @@ class InMemoryTeamRepository implements ITeamRepository {
     return null;
   }
 
+  async findByMember(studentId: string): Promise<Team[]> {
+    return Array.from(this.teams.values()).filter((t) => t.members.some((m) => m.studentId === studentId));
+  }
+
   async findPendingJoinRequestsByApplicant(applicantId: string): Promise<JoinRequest[]> {
     return Array.from(this.joinRequests.values()).filter(
       (r) => r.props.applicantId === applicantId && r.props.status === 'PENDING',
@@ -856,5 +860,56 @@ describe('SCHOL-20: Team Consent, Roster Freeze & Reservation Suite', () => {
       expect(reloaded?.status).toBe('ACTIVE');
       expect(reloaded?.rosterVersion).toBe(2);
     });
+  });
+});
+
+describe('Teams and the competition they enter (student-suggested competitions)', () => {
+  const competitions: Record<string, { id: string; title: string; type: string; status: string }> = {
+    opp_live: { id: 'opp_live', title: 'Cuộc thi đã duyệt', type: 'COMPETITION', status: 'PUBLISHED' },
+    opp_wait: { id: 'opp_wait', title: 'Cuộc thi chờ duyệt', type: 'COMPETITION', status: 'PENDING_REVIEW' },
+    opp_no: { id: 'opp_no', title: 'Bị từ chối', type: 'COMPETITION', status: 'REJECTED' },
+  };
+  class CatalogClient extends MockOpportunityClient {
+    async getCompetition(id: string) {
+      return competitions[id] ?? null;
+    }
+  }
+  let teamRepo: InMemoryTeamRepository;
+  let useCase: TeamUseCase;
+  const dto = (competitionId: string) => ({ competitionId, name: 'Đội A', minSize: 2, maxSize: 4 });
+
+  beforeEach(() => {
+    teamRepo = new InMemoryTeamRepository();
+    useCase = new TeamUseCase(teamRepo, new InMemoryChatRepository(), new MockIdentityClient(), new CatalogClient());
+  });
+
+  it('stores the competition title and refuses unknown or rejected competitions', async () => {
+    const team = await useCase.createTeam('leader', dto('opp_live'));
+    expect(team.competitionTitle).toBe('Cuộc thi đã duyệt');
+    await expect(useCase.createTeam('leader2', dto('opp_missing'))).rejects.toMatchObject({ statusCode: 404 });
+    await expect(useCase.createTeam('leader3', dto('opp_no'))).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('a team of a competition under review is hidden and cannot be joined until approval', async () => {
+    const team = await useCase.createTeam('leader', dto('opp_wait'));
+    expect(await useCase.getCompetitionTeams('opp_wait')).toEqual([]);
+    await expect(useCase.sendJoinRequest(team.id, 'student', {})).rejects.toMatchObject({ statusCode: 409 });
+
+    competitions.opp_wait.status = 'PUBLISHED';
+    expect(await useCase.getCompetitionTeams('opp_wait')).toHaveLength(1);
+    await expect(useCase.sendJoinRequest(team.id, 'student', {})).resolves.toMatchObject({ status: 'PENDING' });
+    competitions.opp_wait.status = 'PENDING_REVIEW';
+  });
+
+  it('one student may lead teams in different competitions and sees them all in /teams/me', async () => {
+    await useCase.createTeam('leader', dto('opp_live'));
+    await useCase.createTeam('leader', dto('opp_wait'));
+    await expect(useCase.createTeam('leader', dto('opp_live'))).rejects.toMatchObject({ statusCode: 409 });
+
+    const mine = await useCase.getMyTeams('leader');
+    expect(mine.map((t) => [t.competitionId, t.competitionStatus]).sort()).toEqual([
+      ['opp_live', 'PUBLISHED'],
+      ['opp_wait', 'PENDING_REVIEW'],
+    ]);
   });
 });

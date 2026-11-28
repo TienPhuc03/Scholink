@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_routes.dart';
 import 'core/database/room_database.dart';
@@ -53,6 +55,7 @@ import 'features/opportunity/opportunity_list_view.dart';
 import 'features/opportunity/opportunity_model.dart';
 import 'features/opportunity/opportunity_repository.dart';
 import 'features/opportunity/opportunity_viewmodel.dart';
+import 'core/services/user_avatar_service.dart';
 import 'features/passport/passport_edit_view.dart';
 import 'features/passport/passport_model.dart';
 import 'features/passport/passport_repository.dart';
@@ -120,6 +123,7 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _closeAccountScreensAndData() {
     _nav.popUntil((Route<dynamic> r) => r.isFirst);
     _resetTabViewModels();
+    UserAvatarService.instance.clear();
     // F29: the next account on this device must not receive this account's pushes.
     if (sl.isRegistered<PushListener>()) unawaited(sl<PushListener>().stop());
     if (sl.isRegistered<FcmService>()) unawaited(sl<FcmService>().unregister());
@@ -174,6 +178,14 @@ class _ScholinkAppState extends State<ScholinkApp> {
     }
     // FCM reaches this device even when the app is closed (MQTT only while it runs).
     if (sl.isRegistered<FcmService>()) unawaited(sl<FcmService>().register());
+    // iOS has no FCM here: ask for the notification permission (dialog shows once per
+    // install) so MQTT pushes can be shown as system notifications.
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        sl.isRegistered<NotificationPermission>()) {
+      unawaited(sl<NotificationPermission>()
+          .request()
+          .then<void>((_) {}, onError: (Object _) {}));
+    }
     await sl<PushListener>().start(
       userId,
       onReceived: () {
@@ -231,6 +243,8 @@ class _ScholinkAppState extends State<ScholinkApp> {
   void _onLoginSuccess() {
     _nav.popUntil((Route<dynamic> r) => r.isFirst);
     _resetTabViewModels();
+    // The Passport load sets this account's avatar; never show the previous one meanwhile.
+    UserAvatarService.instance.clear();
     final OpportunityModel? resumeApply = _pendingApply;
     final OpportunityModel? resumeBookmark = _pendingBookmark;
     setState(() {
@@ -260,23 +274,29 @@ class _ScholinkAppState extends State<ScholinkApp> {
   /// else, instead of showing placeholder data. A failed load is skipped (retried next launch).
   Future<void> _ensurePassportComplete() async {
     if (!_isAuthenticated || _isGuest) return;
+    final String skipKey =
+        'onboarding_skipped_${await sl<SecureStorageHelper>().getUserId() ?? ''}';
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {} // no plugin (tests): just don't remember the skip
+    if (prefs?.getBool(skipKey) ?? false) return;
     final PassportViewModel passportVm = _tabs.passport;
     if (passportVm.passport == null) await passportVm.loadPassport();
     final PassportModel? p = passportVm.passport;
     if (!mounted || !_isAuthenticated || p == null || !p.needsOnboarding) {
       return;
     }
-    await _nav.push<bool>(
+    final bool? saved = await _nav.push<bool>(
       MaterialPageRoute<bool>(
         settings: const RouteSettings(name: AppRoutes.passportEdit),
         fullscreenDialog: true,
-        builder: (_) => PassportEditView(
-          viewModel: passportVm,
-          onboarding: true,
-          onLogout: () => unawaited(_handleLogout()),
-        ),
+        builder: (_) =>
+            PassportEditView(viewModel: passportVm, onboarding: true),
       ),
     );
+    // "Bỏ qua" is remembered per account; the apply flow still asks for what is missing.
+    if (saved != true) await prefs?.setBool(skipKey, true);
   }
 
   void _onEnterGuestMode() {

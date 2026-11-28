@@ -42,6 +42,100 @@ class TeamRepository {
     }
   }
 
+  static List<dynamic> _list(dynamic resData, [String key = 'items']) {
+    final dynamic payload = (resData is Map<String, dynamic>)
+        ? (resData['data'] ?? resData[key] ?? resData)
+        : resData;
+    if (payload is Map<String, dynamic> && payload[key] is List) {
+      return payload[key] as List<dynamic>;
+    }
+    return payload is List ? payload : <dynamic>[];
+  }
+
+  /// My teams in every competition, with the competition's review status.
+  Future<Result<List<TeamModel>, Failure>> getMyTeams() async {
+    try {
+      final Response<dynamic> res =
+          await _apiClient.get<dynamic>(ApiEndpoints.myTeams);
+      return SuccessResult<List<TeamModel>, Failure>(_list(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(TeamModel.fromJson)
+          .toList());
+    } on Failure catch (failure) {
+      return FailureResult<List<TeamModel>, Failure>(failure);
+    } catch (e) {
+      return FailureResult<List<TeamModel>, Failure>(
+          ServerFailure(message: e.toString()));
+    }
+  }
+
+  /// Open competitions of the catalog, plus the ones I suggested that are still under review
+  /// (only I can form a team for those until an admin approves them).
+  Future<Result<List<CompetitionOption>, Failure>> getCompetitions() async {
+    try {
+      final Response<dynamic> published = await _apiClient.get<dynamic>(
+        ApiEndpoints.opportunities,
+        queryParameters: <String, dynamic>{'type': 'COMPETITION', 'limit': 50},
+      );
+      List<dynamic> mine = <dynamic>[];
+      try {
+        mine = _list((await _apiClient
+                .get<dynamic>(ApiEndpoints.myCompetitionSuggestions))
+            .data);
+      } catch (_) {} // guests and older backends: published ones are enough
+      final List<CompetitionOption> options = <dynamic>[
+        ...mine.where((dynamic raw) =>
+            raw is Map<String, dynamic> && raw['status'] == 'PENDING_REVIEW'),
+        ..._list(published.data),
+      ]
+          .whereType<Map<String, dynamic>>()
+          .map(CompetitionOption.fromJson)
+          .whereType<CompetitionOption>()
+          .toList();
+      return SuccessResult<List<CompetitionOption>, Failure>(options);
+    } on Failure catch (failure) {
+      return FailureResult<List<CompetitionOption>, Failure>(failure);
+    } catch (e) {
+      return FailureResult<List<CompetitionOption>, Failure>(
+          ServerFailure(message: e.toString()));
+    }
+  }
+
+  /// Sends a competition that is not in the app to the admin review queue. Returns the new
+  /// (or already existing, same link) competition.
+  Future<Result<CompetitionOption, Failure>> suggestCompetition({
+    required String sourceUrl,
+    required String title,
+    required DateTime registerDeadline,
+    String? organizerName,
+  }) async {
+    try {
+      final Response<dynamic> res = await _apiClient.post<dynamic>(
+        ApiEndpoints.competitionSuggestions,
+        data: <String, dynamic>{
+          'sourceUrl': sourceUrl.trim(),
+          'title': title.trim(),
+          'registerDeadline': registerDeadline.toUtc().toIso8601String(),
+          if (organizerName != null && organizerName.trim().isNotEmpty)
+            'organizerName': organizerName.trim(),
+        },
+      );
+      final dynamic data = res.data;
+      final CompetitionOption? option = CompetitionOption.fromJson(
+          (data is Map<String, dynamic> ? (data['data'] ?? data) : data)
+              as Map<String, dynamic>);
+      if (option == null) {
+        throw const ServerFailure(message: 'Máy chủ không trả về cuộc thi.');
+      }
+      return SuccessResult<CompetitionOption, Failure>(option);
+    } on Failure catch (failure) {
+      return FailureResult<CompetitionOption, Failure>(failure);
+    } catch (e) {
+      return FailureResult<CompetitionOption, Failure>(
+          ServerFailure(message: e.toString()));
+    }
+  }
+
   Future<Result<TeamModel, Failure>> getTeamDetail(String teamId) async {
     try {
       final Response<dynamic> response = await _apiClient.get<dynamic>(

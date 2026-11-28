@@ -19,6 +19,11 @@ import {
   SubmitTeamConsentDto,
 } from '../dtos/collaboration.dto';
 import { DomainException, ErrorCode } from '@shared';
+import {
+  CompetitionInfo,
+  IOpportunityClientPort,
+  OPPORTUNITY_CLIENT,
+} from '../../domain/ports/opportunity-client.port';
 
 @Injectable()
 export class TeamUseCase {
@@ -30,7 +35,21 @@ export class TeamUseCase {
     @Optional()
     @Inject(IDENTITY_CLIENT)
     private readonly identityClient?: IIdentityClientPort,
+    @Optional()
+    @Inject(OPPORTUNITY_CLIENT)
+    private readonly opportunityClient?: IOpportunityClientPort,
   ) {}
+
+  /** undefined when Catalog cannot be asked (see IOpportunityClientPort.getCompetition). */
+  private async competitionOf(competitionId: string): Promise<CompetitionInfo | null | undefined> {
+    if (!this.opportunityClient?.getCompetition) return undefined;
+    return this.opportunityClient.getCompetition(competitionId);
+  }
+
+  /** A team may recruit only once its competition is in the catalog (not still under review). */
+  private static isRecruitable(c: CompetitionInfo | null | undefined): boolean {
+    return c === undefined || (c !== null && c.status === 'PUBLISHED');
+  }
 
   async createTeam(studentId: string, dto: CreateTeamDto) {
     const existingMembership = await this.teamRepo.findActiveMembership(dto.competitionId, studentId);
@@ -42,9 +61,24 @@ export class TeamUseCase {
       );
     }
 
+    // The competition must be in the catalog: published, or a student suggestion still under
+    // review (the team then waits, invisible, until an admin approves it).
+    const competition = await this.competitionOf(dto.competitionId);
+    if (competition === null || (competition && competition.type && competition.type !== 'COMPETITION')) {
+      throw DomainException.notFound('Cuộc thi');
+    }
+    if (competition && !['PUBLISHED', 'PENDING_REVIEW'].includes(competition.status)) {
+      throw new DomainException(
+        ErrorCode.STATE_CONFLICT,
+        'Cuộc thi này đã đóng hoặc không được duyệt, không thể tạo đội',
+        409,
+      );
+    }
+
     const teamId = `team_${crypto.randomUUID()}`;
     const team = new Team(teamId, {
       competitionId: dto.competitionId,
+      competitionTitle: competition?.title || undefined,
       name: dto.name,
       description: dto.description,
       leaderId: studentId,
@@ -141,6 +175,14 @@ export class TeamUseCase {
 
     if (team.members.length >= team.props.maxSize) {
       throw new DomainException(ErrorCode.SLOT_FULL, 'Đội thi đã đủ thành viên', 409);
+    }
+
+    if (!TeamUseCase.isRecruitable(await this.competitionOf(team.competitionId))) {
+      throw new DomainException(
+        ErrorCode.STATE_CONFLICT,
+        'Cuộc thi của đội đang chờ admin xác minh, chưa thể xin vào đội',
+        409,
+      );
     }
 
     const existingMembership = await this.teamRepo.findActiveMembership(team.competitionId, applicantId);
@@ -443,13 +485,38 @@ export class TeamUseCase {
     competitionId: string,
     options?: { limit?: number; cursor?: string },
   ) {
+    // Teams of a competition still under review stay hidden until an admin approves it.
+    if (!TeamUseCase.isRecruitable(await this.competitionOf(competitionId))) return [];
     const safeLimit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
     const teams = await this.teamRepo.findManyByCompetition(competitionId, {
       limit: safeLimit,
       cursor: options?.cursor,
     });
+    return this.withMemberProfiles(teams);
+  }
 
-    // T5: Lấy hàng loạt tên và avatar qua 1 lệnh gRPC batch (tránh N+1)
+  /** My teams in every competition, with each competition's current review status. */
+  async getMyTeams(studentId: string) {
+    const teams = await this.teamRepo.findByMember(studentId);
+    const competitions = new Map<string, CompetitionInfo | null | undefined>();
+    await Promise.all(
+      Array.from(new Set(teams.map((t) => t.competitionId))).map(async (id) =>
+        competitions.set(id, await this.competitionOf(id)),
+      ),
+    );
+    return (await this.withMemberProfiles(teams)).map((t) => {
+      const c = competitions.get(t.competitionId);
+      return {
+        ...t,
+        competitionTitle: c?.title || t.competitionTitle,
+        // UNKNOWN when Catalog could not be asked; the app then shows no badge.
+        competitionStatus: c === undefined ? 'UNKNOWN' : c === null ? 'MISSING' : c.status,
+      };
+    });
+  }
+
+  /** T5: names and avatars of all members in one batch gRPC call (no N+1). */
+  private async withMemberProfiles(teams: Team[]) {
     const studentIds = Array.from(new Set(teams.flatMap((t) => t.members.map((m) => m.studentId))));
     const profileMap = new Map<string, { fullName?: string; avatarUrl?: string }>();
 

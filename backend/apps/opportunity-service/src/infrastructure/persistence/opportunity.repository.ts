@@ -66,6 +66,9 @@ export class MongooseOpportunityRepository implements IOpportunityRepository {
     if (filter.applyMode) and.push({ applyMode: { $eq: String(filter.applyMode) } });
     if (filter.fundingLevel) and.push({ fundingLevel: { $eq: String(filter.fundingLevel) } });
     if (filter.organizationId) and.push({ organizationId: { $eq: String(filter.organizationId) } });
+    if (filter.sourceUrl) and.push({ sourceUrl: { $eq: String(filter.sourceUrl) } });
+    if (filter.createdBy) and.push({ createdBy: { $eq: String(filter.createdBy) } });
+    if (filter.createdAfter) and.push({ createdAt: { $gte: filter.createdAfter } });
     if (filter.keyword && filter.keyword.trim()) {
       const re = { $regex: accentInsensitivePattern(filter.keyword.trim()), $options: 'i' };
       and.push({ $or: [{ title: re }, { organizerName: re }, { tags: re }] });

@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   IOpportunityClientPort,
   AbortIntentResult,
+  CompetitionInfo,
 } from '../../domain/ports/opportunity-client.port';
 
 @Injectable()
@@ -26,6 +27,20 @@ export class OpportunityGrpcClient implements IOpportunityClientPort, OnModuleIn
       } catch (err: any) {
         this.logger.warn(`Could not resolve OpportunityGrpcService: ${err.message}`);
       }
+    }
+  }
+
+  async getCompetition(id: string): Promise<CompetitionInfo | null | undefined> {
+    if (!this.grpcService || typeof this.grpcService.getOpportunityById !== 'function') return undefined;
+    try {
+      const res: any = await firstValueFrom(this.grpcService.getOpportunityById({ id }));
+      if (!res?.id) return null;
+      return { id: res.id, title: res.title || '', type: res.type || '', status: res.status || '' };
+    } catch (err: any) {
+      // gRPC NOT_FOUND = 5
+      if (err?.code === 5 || /not found|không tồn tại/i.test(err?.message ?? '')) return null;
+      this.logger.warn(`Opportunity gRPC getOpportunityById failed: ${err.message}`);
+      return undefined;
     }
   }
 

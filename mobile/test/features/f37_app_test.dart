@@ -70,7 +70,8 @@ void main() {
           'education': <String, dynamic>{
             'institution': 'UIT',
             'major': 'KHMT',
-            'startYear': 2024
+            'startYear': 2024,
+            'gpa': 3.4
           },
           'skills': <String>['Dart'],
           'completionScore': 80

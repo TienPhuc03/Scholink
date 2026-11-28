@@ -108,3 +108,20 @@ export interface PaginatedOpportunityResponseDto {
     nextCursor?: string | null;
   };
 }
+
+/** A competition a student wants to form a team for, not yet in the catalog (admin reviews it). */
+export const SuggestCompetitionDtoSchema = z.object({
+  sourceUrl: z
+    .string()
+    .trim()
+    .url('Đường dẫn cuộc thi không hợp lệ')
+    .max(500)
+    .refine((v) => /^https?:\/\//i.test(v), 'Đường dẫn phải bắt đầu bằng http:// hoặc https://'),
+  title: z.string().trim().min(3, 'Tên cuộc thi ít nhất 3 ký tự').max(200),
+  registerDeadline: z.coerce
+    .date()
+    .refine((d) => d.getTime() > Date.now(), 'Hạn đăng ký phải ở tương lai'),
+  organizerName: z.string().trim().max(200).optional(),
+});
+
+export type SuggestCompetitionDto = z.infer<typeof SuggestCompetitionDtoSchema>;
