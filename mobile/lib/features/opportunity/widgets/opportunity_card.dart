@@ -328,12 +328,13 @@ class OpportunityCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 8.0),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 155),
+                      child: SizedBox(
+                        // Full card width; a 16:9 box capped at this height left a gap on the right.
+                        width: double.infinity,
+                        height: 155,
                         child: Stack(
                           children: <Widget>[
-                            AspectRatio(
-                              aspectRatio: 16 / 9,
+                            SizedBox.expand(
                               child: Image.network(
                                 imageUrl,
                                 fit: BoxFit.cover,
