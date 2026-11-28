@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -39,8 +41,10 @@ const List<String> kTeamBannerPresets = <String>[
 ///   and solid purple "Xin vào đội" CTA button.
 class TeamListView extends StatefulWidget {
   final TeamViewModel viewModel;
-  final String competitionId;
-  final String competitionTitle;
+
+  /// Competition to open on; null opens the first one of the catalog (the user can switch).
+  final String? competitionId;
+  final String? competitionTitle;
 
   /// F37 (APP-05): opens the team submission flow for the signed-in member's own team.
   final void Function(TeamModel team, String competitionTitle)?
@@ -49,8 +53,8 @@ class TeamListView extends StatefulWidget {
   const TeamListView({
     super.key,
     required this.viewModel,
-    this.competitionId = 'opp_scholink_ai_challenge_2026',
-    this.competitionTitle = 'Scholink AI Challenge 2026',
+    this.competitionId,
+    this.competitionTitle,
     this.onOpenTeamSubmission,
   });
 
@@ -64,12 +68,32 @@ class _TeamListViewState extends State<TeamListView> {
   String _statusFilter = 'ALL'; // 'ALL', 'FORMING', 'FULL'
   String _sortOrder = 'NEWEST'; // 'NEWEST', 'SLOTS'
 
+  /// The competition "Tìm đội" shows; '' until one is chosen.
+  late String _competitionId = widget.competitionId ?? '';
+  late String _competitionTitle = widget.competitionTitle ?? 'Chọn cuộc thi';
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.viewModel.loadTeams(widget.competitionId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      unawaited(widget.viewModel.loadTeams(_competitionId));
+      await widget.viewModel.loadCompetitions();
+      // Nothing chosen yet: open the first published competition.
+      final CompetitionOption? first = widget.viewModel.competitions
+          .where((CompetitionOption c) => !c.isPending)
+          .firstOrNull;
+      if (mounted && _competitionId.isEmpty && first != null) {
+        _selectCompetition(first);
+      }
     });
+  }
+
+  void _selectCompetition(CompetitionOption c) {
+    setState(() {
+      _competitionId = c.id;
+      _competitionTitle = c.title;
+    });
+    widget.viewModel.loadTeams(c.id);
   }
 
   @override
@@ -199,6 +223,9 @@ class _TeamListViewState extends State<TeamListView> {
     String selectedAvatar = kTeamAvatarPresets[0];
     String selectedBanner = kTeamBannerPresets[0];
     String? localError;
+    CompetitionOption? competition = _competitionId.isEmpty
+        ? null
+        : CompetitionOption(id: _competitionId, title: _competitionTitle);
 
     showModalBottomSheet<void>(
       context: context,
@@ -251,6 +278,65 @@ class _TeamListViewState extends State<TeamListView> {
                       ],
                     ),
                     const SizedBox(height: 10),
+
+                    // The competition the team enters (decides who it recruits).
+                    InkWell(
+                      key: const Key('create_team_competition'),
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        final CompetitionOption? c =
+                            await _showCompetitionPicker();
+                        if (c != null) {
+                          setModalState(() {
+                            competition = c;
+                            localError = null;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: <Widget>[
+                            const Icon(Icons.emoji_events_outlined,
+                                color: Color(0xFF4F46E5)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  const Text('Cuộc thi (*)',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF64748B))),
+                                  Text(
+                                    competition?.title ?? 'Chọn cuộc thi',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  if (competition?.isPending ?? false)
+                                    const Text(
+                                      'Chờ admin xác minh: đội chỉ mình bạn thấy cho tới khi được duyệt.',
+                                      style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: Color(0xFFB45309)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const Text('Đổi',
+                                style: TextStyle(
+                                    color: Color(0xFF4F46E5),
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
 
                     if (localError != null)
                       Container(
@@ -646,6 +732,12 @@ class _TeamListViewState extends State<TeamListView> {
                       ),
                       onPressed: () async {
                         final String name = nameController.text.trim();
+                        final CompetitionOption? chosen = competition;
+                        if (chosen == null) {
+                          setModalState(() =>
+                              localError = 'Vui lòng chọn cuộc thi cho đội.');
+                          return;
+                        }
                         if (name.isEmpty) {
                           setModalState(
                               () => localError = 'Vui lòng nhập tên đội.');
@@ -660,8 +752,15 @@ class _TeamListViewState extends State<TeamListView> {
                                 : 'Tuyển: $skills')
                             : desc;
 
+                        // Show the competition the new team belongs to.
+                        if (chosen.id != _competitionId && !chosen.isPending) {
+                          setState(() {
+                            _competitionId = chosen.id;
+                            _competitionTitle = chosen.title;
+                          });
+                        }
                         final bool ok = await widget.viewModel.createTeam(
-                          competitionId: widget.competitionId,
+                          competitionId: chosen.id,
                           name: name,
                           description: fullDesc,
                           minSize: minSize,
@@ -669,6 +768,12 @@ class _TeamListViewState extends State<TeamListView> {
                           avatarUrl: selectedAvatar,
                           bannerImageUrl: selectedBanner,
                         );
+                        if (ok) {
+                          if (chosen.isPending) {
+                            setState(() => _selectedContext = 'MY_TEAMS');
+                          }
+                          unawaited(widget.viewModel.loadTeams(_competitionId));
+                        }
                         _showFeedbackSnackBar(
                           successMsg:
                               ok ? widget.viewModel.actionFeedback : null,
@@ -686,6 +791,251 @@ class _TeamListViewState extends State<TeamListView> {
           },
         );
       },
+    );
+  }
+
+  // =========================================================================
+  // 1A. CHỌN CUỘC THI / GỬI LINK CUỘC THI CHƯA CÓ TRONG APP
+  // =========================================================================
+
+  /// Competitions of the catalog plus my suggestions under review; returns the one picked.
+  Future<CompetitionOption?> _showCompetitionPicker() {
+    final TeamViewModel vm = widget.viewModel;
+    if (!vm.competitionsLoaded) unawaited(vm.loadCompetitions());
+    return showModalBottomSheet<CompetitionOption>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) => ListenableBuilder(
+        listenable: vm,
+        builder: (BuildContext context, Widget? _) {
+          final List<CompetitionOption> items = vm.competitions;
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.75),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    child: Text('Chọn cuộc thi',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700)),
+                  ),
+                  if (!vm.competitionsLoaded)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (items.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        vm.competitionsError ??
+                            'Chưa có cuộc thi nào đang mở đăng ký.',
+                        style: const TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: <Widget>[
+                          for (final CompetitionOption c in items)
+                            ListTile(
+                              leading: Icon(
+                                  c.isPending
+                                      ? Icons.hourglass_top_rounded
+                                      : Icons.emoji_events_outlined,
+                                  color: c.isPending
+                                      ? const Color(0xFFB45309)
+                                      : const Color(0xFF4F46E5)),
+                              title: Text(c.title),
+                              subtitle: c.isPending
+                                  ? const Text('Bạn đã gửi, chờ admin xác minh')
+                                  : null,
+                              trailing: c.id == _competitionId
+                                  ? const Icon(Icons.check_rounded,
+                                      color: Color(0xFF4F46E5))
+                                  : null,
+                              onTap: () => Navigator.pop(ctx, c),
+                            ),
+                        ],
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  ListTile(
+                    key: const Key('suggest_competition'),
+                    leading: const Icon(Icons.add_link_rounded,
+                        color: Color(0xFF4F46E5)),
+                    title: const Text('Cuộc thi chưa có trong app?',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: const Text(
+                        'Dán link để admin xác minh trong vòng 12 giờ'),
+                    onTap: () async {
+                      final CompetitionOption? c =
+                          await _showSuggestCompetitionSheet();
+                      if (c != null && ctx.mounted) Navigator.pop(ctx, c);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Link + name + registration deadline of a competition that is not in the app yet.
+  Future<CompetitionOption?> _showSuggestCompetitionSheet() {
+    final TextEditingController link = TextEditingController();
+    final TextEditingController title = TextEditingController();
+    final TextEditingController organizer = TextEditingController();
+    DateTime? deadline;
+    String? error;
+    bool sending = false;
+
+    return showModalBottomSheet<CompetitionOption>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext ctx) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setSheet) {
+          Future<void> send() async {
+            final Uri? uri = Uri.tryParse(link.text.trim());
+            if (uri == null ||
+                !(uri.scheme == 'http' || uri.scheme == 'https') ||
+                uri.host.isEmpty) {
+              setSheet(() => error = 'Dán đường dẫn trang cuộc thi (http/https).');
+              return;
+            }
+            if (title.text.trim().length < 3) {
+              setSheet(() => error = 'Nhập tên cuộc thi (ít nhất 3 ký tự).');
+              return;
+            }
+            if (deadline == null) {
+              setSheet(() => error = 'Chọn hạn đăng ký của cuộc thi.');
+              return;
+            }
+            setSheet(() {
+              sending = true;
+              error = null;
+            });
+            final CompetitionOption? c =
+                await widget.viewModel.suggestCompetition(
+              sourceUrl: link.text,
+              title: title.text,
+              // End of the chosen day, so a deadline "today" is still in the future.
+              registerDeadline: DateTime(deadline!.year, deadline!.month,
+                  deadline!.day, 23, 59),
+              organizerName: organizer.text,
+            );
+            if (!ctx.mounted) return;
+            if (c == null) {
+              setSheet(() {
+                sending = false;
+                error = widget.viewModel.actionError ??
+                    'Không gửi được, thử lại sau.';
+              });
+              return;
+            }
+            Navigator.pop(ctx, c);
+            _showFeedbackSnackBar(
+                successMsg: c.isPending
+                    ? 'Đã gửi "${c.title}". Admin sẽ xác minh trong vòng 12 giờ.'
+                    : '"${c.title}" đã có trong app, đã chọn cuộc thi này.');
+          }
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, 18, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const Text('Gửi cuộc thi để admin duyệt',
+                      style:
+                          TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Admin sẽ xác minh trong vòng 12 giờ. Trong lúc chờ, bạn vẫn tạo được đội '
+                    'nhưng đội chỉ mình bạn thấy và chưa tuyển thành viên. Khi được duyệt, '
+                    'cuộc thi sẽ hiện chính thức ở tab Cơ hội.',
+                    style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 14),
+                  if (error != null) ...<Widget>[
+                    Text(error!,
+                        style: const TextStyle(
+                            color: AppColors.error, fontSize: 13)),
+                    const SizedBox(height: 8),
+                  ],
+                  TextField(
+                    key: const Key('suggest_link'),
+                    controller: link,
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(
+                        labelText: 'Link trang cuộc thi (*)',
+                        hintText: 'https://...'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    key: const Key('suggest_title'),
+                    controller: title,
+                    decoration:
+                        const InputDecoration(labelText: 'Tên cuộc thi (*)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: organizer,
+                    decoration: const InputDecoration(
+                        labelText: 'Đơn vị tổ chức (không bắt buộc)'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const Key('suggest_deadline'),
+                    icon: const Icon(Icons.event_rounded),
+                    label: Text(deadline == null
+                        ? 'Chọn hạn đăng ký (*)'
+                        : 'Hạn đăng ký: ${deadline!.day}/${deadline!.month}/${deadline!.year}'),
+                    onPressed: () async {
+                      final DateTime now = DateTime.now();
+                      final DateTime? d = await showDatePicker(
+                        context: context,
+                        firstDate: now,
+                        lastDate: DateTime(now.year + 3),
+                        initialDate: deadline ?? now,
+                      );
+                      if (d != null) setSheet(() => deadline = d);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    key: const Key('suggest_send'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: sending ? null : send,
+                    child: Text(sending ? 'Đang gửi...' : 'Gửi để duyệt'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1177,7 +1527,7 @@ class _TeamListViewState extends State<TeamListView> {
 
                         final bool ok = await widget.viewModel.updateTeam(
                           teamId: team.id,
-                          competitionId: widget.competitionId,
+                          competitionId: _competitionId,
                           name: name,
                           description: fullDesc,
                           minSize: minSize,
@@ -1247,7 +1597,7 @@ class _TeamListViewState extends State<TeamListView> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 final bool ok = await widget.viewModel
-                    .deleteTeam(team.id, widget.competitionId);
+                    .deleteTeam(team.id, _competitionId);
                 _showFeedbackSnackBar(
                   successMsg: ok ? widget.viewModel.actionFeedback : null,
                   errorMsg: !ok ? widget.viewModel.actionError : null,
@@ -1292,7 +1642,7 @@ class _TeamListViewState extends State<TeamListView> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 final bool ok = await widget.viewModel
-                    .leaveTeam(team.id, widget.competitionId);
+                    .leaveTeam(team.id, _competitionId);
                 _showFeedbackSnackBar(
                   successMsg: ok ? widget.viewModel.actionFeedback : null,
                   errorMsg: !ok ? widget.viewModel.actionError : null,
@@ -1358,7 +1708,7 @@ class _TeamListViewState extends State<TeamListView> {
                 final bool ok = await widget.viewModel.sendJoinRequest(
                   teamId: team.id,
                   message: msgController.text.trim(),
-                  competitionId: widget.competitionId,
+                  competitionId: _competitionId,
                 );
                 _showFeedbackSnackBar(
                   successMsg: ok ? widget.viewModel.actionFeedback : null,
@@ -1796,6 +2146,12 @@ class _TeamListViewState extends State<TeamListView> {
                 widget.viewModel.getJoinRequestsForTeam(team.id);
             final List<JoinRequestModel> pendingRequests =
                 allRequests.where((JoinRequestModel r) => r.isPending).toList();
+            // A request disappears from "pending" when the applicant withdraws it, joins or
+            // creates another team; list it with its status so the leader is not left guessing.
+            final List<JoinRequestModel> handledRequests = allRequests
+                .where((JoinRequestModel r) => !r.isPending)
+                .take(10)
+                .toList();
 
             return SafeArea(
               child: Padding(
@@ -1825,11 +2181,14 @@ class _TeamListViewState extends State<TeamListView> {
                     ),
                     const SizedBox(height: 14),
                     if (pendingRequests.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Center(
-                          child: Text('Chưa có yêu cầu gia nhập nào.',
-                              style: TextStyle(color: Color(0xFF64748B))),
+                          child: Text(
+                              handledRequests.isEmpty
+                                  ? 'Chưa có yêu cầu gia nhập nào.'
+                                  : 'Không có yêu cầu nào đang chờ duyệt.',
+                              style: const TextStyle(color: Color(0xFF64748B))),
                         ),
                       )
                     else
@@ -1868,7 +2227,7 @@ class _TeamListViewState extends State<TeamListView> {
                                         teamId: team.id,
                                         requestId: req.id,
                                         decision: 'REJECT',
-                                        competitionId: widget.competitionId,
+                                        competitionId: _competitionId,
                                       );
                                     },
                                     child: const Text('Từ chối',
@@ -1885,7 +2244,7 @@ class _TeamListViewState extends State<TeamListView> {
                                         teamId: team.id,
                                         requestId: req.id,
                                         decision: 'ACCEPT',
-                                        competitionId: widget.competitionId,
+                                        competitionId: _competitionId,
                                       );
                                     },
                                     child: const Text('Chấp nhận',
@@ -1897,6 +2256,16 @@ class _TeamListViewState extends State<TeamListView> {
                           ),
                         );
                       }),
+                    if (handledRequests.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 8),
+                      const Text('Đã xử lý gần đây',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B))),
+                      const SizedBox(height: 6),
+                      ...handledRequests.map(_buildHandledRequestRow),
+                    ],
                   ],
                 ),
               ),
@@ -1904,6 +2273,38 @@ class _TeamListViewState extends State<TeamListView> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildHandledRequestRow(JoinRequestModel req) {
+    final String name = (req.applicant?.fullName ?? '').isNotEmpty
+        ? req.applicant!.fullName
+        : 'Sinh viên chưa cập nhật tên';
+    // WITHDRAWN covers both "rút yêu cầu" and the automatic cancel when they created or
+    // joined another team in this competition.
+    final String status = req.isWithdrawn
+        ? 'Đã rút / vào đội khác'
+        : req.statusDisplay;
+    final Color color = req.isAccepted
+        ? const Color(0xFF16A34A)
+        : req.isRejected
+            ? const Color(0xFFDC2626)
+            : const Color(0xFF64748B);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(name,
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155)),
+                overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: 8),
+          Text(status,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ],
+      ),
     );
   }
 
@@ -2039,12 +2440,29 @@ class _TeamListViewState extends State<TeamListView> {
         scrolledUnderElevation: 1.0,
         leading: const BackButton(color: Color(0xFF0F172A)),
         titleSpacing: 0,
-        title: Text(
-          widget.competitionTitle,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0F172A),
+        title: InkWell(
+          key: const Key('team_competition_picker'),
+          onTap: () async {
+            final CompetitionOption? c = await _showCompetitionPicker();
+            if (c != null) _selectCompetition(c);
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  _competitionTitle,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_drop_down_rounded,
+                  color: Color(0xFF0F172A)),
+            ],
           ),
         ),
         actions: <Widget>[
@@ -2089,13 +2507,11 @@ class _TeamListViewState extends State<TeamListView> {
           final String query = _searchController.text.trim();
 
           // Filtering
-          final List<TeamModel> filteredTeams =
-              widget.viewModel.teams.where((TeamModel t) {
-            if (_selectedContext == 'MY_TEAMS') {
-              final bool isMyTeam = currentUserId != null &&
-                  (t.isMember(currentUserId) || t.isLeader(currentUserId));
-              if (!isMyTeam) return false;
-            }
+          // "Đội của tôi" lists my teams in every competition; "Tìm đội" the chosen one.
+          final List<TeamModel> filteredTeams = (_selectedContext == 'MY_TEAMS'
+                  ? widget.viewModel.myTeams
+                  : widget.viewModel.teams)
+              .where((TeamModel t) {
 
             if (_statusFilter == 'FORMING' && t.isFull) return false;
             if (_statusFilter == 'FULL' && !t.isFull) return false;
@@ -2130,7 +2546,7 @@ class _TeamListViewState extends State<TeamListView> {
                 child: filteredTeams.isEmpty
                     ? RefreshIndicator(
                         onRefresh: () =>
-                            widget.viewModel.loadTeams(widget.competitionId),
+                            widget.viewModel.loadTeams(_competitionId),
                         color: const Color(0xFF4338CA),
                         child: ListView(
                           children: <Widget>[
@@ -2140,7 +2556,9 @@ class _TeamListViewState extends State<TeamListView> {
                                 icon: Icons.groups_outlined,
                                 title: _selectedContext == 'MY_TEAMS'
                                     ? 'Bạn chưa tham gia đội thi nào'
-                                    : 'Không tìm thấy đội thi phù hợp',
+                                    : _competitionId.isEmpty
+                                        ? 'Chọn cuộc thi để tìm đội'
+                                        : 'Không tìm thấy đội thi phù hợp',
                                 message: _selectedContext == 'MY_TEAMS'
                                     ? 'Hãy chuyển sang tab "Tìm đội" để xin vào đội, hoặc tự tạo đội mới.'
                                     : 'Hãy thử thay đổi từ khóa hoặc đặt lại bộ lọc để tìm kiếm.',
@@ -2151,7 +2569,7 @@ class _TeamListViewState extends State<TeamListView> {
                       )
                     : RefreshIndicator(
                         onRefresh: () =>
-                            widget.viewModel.loadTeams(widget.competitionId),
+                            widget.viewModel.loadTeams(_competitionId),
                         color: const Color(0xFF4338CA),
                         child: ListView.separated(
                           padding: const EdgeInsets.only(bottom: 24),
@@ -2474,12 +2892,28 @@ class _TeamListViewState extends State<TeamListView> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          widget.competitionTitle,
+                          team.competitionTitle ?? _competitionTitle,
                           style: const TextStyle(
                             fontSize: 12.5,
                             color: Color(0xFF64748B),
                           ),
                         ),
+                        if (team.isCompetitionPending)
+                          const Text(
+                            'Cuộc thi chờ admin xác minh (tối đa 12 giờ) · chưa tuyển thành viên',
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFB45309)),
+                          )
+                        else if (team.isCompetitionRejected)
+                          const Text(
+                            'Cuộc thi không được duyệt · hãy giải tán đội và tạo lại với cuộc thi khác',
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFDC2626)),
+                          ),
                       ],
                     ),
                   ),
@@ -2668,12 +3102,13 @@ class _TeamListViewState extends State<TeamListView> {
               padding: const EdgeInsets.only(top: 8.0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 130),
+                child: SizedBox(
+                  // Full card width; a 16:9 box capped at this height left a gap on the right.
+                  width: double.infinity,
+                  height: 130,
                   child: Stack(
                     children: <Widget>[
-                      AspectRatio(
-                        aspectRatio: 16 / 9,
+                      SizedBox.expand(
                         child: AppNetworkOrBase64Image(
                           src: team.bannerImageUrl,
                           fit: BoxFit.cover,

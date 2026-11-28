@@ -227,6 +227,10 @@ class InMemoryTeamRepository implements ITeamRepository {
     }
     return null;
   }
+  async findByMember(studentId: string): Promise<Team[]> {
+    return Array.from(this.teams.values()).filter((t) => t.members.some((m) => m.studentId === studentId));
+  }
+
   async findPendingJoinRequestsByApplicant(applicantId: string): Promise<JoinRequest[]> {
     return Array.from(this.joinRequests.values()).filter(
       (r) => r.props.applicantId === applicantId && r.props.status === 'PENDING',

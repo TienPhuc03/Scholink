@@ -10,6 +10,7 @@ export default function ReviewQueue({ user, q }) {
   const toast = useToast();
   const [type, setType] = useState('');
   const [fuzzyOnly, setFuzzyOnly] = useState(false);
+  const [studentOnly, setStudentOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(new Set());
   const [rejecting, setRejecting] = useState(null); // opp | 'BULK'
@@ -22,8 +23,10 @@ export default function ReviewQueue({ user, q }) {
     if (type) p.set('type', type);
     if (q) p.set('search', q);
     if (fuzzyOnly) p.set('fuzzyOnly', 'true');
+    if (studentOnly) p.set('origin', 'STUDENT');
     return get(`${BASE}/review-queue?${p}`);
-  }, [page, type, q, fuzzyOnly]);
+  }, [page, type, q, fuzzyOnly, studentOnly]);
+  const overdue = state.data?.overdueStudentCount || 0;
 
   const items = state.data?.items || [];
   const refresh = () => { setSelected(new Set()); state.reload(); };
@@ -47,10 +50,17 @@ export default function ReviewQueue({ user, q }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">Kiểm duyệt cơ hội</h1>
-          <p className="page-sub">Hàng chờ <span className="mono">PENDING_REVIEW</span> từ crawler — duyệt, từ chối hoặc gộp bản trùng.</p>
+          <p className="page-sub">Hàng chờ <span className="mono">PENDING_REVIEW</span> từ crawler và sinh viên đề xuất (cam kết duyệt trong 12 giờ) — duyệt, từ chối hoặc gộp bản trùng.</p>
         </div>
         <button className="btn btn-neutral" onClick={refresh} disabled={state.loading}><RefreshCw size={16} /> Làm mới</button>
       </div>
+
+      {overdue > 0 && (
+        <div className="card" role="alert" style={{ borderColor: 'var(--error)', color: 'var(--error)', fontWeight: 600, marginBottom: 12, padding: '10px 14px' }}>
+          {overdue} cuộc thi do sinh viên đề xuất đã chờ quá 12 giờ. Đội của họ chưa tuyển được thành viên cho tới khi được duyệt.{' '}
+          {!studentOnly && <button className="btn btn-sm btn-neutral" onClick={() => { setStudentOnly(true); setPage(1); }}>Xem ngay</button>}
+        </div>
+      )}
 
       <section className="card">
         <div className="filters">
@@ -61,6 +71,9 @@ export default function ReviewQueue({ user, q }) {
           </div>
           <label className="row" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-3)' }}>
             <input type="checkbox" checked={fuzzyOnly} onChange={(e) => { setFuzzyOnly(e.target.checked); setPage(1); }} /> Chỉ hiện nghi trùng
+          </label>
+          <label className="row" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-3)' }}>
+            <input type="checkbox" checked={studentOnly} onChange={(e) => { setStudentOnly(e.target.checked); setPage(1); }} /> Sinh viên đề xuất
           </label>
           <span className="spacer" style={{ flex: 1 }} />
           <span className="muted num">{state.data?.total ?? 0} đang chờ</span>
@@ -83,6 +96,14 @@ export default function ReviewQueue({ user, q }) {
                         <td style={{ maxWidth: 380 }}>
                           <div className="entity-name">{o.title}</div>
                           <div className="entity-sub">{o.organizerName} · <span className="mono">{o.id}</span></div>
+                          {o.fromStudent && (
+                            <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                              <Pill tone={o.overdue ? 'error' : 'warning'}>
+                                Sinh viên đề xuất · chờ {o.waitingHours} giờ{o.overdue ? ' (quá 12 giờ)' : ''}
+                              </Pill>
+                              {o.sourceUrl && <a href={o.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>Mở trang cuộc thi để xác minh</a>}
+                            </div>
+                          )}
                         </td>
                         <td><span className="chip">{TYPE_LABEL[o.type] || o.type}</span></td>
                         <td className="num">{fmtDate(o.registerDeadline)}</td>

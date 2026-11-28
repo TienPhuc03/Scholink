@@ -24,6 +24,8 @@ import {
   CreateOpportunityDtoSchema,
   QueryOpportunityDto,
   QueryOpportunityDtoSchema,
+  SuggestCompetitionDto,
+  SuggestCompetitionDtoSchema,
 } from "../application/dtos/opportunity.dto";
 import {
   ZodValidationPipe,
@@ -93,6 +95,26 @@ export class OpportunityController {
     query: QueryOpportunityDto,
   ) {
     return this.opportunityUseCase.list(query);
+  }
+
+  @Post('suggestions')
+  @ApiBearerAuth()
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Sinh viên đề xuất một cuộc thi chưa có trong app (vào hàng chờ admin duyệt)' })
+  @ApiResponse({ status: 201, description: 'Cuộc thi PENDING_REVIEW (hoặc cuộc thi đã có cùng đường dẫn)' })
+  async suggestCompetition(
+    @Req() req: { user: AuthenticatedUser },
+    @Body(new ZodValidationPipe(SuggestCompetitionDtoSchema)) dto: SuggestCompetitionDto,
+  ) {
+    return this.opportunityUseCase.suggestCompetition(req.user.userId, dto);
+  }
+
+  @Get('suggestions/me')
+  @ApiBearerAuth()
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Các cuộc thi tôi đã đề xuất và kết quả duyệt' })
+  async mySuggestions(@Req() req: { user: AuthenticatedUser }) {
+    return this.opportunityUseCase.mySuggestions(req.user.userId);
   }
 
   @Get('organizer/my-opportunities')

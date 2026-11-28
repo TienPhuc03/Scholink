@@ -34,6 +34,10 @@ import {
 } from '../infrastructure/persistence/application.schema';
 import { OpportunityType } from '../domain/opportunity.entity';
 
+/** Matches OpportunityUseCase.STUDENT_ORIGIN (competitions suggested from the app). */
+const STUDENT_ORIGIN = 'STUDENT_SUGGESTION';
+const REVIEW_SLA_MS = 12 * 60 * 60 * 1000;
+
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
@@ -128,6 +132,7 @@ export class AdminOpportunityController {
     @Query('page') pageStr?: string,
     @Query('limit') limitStr?: string,
     @Query('fuzzyOnly') fuzzyOnly?: string,
+    @Query('origin') origin?: string,
   ) {
     const page = Math.max(Number(pageStr) || 1, 1);
     const limit = Math.min(Math.max(Number(limitStr) || 20, 1), 100);
@@ -142,6 +147,7 @@ export class AdminOpportunityController {
     if (fuzzyOnly === 'true') {
       query.candidateMergeIds = { $exists: true, $not: { $size: 0 } };
     }
+    if (origin === 'STUDENT') query['rawPayload.origin'] = STUDENT_ORIGIN;
 
     const [items, total] = await Promise.all([
       this.opportunityModel
@@ -154,13 +160,50 @@ export class AdminOpportunityController {
       this.opportunityModel.countDocuments(query).exec(),
     ]);
 
+    // Student suggestions are promised a decision within 12 h; flag the ones past it.
+    const now = Date.now();
+    const overdueStudentCount = await this.opportunityModel
+      .countDocuments({
+        status: 'PENDING_REVIEW',
+        'rawPayload.origin': STUDENT_ORIGIN,
+        createdAt: { $lte: new Date(now - REVIEW_SLA_MS) },
+      })
+      .exec();
     return {
-      items,
+      items: items.map((it: any) => {
+        const fromStudent = it.rawPayload?.origin === STUDENT_ORIGIN;
+        const waitingMs = it.createdAt ? now - new Date(it.createdAt).getTime() : 0;
+        return {
+          ...it,
+          fromStudent,
+          waitingHours: Math.floor(waitingMs / 3_600_000),
+          overdue: fromStudent && waitingMs >= REVIEW_SLA_MS,
+        };
+      }),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      overdueStudentCount,
     };
+  }
+
+  /** Tells the student who suggested [opp] how the review ended (no-op for other items). */
+  private async notifySuggester(opp: any, approved: boolean, reason?: string): Promise<void> {
+    const studentId = opp.rawPayload?.origin === STUDENT_ORIGIN ? opp.rawPayload?.submittedBy : undefined;
+    if (!studentId) return;
+    await this.dispatchNotificationEvent('/api/v1/notifications/transactional', {
+      userId: studentId,
+      businessKey: `competition_suggestion:${opp.id}:${approved ? 'approved' : 'rejected'}`,
+      type: 'TEAM_COMPETITION_REVIEW',
+      title: approved
+        ? `Cuộc thi "${opp.title}" đã được duyệt`
+        : `Cuộc thi "${opp.title}" không được duyệt`,
+      body: approved
+        ? 'Đội của bạn đã có thể tuyển thành viên.'
+        : `Lý do: ${reason || 'không xác minh được cuộc thi'}. Bạn có thể chọn cuộc thi khác cho đội.`,
+      refUrl: '/teams/me', // opens the Đội thi tab
+    });
   }
 
   /**
@@ -369,6 +412,7 @@ export class AdminOpportunityController {
     this.eventEmitter.emit('opportunity.published', eventPayload);
     await this.dispatchNotificationEvent('/api/v1/notifications/events/opportunity-published', eventPayload);
     await this.crawlerUseCase.recordPublishedItem((opp as any).crawlerSourceId);
+    await this.notifySuggester(opp, true);
 
     return opp;
   }
@@ -414,6 +458,7 @@ export class AdminOpportunityController {
     });
     await revision.save();
     await this.crawlerUseCase.recordRejectedItem((opp as any).crawlerSourceId);
+    await this.notifySuggester(opp, false, body.reason);
 
     return {
       success: true,

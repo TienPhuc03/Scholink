@@ -27,6 +27,18 @@ class TeamViewModel extends BaseViewModel {
       <String, JoinRequestModel>{};
 
   List<TeamModel> get teams => _teams;
+
+  /// My teams in every competition ("Đội của tôi").
+  List<TeamModel> _myTeams = <TeamModel>[];
+  List<TeamModel> get myTeams => _myTeams;
+
+  /// Competitions a team can be formed for (catalog + my suggestions under review).
+  List<CompetitionOption> _competitions = <CompetitionOption>[];
+  List<CompetitionOption> get competitions => _competitions;
+  bool _competitionsLoaded = false;
+  bool get competitionsLoaded => _competitionsLoaded;
+  String? _competitionsError;
+  String? get competitionsError => _competitionsError;
   String? get currentUserId => _currentUserId;
   String? get actionFeedback => _actionFeedback;
   String? get actionError => _actionError;
@@ -66,13 +78,82 @@ class TeamViewModel extends BaseViewModel {
     return rawMessage;
   }
 
+  Future<void> loadCompetitions() async {
+    final Result<List<CompetitionOption>, Failure> result =
+        await _repository.getCompetitions();
+    result.fold<void>(
+      onSuccess: (List<CompetitionOption> data) {
+        _competitions = data;
+        _competitionsError = null;
+      },
+      onFailure: (Failure f) => _competitionsError = f.message,
+    );
+    _competitionsLoaded = true;
+    notifyListeners();
+  }
+
+  Future<void> loadMyTeams() async {
+    if (_currentUserId == null) return;
+    final Result<List<TeamModel>, Failure> result =
+        await _repository.getMyTeams();
+    result.fold<void>(
+      onSuccess: (List<TeamModel> data) {
+        _myTeams = data;
+        notifyListeners();
+      },
+      onFailure: (_) {}, // keep the last list; the competition list still works
+    );
+  }
+
+  /// Sends a competition that is not in the app for admin review. Returns it (pending, or the
+  /// existing one with the same link) so the caller can create the team for it right away.
+  Future<CompetitionOption?> suggestCompetition({
+    required String sourceUrl,
+    required String title,
+    required DateTime registerDeadline,
+    String? organizerName,
+  }) async {
+    _actionError = null;
+    final Result<CompetitionOption, Failure> result =
+        await _repository.suggestCompetition(
+      sourceUrl: sourceUrl,
+      title: title,
+      registerDeadline: registerDeadline,
+      organizerName: organizerName,
+    );
+    return result.fold<CompetitionOption?>(
+      onSuccess: (CompetitionOption c) {
+        _competitions = <CompetitionOption>[
+          c,
+          ..._competitions.where((CompetitionOption o) => o.id != c.id),
+        ];
+        notifyListeners();
+        return c;
+      },
+      onFailure: (Failure f) {
+        _actionError = f.message;
+        notifyListeners();
+        return null;
+      },
+    );
+  }
+
+  /// [competitionId] empty: no competition chosen yet, only "Đội của tôi" is loaded.
   Future<void> loadTeams(String competitionId) async {
     // Feedback is not cleared here: actions call loadTeams right before the view reads it.
     setLoading();
     await initUser();
+    final Future<void> mine = loadMyTeams();
+    if (competitionId.isEmpty) {
+      _teams = <TeamModel>[];
+      await mine;
+      setSuccess();
+      return;
+    }
 
     final Result<List<TeamModel>, Failure> result =
         await _repository.getTeamsByCompetition(competitionId);
+    await mine;
     if (_currentUserId != null) await _loadMyRequests();
 
     result.fold<void>(
@@ -81,7 +162,7 @@ class TeamViewModel extends BaseViewModel {
         setSuccess();
         // Automatically fetch join requests for teams where current user is Leader
         if (_currentUserId != null) {
-          for (final TeamModel t in _teams) {
+          for (final TeamModel t in <TeamModel>{..._teams, ..._myTeams}) {
             if (t.isLeader(_currentUserId!)) {
               loadJoinRequests(t.id);
             }

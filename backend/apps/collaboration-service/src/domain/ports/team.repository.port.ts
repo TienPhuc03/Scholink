@@ -13,6 +13,8 @@ export interface ActiveMembershipRecord {
 
 export interface ITeamRepository {
   findById(id: string): Promise<Team | null>;
+  /** Teams the student is in, across all competitions (newest first). */
+  findByMember(studentId: string): Promise<Team[]>;
   findByCompetitionAndStudent(competitionId: string, studentId: string): Promise<Team | null>;
   findManyByCompetition(
     competitionId: string,

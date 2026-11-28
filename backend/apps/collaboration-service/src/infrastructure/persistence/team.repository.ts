@@ -77,6 +77,15 @@ export class MongooseTeamRepository implements ITeamRepository {
     return this.toDomain(doc);
   }
 
+  async findByMember(studentId: string): Promise<Team[]> {
+    const docs = await this.teamModel
+      .find({ 'members.studentId': studentId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .exec();
+    return docs.map((d) => this.toDomain(d));
+  }
+
   async findManyByCompetition(
     competitionId: string,
     options?: { limit?: number; cursor?: string },
@@ -98,6 +107,7 @@ export class MongooseTeamRepository implements ITeamRepository {
     await this.teamModel.create({
       id: team.id,
       competitionId: team.competitionId,
+      competitionTitle: team.props.competitionTitle,
       name: team.props.name,
       description: team.props.description,
       leaderId: team.leaderId,
@@ -548,6 +558,7 @@ export class MongooseTeamRepository implements ITeamRepository {
   private toDomain(doc: TeamDocument): Team {
     return new Team(doc.id, {
       competitionId: doc.competitionId,
+      competitionTitle: doc.competitionTitle,
       name: doc.name,
       description: doc.description,
       leaderId: doc.leaderId,

@@ -10,6 +10,8 @@ export interface TeamMember {
 
 export interface TeamProps {
   competitionId: string;
+  /** Copied at creation so lists can show it without asking Catalog for every team. */
+  competitionTitle?: string;
   name: string;
   description?: string;
   leaderId: string;

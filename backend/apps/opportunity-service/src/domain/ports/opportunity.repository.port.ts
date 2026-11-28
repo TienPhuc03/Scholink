@@ -10,6 +10,9 @@ export interface OpportunityFilter {
   /** BR11: only opportunities whose registerDeadline is still ahead of [now]. */
   openOnly?: boolean;
   now?: Date;
+  sourceUrl?: string;
+  createdBy?: string;
+  createdAfter?: Date;
   limit?: number;
   /** Keyset cursor: the last item of the previous page (sorted by registerDeadline, id). */
   cursor?: string;

@@ -49,6 +49,14 @@ export class TeamController {
     return this.teamUseCase.updateTeam(teamId, req.user.userId, dto);
   }
 
+  @Get('me')
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Các đội của tôi ở mọi cuộc thi (kèm trạng thái duyệt của cuộc thi)' })
+  @ApiResponse({ status: 200, description: 'Danh sách đội' })
+  async getMyTeams(@Req() req: { user: AuthenticatedUser }) {
+    return this.teamUseCase.getMyTeams(req.user.userId);
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết đội thi' })

@@ -106,6 +106,30 @@ export class GatewayOpportunityController implements OnModuleInit {
     });
   }
 
+  // ============ Sinh viên đề xuất cuộc thi chưa có trong app (admin duyệt) ============
+
+  @Post('suggestions')
+  @ApiBearerAuth()
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Đề xuất cuộc thi bằng đường dẫn; vào hàng chờ admin duyệt' })
+  async suggestCompetition(@Headers('authorization') auth: string, @Body() body: unknown) {
+    return forwardOpportunity('/api/v1/opportunities/suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
+  @Get('suggestions/me')
+  @ApiBearerAuth()
+  @Roles('STUDENT')
+  @ApiOperation({ summary: 'Các cuộc thi tôi đã đề xuất và kết quả duyệt' })
+  async mySuggestions(@Headers('authorization') auth: string) {
+    return forwardOpportunity('/api/v1/opportunities/suggestions/me', {
+      headers: { Authorization: auth },
+    });
+  }
+
   // ================= F14 / OPP-06: Bookmark (forward HTTP to Opportunity Service) =================
 
   @Get('bookmarks/me')
