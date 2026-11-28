@@ -181,9 +181,11 @@ export class ReverseProxyMiddleware implements NestMiddleware {
       }
     }
 
-    // Prepare body if parsed
+    // Prepare body if parsed. Once body-parser has drained the stream, an empty `{}` must be
+    // re-sent too: piping the drained stream sends nothing while Content-Length still says
+    // otherwise, so the service waits until the 30 s timeout ("socket hang up").
     let bodyData: string | Buffer | null = null;
-    if (req.body && Object.keys(req.body).length > 0) {
+    if (req.body != null && (req.readableEnded || Object.keys(req.body).length > 0)) {
       if (Buffer.isBuffer(req.body)) {
         bodyData = req.body;
       } else if (typeof req.body === 'string') {

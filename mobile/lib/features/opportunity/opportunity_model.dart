@@ -409,6 +409,7 @@ class OpportunityModel {
     int? version,
     bool? isBookmarked,
     bool? isExternalMarked,
+    bool? isPromoted,
   }) {
     return OpportunityModel(
       id: id ?? this.id,
